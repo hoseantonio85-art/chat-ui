@@ -1,0 +1,38 @@
+{
+  "name": "norm-universal-agent-ui-pilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 4410 --strictPort",
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.activity.json"
+  },
+  "dependencies": {
+    "@reatom/framework": "3.4.52",
+    "@reatom/npm-react": "3.4.2",
+    "classnames": "2.5.1",
+    "d3": "7.9.0",
+    "exceljs": "4.4.0",
+    "file-saver": "2.0.5",
+    "html2canvas": "1.4.1",
+    "i18next": "23.16.5",
+    "i18next-browser-languagedetector": "8.0.0",
+    "mobile-detect": "1.4.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-i18next": "15.1.1",
+    "uuid": "8.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.3",
+    "sass": "1.81.0",
+    "typescript": "5.7.3",
+    "vite": "5.4.21",
+    "vitest": "3.0.4"
+  }
+}

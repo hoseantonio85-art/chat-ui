@@ -1,0 +1,209 @@
+.chat {
+  padding: 32px 40px 40px;
+
+  height: 100%;
+  width: 1320px;
+  min-width: 400px;
+
+  display: flex;
+  flex-direction: column;
+
+  border-radius: 24px;
+  background-color: var(--backgroundBasicDefault);
+  box-shadow:
+    0 0 1px 0 rgba(36, 41, 46, 0.32),
+    0 16px 24px 0 rgba(36, 41, 46, 0.12);
+  transition: width 0.3s;
+  position: relative;
+
+  &Small {
+    width: 468px;
+    align-self: flex-end;
+    overflow: hidden;
+    transition:
+      width 0.3s,
+      min-width 0.3s,
+      height 0.3s;
+
+    .title {
+      width: 60px;
+    }
+  }
+}
+
+.header {
+  margin-bottom: 24px;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+
+  &ButtonIcon {
+    background-color: var(--backgroundSecondaryDefault);
+    border-radius: 20px;
+    padding: 8px;
+    height: 40px;
+    margin-left: 8px;
+  }
+
+  &Divider {
+    width: 1px;
+    height: 20px;
+    background-color: var(--textBaseDefault);
+  }
+}
+
+.headerLeading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  > button { flex-shrink: 0; }
+}
+
+.navigationDivider {
+  width: 1px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: var(--textBaseDefault);
+}
+
+@media (max-width: 599px) {
+  .headerLeading { gap: 8px; }
+}
+
+.title {
+  min-height: 40px;
+
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  &Logo {
+    margin-right: 20px;
+
+    height: 40px;
+    width: 40px;
+  }
+
+  &Text {
+    white-space: nowrap;
+  }
+}
+
+.headerButton {
+  width: 40px;
+  height: 40px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    background-color: rgba(9, 32, 55, 0.13);
+    transition: background-color 0.3s;
+  }
+
+  &:not(:hover) {
+    background-color: rgba(5, 38, 88, 0.06);
+    transition: background-color 0.3s;
+  }
+}
+
+.content {
+  margin-right: -40px;
+  padding-right: 40px;
+
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.messages {
+  margin-right: -40px;
+  padding-right: 24px;
+  margin-bottom: 24px;
+
+  white-space: pre-line;
+
+  display: flex;
+  flex-direction: column-reverse;
+  flex-grow: 1;
+  gap: 8px;
+
+  overflow-y: scroll;
+  overflow-x: hidden;
+
+  &::-webkit-scrollbar {
+    width: 16px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--backgroundBasicDefault);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--scrollDefault);
+    border: 4px solid transparent;
+    border-radius: 8px;
+    background-clip: padding-box;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollHover);
+  }
+}
+
+.message {
+  padding: 16px;
+  max-width: calc(100% - 32px);
+
+  &Loader {
+    width: 49px;
+
+    &> :first-child {
+      animation: dots 1.5s steps(1) infinite;
+
+      @keyframes dots {
+        0% {
+          clip-path: inset(0 18px 0 0);
+        }
+
+        25% {
+          clip-path: inset(0 12px 0 0);
+        }
+
+        50% {
+          clip-path: inset(0 6px 0 0);
+        }
+
+        75% {
+          clip-path: inset(0 0 0 0);
+        }
+      }
+    }
+  }
+
+  &User {
+    align-self: end;
+
+    background-color: #f0f2f5;
+    border-radius: 24px 24px 4px 24px;
+  }
+
+  &Bot {
+    align-self: start;
+
+    background: linear-gradient(to right, #e0f9ed, #ddf8fb);
+    border-radius: 24px 24px 24px 4px;
+  }
+}

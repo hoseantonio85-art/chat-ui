@@ -1,0 +1,9 @@
+.root { position: relative; }
+.trigger { white-space: nowrap; }
+.chip { min-height: 32px; padding: 5px 8px 5px 10px; display: inline-flex; align-items: center; gap: 6px; color: var(--textBaseDefault); background: var(--backgroundSecondaryDefault); border-radius: 10px; font-size: 14px; font-weight: 600; }
+.chip > span { color: #1a9464; }
+.chip button { padding: 2px; display: inline-flex; color: inherit; border: 0; background: transparent; cursor: pointer; }
+.menu { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 10; min-width: 260px; padding: 8px; display: grid; gap: 4px; background: var(--backgroundBasicDefault); border-radius: 14px; box-shadow: 0 8px 28px rgba(9,32,55,.16); }
+.menu button { padding: 10px 12px; display: grid; gap: 3px; text-align: left; color: inherit; border: 0; border-radius: 10px; background: transparent; cursor: pointer; }
+.menu button:hover { background: var(--backgroundSecondaryDefault); }
+.menu span { color: var(--textBaseSecondary); font-size: 12px; }

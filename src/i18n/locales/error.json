@@ -1,0 +1,9 @@
+{
+	"Field is required": "Поле обязательно для заполнения",
+	"File is required": "Для продолжения загрузите файлы",
+	"File extensions not supported": "Расширение файла не поддерживается",
+	"File with this name already exists": "Файл с таким именем уже есть",
+	"File is too big": "Файл слишком большой, пожалуйста, выберите файл размером менее {{fileSize}} МБ.",
+	"File name more then characters": "Наименование файла превышает {{fileNameLength}} символов.",
+	"file will not be processed": "Файл заблокирован антивирусом"
+}

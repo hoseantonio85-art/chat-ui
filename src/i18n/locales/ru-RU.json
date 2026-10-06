@@ -1,0 +1,14 @@
+{
+	"defaultPlaceholder": "Чем я могу помочь?",
+	"modalTitle": "Норм на связи",
+	"modalPlaceholder": "Я твой ИИ помощник",
+	"openForm": "Открыть форму",
+	"send": "Отправить",
+	"error": "Ошибка",
+	"clearContextSuccess": "Контекст диалога очищен",
+	"clearContextHint": "Очистить контекст диалога",
+	"download": "Скачать",
+	"failDownload": "Не удалось скачать график",
+	"chartNotFound": "График не найден",
+	"fileUploadError": "Ошибка загрузки файла"
+}

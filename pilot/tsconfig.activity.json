@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "lib": ["ES2022", "DOM"], "module": "ESNext", "moduleResolution": "Bundler",
+    "jsx": "react-jsx", "strict": true, "noEmit": true, "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".", "types": ["vite/client"],
+    "paths": {
+      "@/*": ["../src/*"],
+      "@sber-orm/ui-kit": ["vendor/ui-kit/dist/index.d.ts"],
+      "react": ["node_modules/@types/react"],
+      "react/*": ["node_modules/@types/react/*"],
+      "vitest": ["node_modules/vitest"]
+    }
+  },
+  "include": ["../src/@types/**/*.d.ts", "../src/components/AgentActivity/**/*.ts", "../src/components/AgentActivity/**/*.tsx", "../src/components/ChatLogoSVG/**/*.tsx"]
+}

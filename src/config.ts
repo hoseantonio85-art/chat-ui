@@ -1,0 +1,63 @@
+// Fetch config variables defined in window.*
+const environmentSettings = window;
+
+export const Config = {
+	clickStreamEnabled: environmentSettings.STAND_TYPE === 'PROM',
+	clickStreamKey: environmentSettings.SBERNORM_CLICKSTREAM_KEY,
+	clickStreamUrl: environmentSettings.SBERNORM_CLICKSTREAM_URL,
+	filesUploadEnabled: !!environmentSettings.FF_CHAT_ATTACHMENTS_ENABLED,
+};
+
+export const ALLOWED_EXTENSIONS = [
+	'.arj',
+	'.bmp',
+	'.csv',
+	'.doc',
+	'.docm',
+	'.docx',
+	'.dot',
+	'.dotm',
+	'.eml',
+	'.gif',
+	'.htm',
+	'.html',
+	'.ics',
+	'.jpeg',
+	'.jpg',
+	'.m4a',
+	'.mdi',
+	'.mht',
+	'.mp3',
+	'.mp4',
+	'.msg',
+	'.odg',
+	'.ods',
+	'.odt',
+	'.oft',
+	'.pdf',
+	'.png',
+	'.ppdf',
+	'.ppt',
+	'.pptm',
+	'.pptx',
+	'.ps',
+	'.rar',
+	'.rtf',
+	'.tif',
+	'.tiff',
+	'.txt',
+	'.vsd',
+	'.wav',
+	'.xls',
+	'.xlsb',
+	'.xlsm',
+	'.xlsx',
+	'.xlt',
+	'.xltm',
+	'.xltx',
+	'.zip',
+	'.z01',
+];
+
+export const MAX_FILE_SIZE = 15 * 1024 * 1024;
+export const MAX_FILE_NAME_LENGTH = 200;

@@ -1,0 +1,120 @@
+.textarea {
+  padding: 16px 12px;
+
+  width: 100%;
+  height: 22px;
+  max-height: 304px;
+  box-sizing: content-box;
+
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+
+  white-space: pre-line;
+
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: inherit;
+  line-height: 22px;
+  border: none;
+  border-radius: 20px;
+  resize: none;
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &::placeholder {
+    color: var(--textBaseDisabled);
+  }
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.size-sm {
+  height: 22px;
+}
+
+.size-md {
+  height: 22px;
+}
+
+.buttonAlign {
+  align-self: end;
+  margin: auto 0 !important;
+}
+
+.wrapper {
+  width: 100%;
+  padding: 4px;
+
+  position: relative;
+
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: start;
+
+  font-weight: 500;
+  background-color: var(--backgroundBasicDefault);
+  border-radius: 20px;
+  border: 4px solid var(--borderFocus);
+
+  &Shadowed {
+    padding: 4px 8px;
+
+    border: none;
+    box-shadow: 0 0 114px 0 rgba(50, 213, 141, 0.25);
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 4px;
+      background: linear-gradient(to right, #32d583 20%, #1bd0ee 100%);
+      mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+      -webkit-mask-composite: destination-out;
+      mask-composite: exclude;
+      border-radius: 20px;
+    }
+
+    .fileButton {
+      margin-bottom: 4px !important;
+    }
+  }
+}
+
+.white {
+  color: var(--textBaseInverse) !important;
+}
+
+.fileButton {
+  align-self: end;
+}
+
+.file {
+  max-width: 440px;
+  width: auto !important;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+
+.fileList {
+  @extend .fullWidth;
+
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+
+  max-height: 128px;
+  width: 100%;
+}

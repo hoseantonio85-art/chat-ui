@@ -1,0 +1,53 @@
+.wrapper {
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+
+  display: flex;
+  justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  z-index: 999;
+
+  &WithBackground {
+    background-color: rgba(36, 40, 43, 0.56);
+  }
+
+  &ChatRight {
+    left: unset;
+    right: 0;
+    bottom: 0;
+    width: unset;
+    height: unset;
+    justify-content: flex-start;
+    padding-left: 16px;
+
+    .contentChatRight {
+      margin-left: 0;
+    }
+  }
+
+  &Phone {
+    padding: 0 16px;
+  }
+}
+
+.content {
+  margin: 24px auto;
+
+  height: calc(100% - 48px);
+  max-width: calc(100% - 48px);
+  width: 100%;
+
+  display: flex;
+  justify-content: center;
+  position: relative;
+  gap: 8px;
+
+  &ChatRight {
+    margin-right: 24px;
+    max-width: unset;
+  }
+}

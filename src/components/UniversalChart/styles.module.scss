@@ -1,0 +1,192 @@
+.root {
+  padding: 32px 40px 40px;
+  height: 100%;
+  min-width: 600px;
+  border-radius: 24px;
+  background-color: var(--backgroundBasicDefault);
+  box-shadow: 0 0 1px 0 rgba(36, 41, 46, 0.32), 0 16px 24px 0 rgba(36, 41, 46, 0.12);
+  transition: width 0.3s;
+}
+
+.header {
+  width: 100%;
+  flex: 0;
+
+  &InMessage {
+    padding-left: 24px;
+  }
+}
+
+.divider {
+  width: 1px;
+  height: 16px;
+
+  border-right: 1px solid var(--gray200);
+}
+
+.content {
+  padding: 16px;
+  height: calc(100% - 136px);
+  width: 100%;
+  border-radius: 24px;
+  border: 1px solid var(--borderDefault);
+  flex: 1;
+  display: flex !important;
+
+  &Small {
+    margin-top: 16px;
+    height: auto;
+    max-height: 332px;
+
+    background-color: var(--backgroundBasicDefault);
+  }
+}
+
+.chartContainer {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.legendWrapper {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px 24px;
+  margin-bottom: 28px;
+  max-width: 100%;
+  width: 100%;
+  padding: 0 16px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: start;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.legendColor {
+  display: inline-block;
+  min-width: 50px;
+  height: 22px;
+  border-radius: 4px;
+}
+
+.legendText {
+  padding: 4px 0;
+}
+
+.chartWrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.svg {
+  width: 100%;
+  display: block;
+  overflow: visible !important;
+  pointer-events: auto !important;
+}
+
+.svg * {
+  pointer-events: auto !important;
+}
+
+.preview {
+  align-self: center;
+  flex: 0;
+  position: relative;
+  z-index: 100;
+
+  &Button {
+    border: 1px solid var(--borderDefault);
+    border-radius: 8px;
+    cursor: pointer;
+    background-color: var(--backgroundBasicDefault);
+    outline: none;
+
+    &Active {
+      border-color: var(--borderFocus);
+    }
+  }
+
+  &Image {
+    // Стили для изображений превью
+  }
+}
+
+// Медиа-запрос для очень маленьких экранов
+@media (max-width: 800px) {
+  .root {
+    padding: 24px 20px 32px;
+    min-width: unset;
+  }
+
+  .content {
+    padding: 12px;
+
+    overflow: visible;
+  }
+
+  .chartContainer {
+    padding: 8px 0;
+  }
+
+  .chartWrapper {
+    min-width: 600px;
+
+    overflow: visible;
+
+    &:has(.svg) {
+      min-width: 600px;
+    }
+  }
+
+  .svg {
+    overflow: visible !important;
+  }
+}
+
+.chartWrapper,
+.chartContainer,
+.content {
+  overflow: visible !important;
+}
+
+.noWrapTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tooltip {
+  position: absolute;
+  padding: 8px 12px;
+  background: rgba(36, 41, 46, 0.95);
+  color: white;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  pointer-events: none;
+  z-index: 1000;
+  // ✅ Разрешаем переносы:
+  white-space: normal;
+  word-wrap: break-word;
+  word-break: break-word;
+  // ✅ Ограничиваем ширину, но не жёстко:
+  max-width: 280px;
+  min-width: 120px;
+  // ✅ Выравнивание
+  text-align: left;
+  line-height: 1.4;
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.2s;
+}

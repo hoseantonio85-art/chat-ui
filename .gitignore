@@ -1,0 +1,11 @@
+node_modules/
+pilot/dist/
+.npm-cache/
+*.log
+*.local
+.DS_Store
+.idea/
+.vscode/
+*.tsbuildinfo
+*.map
+

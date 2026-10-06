@@ -1,0 +1,18 @@
+.fileList {
+  width: 100%;
+}
+
+.scrollBar {
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+
+  max-height: 128px;
+  width: 100%;
+
+  overflow-x: hidden;
+}
+
+.file {
+  max-width: 100%;
+  width: auto !important;
+}

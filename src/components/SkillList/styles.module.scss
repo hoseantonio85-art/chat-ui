@@ -1,0 +1,46 @@
+.container {
+  width: 100%;
+
+  &Phone {
+    flex-direction: column;
+    align-items: start;
+    gap: 8px;
+  }
+}
+
+.skill {
+  outline: none;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px 24px 24px 24px;
+  flex: 1;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &.secondaryGradient {
+    background: linear-gradient(rgba(50, 213, 131, 0.1), rgba(27, 208, 238, 0.1));
+    color: var(--textBrandDefault);
+
+    .text {
+      color: var(--textBrandDefault);
+    }
+  }
+
+  &.primaryGradient {
+    background: linear-gradient(to right, rgb(50, 213, 131), rgb(27, 208, 238));
+    color: var(--textBaseInverse);
+
+    .text {
+      color: var(--textBaseInverse);
+    }
+  }
+
+  &Large {
+    border-radius: 12px;
+    padding: 16px 24px;
+  }
+}
+
+.title {
+  white-space: nowrap;
+}
