@@ -186,11 +186,14 @@ export const Chat = React.memo(
 							<>
 								<Button
 									variant="ellipse"
-									iconAfter="fill"
+									icon={chatState === EChatState.small ? EIconName.fill : undefined}
+									iconAfter={chatState === EChatState.small ? undefined : EIconName.fill}
+									iconOnly={chatState === EChatState.small}
+									aria-label={t('openForm')}
 									onClick={createIncident}
 									disabled={uploadingFiles}
 								>
-									{t('openForm')}
+									{chatState === EChatState.small ? null : t('openForm')}
 								</Button>
 								<div className={classes.headerDivider} />
 							</>
