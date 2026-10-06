@@ -16,6 +16,8 @@ import {
 	isLoadingAtom,
 	sortMessagesAtom,
 } from '@/stores';
+import { hasRunningAgentRunAtom } from '@/stores/agentRuns';
+import { Config } from '@/config';
 import type { IMessage } from '@/types';
 import {
 	EChatState,
@@ -52,6 +54,7 @@ export const Chat = React.memo(
 		const [isLoading] = useAtom(isLoadingAtom);
 		const [canLoadHistory] = useAtom(canLoadHistoryAtom);
 		const [createIncidentAvailable] = useAtom(isCreateIncidentAvailable);
+		const [hasRunningAgentRun] = useAtom(hasRunningAgentRunAtom);
 		const threadUi = useThreadUi();
 		const [historyOpen, setHistoryOpen] = useState(false);
 		const activeThread = threadUi.threads.find(item => item.id === threadUi.activeThreadId);
@@ -221,7 +224,10 @@ export const Chat = React.memo(
 				</div>
 				<div className={classes.content}>
 					<div className={classes.messages} ref={messageContainerRef}>
-						{isLoading && <Message key="loader" loader />}
+						{isLoading &&
+							(!Config.universalAgentEnabled || !hasRunningAgentRun) && (
+								<Message key="loader" loader />
+							)}
 						{[...messages].reverse().map((message, index) => (
 							<Message
 								id={message.id}

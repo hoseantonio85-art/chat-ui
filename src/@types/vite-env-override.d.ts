@@ -10,5 +10,8 @@ declare global {
 		readonly SBERNORM_CLICKSTREAM_URL: string;
 		readonly SBERNORM_CLICKSTREAM_ENABLED: number;
 		readonly FF_CHAT_ATTACHMENTS_ENABLED: number;
+		readonly FF_UNIVERSAL_AGENT_ENABLED?: number;
+		readonly FF_CHAT_THREADS_ENABLED?: number;
+		readonly FF_CHAT_ASSISTANT_SKILLS_ENABLED?: number;
 	}
 }

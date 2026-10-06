@@ -1,12 +1,7 @@
 import React, { createContext, useContext } from 'react';
+import type { ChatThread } from '@/stores/threads';
 
-export interface ChatThread {
-	id: string;
-	title: string;
-	pinned: boolean;
-	updatedAt: number;
-	initialSkill?: string;
-}
+export type { ChatThread } from '@/stores/threads';
 
 interface ThreadUiValue {
 	enabled: boolean;

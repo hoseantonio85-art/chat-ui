@@ -6,6 +6,9 @@ export const Config = {
 	clickStreamKey: environmentSettings.SBERNORM_CLICKSTREAM_KEY,
 	clickStreamUrl: environmentSettings.SBERNORM_CLICKSTREAM_URL,
 	filesUploadEnabled: !!environmentSettings.FF_CHAT_ATTACHMENTS_ENABLED,
+	universalAgentEnabled: !!environmentSettings.FF_UNIVERSAL_AGENT_ENABLED,
+	threadsEnabled: !!environmentSettings.FF_CHAT_THREADS_ENABLED,
+	assistantSkillsEnabled: !!environmentSettings.FF_CHAT_ASSISTANT_SKILLS_ENABLED,
 };
 
 export const ALLOWED_EXTENSIONS = [
