@@ -59,7 +59,7 @@ export const skillsAtom = atom<ISkillInfo[]>([], 'skillsAtom');
  */
 // Вычисляемый атом для сортировки списка сообщений.
 export const sortMessagesAtom = atom(
-	(context) => context.spy(messagesAtom).sort(sortMessagesByTime),
+	(context) => [...context.spy(messagesAtom)].sort(sortMessagesByTime),
 	'sortMessagesAtom',
 );
 
@@ -77,16 +77,17 @@ export const isCreateIncidentAvailable = atom(
 const createMessageStore = (message: IMessage): TMessageStore => {
 	const name = `message#${random(1, 1e10)}`;
 
-	return {
+	const messageStore: TMessageStore = {
 		...message,
 		remove: action(
 			(context) =>
 				messagesAtom(context, (list) =>
-					list.filter((element) => element !== message),
+					list.filter((element) => element !== messageStore),
 				),
 			`${name}.remove`,
 		),
-	} as TMessageStore;
+	};
+	return messageStore;
 };
 
 /**
@@ -105,7 +106,8 @@ export const addMessageAction = action(
 
 		const newMessage = createMessageStore(message);
 
-		messagesAtom(context, (list) => {
+		messagesAtom(context, (currentList) => {
+			const list = [...currentList];
 			const existingMessageIndex = list.findLastIndex(
 				(m) => m.id === newMessage.id,
 			);
@@ -120,21 +122,21 @@ export const addMessageAction = action(
 					list.push(newMessage);
 				}
 
-				lastUserMessageIndex !== -1 && isLoadingAtom(context, false);
-
-				if (
-					newMessage.extras?.action === 'createIncident' &&
-					!options?.silent
-				) {
-					chat$.closeChat();
-					navigateToUrl(
-						`${baseUrl$.incidents ?? ''}/create?requestId=${newMessage.requestId}&startModalUrl=${location.pathname}`,
-					);
-
-					contextChatAtom(context, () => null);
-				}
 			} else {
 				list[existingMessageIndex] = newMessage;
+			}
+			if (lastUserMessageIndex !== -1 && newMessage.role === ERoles.bot && newMessage.extras?.agentPending !== 'true') {
+				isLoadingAtom(context, false);
+			}
+			if (
+				newMessage.extras?.action === 'createIncident' && !options?.silent &&
+				currentList[existingMessageIndex]?.extras?.action !== 'createIncident'
+			) {
+				chat$.closeChat();
+				navigateToUrl(
+					`${baseUrl$.incidents ?? ''}/create?requestId=${encodeURIComponent(newMessage.requestId ?? '')}&startModalUrl=${encodeURIComponent(location.pathname)}`,
+				);
+				contextChatAtom(context, () => null);
 			}
 
 			return [...list];
@@ -267,6 +269,7 @@ export const addSkillsAction = action((context, items: ISkillInfo[]) => {
  */
 export const resetAction = action((context) => {
 	messagesAtom(context, () => new Array<TMessageStore>());
+	isLoadingAtom(context, false);
 }, 'resetAction');
 
 /**

@@ -28,6 +28,10 @@ export const hasRunningAgentRunAtom = atom(
 
 export const startAgentRunAction = action(
 	(context, payload: StartAgentRunPayload) => {
+		// Replayed starts must not erase trace or reopen a completed run.
+		if (context.get(agentRunsAtom)[payload.assistantMessageId]?.runId === payload.runId) {
+			return;
+		}
 		agentRunsAtom(context, (runs) => ({
 			...runs,
 			[payload.assistantMessageId]: createRun(

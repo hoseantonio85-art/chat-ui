@@ -30,7 +30,7 @@ export default function vite({ mode }: ConfigEnv) {
   return defineConfig({
     base: environment.BASE_PREFIX_URL ?? './',
     define: {
-      'process.env': environment,
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? (mode === 'test' ? 'test' : 'production')),
     },
     plugins: [
       react({

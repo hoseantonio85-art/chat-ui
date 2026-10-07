@@ -9,6 +9,19 @@ import {
 } from './agentRuns';
 
 describe('agentRuns store', () => {
+	it('preserves completed trace when the server replays a start', () => {
+		const context = createCtx();
+		const payload = { assistantMessageId: 'a', requestId: 'q', runId: 'r', startedAt: 1000 };
+		startAgentRunAction(context, payload);
+		appendAgentEventAction(context, {
+			assistantMessageId: 'a',
+			event: { id: 'f', runId: 'r', at: 2000, kind: 'finish' },
+		});
+		const completed = context.get(agentRunsAtom).a;
+		startAgentRunAction(context, payload);
+		expect(context.get(agentRunsAtom).a).toBe(completed);
+		expect(context.get(hasRunningAgentRunAtom)).toBe(false);
+	});
 	it('owns a live run and completes it from streamed events', () => {
 		const context = createCtx();
 		startAgentRunAction(context, {

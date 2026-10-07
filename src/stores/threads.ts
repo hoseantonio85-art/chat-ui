@@ -13,6 +13,14 @@ export type ThreadsStatus = 'idle' | 'loading' | 'ready' | 'error';
 export const threadsAtom = atom<ChatThread[]>([], 'threadsAtom');
 export const activeThreadIdAtom = atom<string | undefined>(undefined, 'activeThreadIdAtom');
 export const threadsStatusAtom = atom<ThreadsStatus>('idle', 'threadsStatusAtom');
+export const threadsScopeVersionAtom = atom(0, 'threadsScopeVersionAtom');
+
+export const resetThreadsAction = action((context) => {
+	threadsScopeVersionAtom(context, (version) => version + 1);
+	threadsAtom(context, []);
+	activeThreadIdAtom(context, undefined);
+	threadsStatusAtom(context, 'idle');
+}, 'resetThreadsAction');
 
 export const setThreadsAction = action((context, threads: ChatThread[]) => {
 	threadsAtom(context, [...threads]);

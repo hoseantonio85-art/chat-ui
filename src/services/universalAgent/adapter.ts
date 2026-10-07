@@ -155,9 +155,17 @@ const adaptMessage = (value: unknown): IMessage | undefined => {
 		return undefined;
 	}
 
-	const extras = isRecord(value.extras)
-		? (value.extras as IMessage['extras'])
-		: undefined;
+	// Legacy servers send boolean markers; keep the domain extras contract string/null.
+	const extras: IMessage['extras'] = isRecord(value.extras) ? {} : undefined;
+	if (extras && isRecord(value.extras)) {
+		for (const [key, item] of Object.entries(value.extras)) {
+			if (typeof item === 'string' || item === null) {
+				extras[key] = item;
+			} else if (typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item))) {
+				extras[key] = String(item);
+			}
+		}
+	}
 
 	return {
 		id: stringValue(value.id),

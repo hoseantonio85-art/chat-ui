@@ -12,6 +12,8 @@ import {
 	isLoadingAtom,
 	resetAction,
 	messagesAtom,
+	attachmentsAtom,
+	textAtom,
 } from '@/stores';
 import {
 	agentRunsAtom,
@@ -20,20 +22,22 @@ import {
 	startAgentRunAction,
 	upsertAgentRunAction,
 } from '@/stores/agentRuns';
-import { activeThreadIdAtom } from '@/stores/threads';
+import { activeThreadIdAtom, resetThreadsAction } from '@/stores/threads';
+import { selectAssistantSkillAction } from '@/stores/assistantSkills';
 import {
 	ERoles,
 	type IAddActionOptions,
 	type IMessage,
 	type TReaction,
 } from '@/types';
-import { Client, type Message, type StompConfig } from '@stomp/stompjs';
+import { Client, type Message, type StompConfig, type StompSubscription } from '@stomp/stompjs';
 
 import { ChatStore } from './store';
 import type { IChatClass, ISendActionProps } from './types';
 
 export class Chat extends ChatStore {
 	private stompClient?: Client;
+	private subscription?: StompSubscription;
 	private brokerURL: string;
 	private host: string;
 	private userId: string;
@@ -64,7 +68,10 @@ export class Chat extends ChatStore {
 	}
 
 	private subscribeOnMessages() {
-		this.stompClient?.subscribe(this.subscriptionPath, (data: Message) => {
+		const tenantId = this.tenantId;
+		const client = this.stompClient;
+		this.subscription = this.stompClient?.subscribe(this.subscriptionPath, (data: Message) => {
+			if (this.tenantId !== tenantId || this.stompClient !== client) return;
 			try {
 				const payload: unknown = JSON.parse(data.body);
 				const updates = adaptUniversalAgentPayload(payload);
@@ -73,7 +80,7 @@ export class Chat extends ChatStore {
 					this.applyInboundUpdate(update);
 				}
 			} catch {
-				console.error('Error while parse server message:', data.body);
+				console.error('Unable to process chat server message');
 			}
 		});
 	}
@@ -137,16 +144,25 @@ export class Chat extends ChatStore {
 	}
 
 	private applyInboundUpdate(update: UniversalAgentInboundUpdate) {
+		if (update.kind !== 'message' && !Config.universalAgentEnabled) {
+			return;
+		}
 		if (!belongsToActiveThread(update, Config.threadsEnabled, this.store.get(activeThreadIdAtom))) {
 			return;
 		}
 
 		if (update.kind === 'message') {
-			if (update.message.extras?.lastMessage) {
+			if (update.message.extras?.lastMessage === 'true') {
 				canLoadHistoryAtom(this.store, false);
 			}
 
-			const pending = this.findPendingAssistant(update.message.requestId);
+			// Match only assistant messages. A user echo may carry the same requestId.
+			const pending = update.message.role === ERoles.bot
+				? this.findPendingAssistant(update.message.requestId) ?? this.store.get(messagesAtom).find(
+					(message) => message.role === ERoles.bot && !!update.message.id &&
+						message.extras?.backendMessageId === update.message.id,
+				)
+				: undefined;
 			const message = pending?.id
 				? {
 						...update.message,
@@ -159,12 +175,13 @@ export class Chat extends ChatStore {
 						},
 					}
 				: update.message;
-			const options: IAddActionOptions | undefined = this.gettingHistory
+			const options: IAddActionOptions | undefined = this.gettingHistory && !pending
 				? { insertToTop: true, silent: true }
 				: undefined;
 
 			this.pushIntoMessages(message, options);
 			if (pending?.id) {
+				isLoadingAtom(this.store, false);
 				const run = this.store.get(agentRunsAtom)[pending.id];
 				if (run?.status === 'running') {
 					appendAgentEventAction(this.store, {
@@ -254,7 +271,8 @@ export class Chat extends ChatStore {
 	}
 
 	public unsubscribe() {
-		this.stompClient?.unsubscribe(this.subscriptionPath);
+		this.subscription?.unsubscribe();
+		this.subscription = undefined;
 	}
 
 	private get subscriptionPath() {
@@ -273,18 +291,20 @@ export class Chat extends ChatStore {
 			this.brokerURL.startsWith('ws') || this.brokerURL.startsWith('wss')
 				? this.brokerURL
 				: this.host + this.brokerURL;
-		this.stompClient = new Client({
+		const client = new Client({
 			brokerURL: url,
 			connectionTimeout: 30_000,
 			heartbeatIncoming: 5000,
 			heartbeatOutgoing: 5000,
 			onConnect: () => {
+				if (this.stompClient !== client) return;
 				this.subscribeOnMessages();
 				this.sendWaitingMessages();
 				this.loadHistory();
 			},
 			reconnectDelay: 1000,
 		} as StompConfig);
+		this.stompClient = client;
 		this.stompClient.activate();
 	}
 
@@ -412,7 +432,7 @@ export class Chat extends ChatStore {
 		this.pushIntoMessages(message);
 
 		this.stompClient.publish({
-			body: JSON.stringify(message),
+			body: JSON.stringify({ ...message, id: data.extras?.backendMessageId ?? data.id }),
 			destination: this.reactionDestination,
 			headers: this.defaultHeaders,
 		});
@@ -430,13 +450,14 @@ export class Chat extends ChatStore {
 		}
 
 		this.gettingHistory = true;
+		const cursorMessage = this.store.get(messagesAtom).find((message) => message.id === messageId);
 
 		const message = {
 			extras: {
 				loadLast: this.LOAD_LIMIT,
 				...(activeThreadId ? { threadId: activeThreadId } : {}),
 			},
-			id: messageId,
+			id: cursorMessage?.extras?.backendMessageId ?? messageId,
 			role: ERoles.system,
 			timeCreated: new Date().toISOString(),
 			userId: this.userId,
@@ -471,16 +492,25 @@ export class Chat extends ChatStore {
 		this.waitingMessages.some((message) => message.id === id);
 
 	public disconnect = () => {
-		if (this.stompClient?.connected) {
-			this.stompClient.deactivate();
-		}
+		// An offline client is still active and may have a scheduled reconnect.
+		void this.stompClient?.deactivate().catch(() => {
+			console.error('Unable to deactivate chat connection');
+		});
 	};
 
 	public reconnect = (tenantId: string) => {
 		if (this.tenantId !== tenantId) {
 			this.tenantId = tenantId;
+			this.waitingMessages = [];
+			this.gettingHistory = false;
 			resetAction(this.store);
+			canLoadHistoryAtom(this.store, true);
 			clearAgentRunsAction(this.store);
+			resetThreadsAction(this.store);
+			selectAssistantSkillAction(this.store, undefined);
+			clearContextChatAction(this.store);
+			attachmentsAtom(this.store, []);
+			textAtom(this.store, '');
 
 			this.reinitialize();
 		}

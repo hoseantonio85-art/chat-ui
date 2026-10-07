@@ -100,7 +100,7 @@ describe('messagesAtom', () => {
         expect(contextChat.lastInput()).toBeNull();
         expect(chat$.closeChat).toHaveBeenCalled();
         expect(navigateToUrl).toHaveBeenCalledWith(
-            `${baseUrl$.incidents}/create?requestId=123&startModalUrl=${location.pathname}`,
+            `${baseUrl$.incidents}/create?requestId=123&startModalUrl=${encodeURIComponent(location.pathname)}`,
         );
     });
 });

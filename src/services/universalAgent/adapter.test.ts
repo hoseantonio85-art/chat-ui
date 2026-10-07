@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { adaptUniversalAgentPayload } from './adapter';
 
 describe('adaptUniversalAgentPayload', () => {
+	it('normalizes legacy boolean markers and discards invalid extras', () => {
+		const [update] = adaptUniversalAgentPayload({
+			id: 'a', role: 'bot', extras: { lastMessage: false, contextCleared: true, invalid: {} },
+		});
+		expect(update).toMatchObject({
+			kind: 'message', message: { extras: { lastMessage: 'false', contextCleared: 'true' } },
+		});
+		if (update.kind === 'message') expect(update.message.extras).not.toHaveProperty('invalid');
+	});
 	it('normalizes a backend run event without exposing its envelope to UI', () => {
 		const updates = adaptUniversalAgentPayload({
 			type: 'agent_run_event',

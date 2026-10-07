@@ -1,391 +1,220 @@
-import { v4 as uuidv4 } from "uuid";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { navigateToUrl } from 'single-spa';
+import type { IMessage as StompMessage, StompConfig } from '@stomp/stompjs';
+import { Config } from '@/config';
+import { addMessageAction, canLoadHistoryAtom, isLoadingAtom, messagesAtom, resetAction, sortMessagesAtom } from '@/stores';
+import { ctx } from '@/stores/ctx';
+import { agentRunsAtom, clearAgentRunsAction } from '@/stores/agentRuns';
+import { activeThreadIdAtom, setThreadsAction, threadsAtom, threadsScopeVersionAtom, threadsStatusAtom } from '@/stores/threads';
+import { ERoles } from '@/types';
+import { Chat } from './chat';
 
-import { addMessageAction, canLoadHistoryAtom, isLoadingAtom, resetAction } from "@/stores";
-import { ctx } from "@/stores/ctx";
-import { ERoles, type IMessage, type TReaction } from "@/types";
-import { Client, type Message } from "@stomp/stompjs";
-
-import { Chat, type Chat as TChat } from "./chat";
-import type { ISendActionProps } from "./types";
-
-vi.mock("uuid");
-vi.mock("@stomp/stompjs");
-vi.mock("@/helpers/cookie", () => ({
-	getCookie: vi.fn().mockReturnValue("mock-session-id"),
+const transport = vi.hoisted(() => ({
+	connected: true,
+	config: undefined as StompConfig | undefined,
+	receive: undefined as ((message: StompMessage) => void) | undefined,
+	publish: vi.fn(), activate: vi.fn(), deactivate: vi.fn(async () => {}), unsubscribe: vi.fn(),
 }));
-vi.mock("@/stores/ctx", () => ({
-	__esModule: true,
-	ctx: {
-		get: vi.fn().mockReturnValue(true),
+vi.mock('@stomp/stompjs', () => ({
+	Client: class {
+		constructor(config: StompConfig) { transport.config = config; }
+		get connected() { return transport.connected; }
+		activate = transport.activate;
+		deactivate = transport.deactivate;
+		publish = transport.publish;
+		subscribe(_destination: string, callback: (message: StompMessage) => void) {
+			transport.receive = callback;
+			return { id: 'subscription-1', unsubscribe: transport.unsubscribe };
+		}
 	},
 }));
-vi.mock("@/stores", () => ({
-	__esModule: true,
-	addMessageAction: vi.fn(),
-	isLoadingAtom: vi.fn(),
-	canLoadHistoryAtom: vi.fn(),
-	contextChatAtom: vi.fn(),
-	resetAction: vi.fn(),
-	clearContextChatAction: vi.fn(),
+vi.mock('@/config', () => ({
+	Config: { universalAgentEnabled: true, threadsEnabled: false },
+	ALLOWED_EXTENSIONS: [], MAX_FILE_NAME_LENGTH: 200, MAX_FILE_SIZE: 1000,
 }));
+vi.mock('@/stores/ctx', async () => {
+	const { createCtx } = await import('@reatom/framework');
+	return { ctx: createCtx() };
+});
+vi.mock('@/helpers/cookie', () => ({ getCookie: () => 'session' }));
+vi.mock('@sber-orm/components', () => ({ validatorsSchema: {} }));
+vi.mock('@n-orm/auth-mf-app', () => ({ baseUrl$: {}, chat$: { closeChat: vi.fn() } }));
+vi.mock('single-spa', () => ({ navigateToUrl: vi.fn() }));
 
-describe("Chat", () => {
-	let chat: TChat;
-	let mockClient: vi.Mocked<Client>;
-	let mockMessage: vi.Mocked<Message>;
+function connect() {
+	transport.config?.onConnect?.({ command: 'CONNECTED', headers: {}, body: '', isBinaryBody: false, binaryBody: new Uint8Array() });
+}
+function receive(payload: object) {
+	if (!transport.receive) throw new Error('Subscription missing');
+	transport.receive({ body: JSON.stringify(payload) } as StompMessage);
+}
 
-	const host = 'ws://example.com';
-	const mockTenantId = "tenant123";
-	const mockUserId = "user123";
-
+describe('Chat transport integration', () => {
+	let chat: Chat;
+	afterEach(() => vi.unstubAllGlobals());
 	beforeEach(() => {
-		mockClient = new Client() as vi.Mocked<Client>;
-		vi.spyOn(mockClient, "connected", "get").mockReturnValue(true); // Мокируем геттер
-		mockMessage = {} as vi.Mocked<Message>;
-		vi.mocked(Client).mockImplementation(() => mockClient);
-		vi.mocked(uuidv4).mockReturnValue("mock-uuid");
-
-		chat = new Chat({
-			brokerURL: '',
-			host,
-			tenantId: mockTenantId,
-			userId: mockUserId,
-			loadLimit: 10,
-		});
-	});
-
-	afterEach(() => {
-		vi.mocked(Client).mockClear();
 		vi.clearAllMocks();
+		transport.connected = true;
+		Config.threadsEnabled = false;
+		Config.universalAgentEnabled = true;
+		resetAction(ctx);
+		clearAgentRunsAction(ctx);
+		canLoadHistoryAtom(ctx, true);
+		isLoadingAtom(ctx, false);
+		activeThreadIdAtom(ctx, undefined);
+		chat = new Chat({ brokerURL: '/ws', host: 'wss://norm.example', loadLimit: 10, tenantId: 'tenant', userId: 'user' });
+		connect();
+		transport.publish.mockClear();
 	});
 
-	it("should initialize with correct parameters", () => {
-		expect(Client).toHaveBeenCalledWith({
-			brokerURL: host,
-			connectionTimeout: 30_000,
-			heartbeatIncoming: 5000,
-			heartbeatOutgoing: 5000,
-			onConnect: expect.any(Function),
-			reconnectDelay: 1000,
-		});
-		expect(mockClient.activate).toHaveBeenCalled();
+	it('streams into the pending turn, completes it and deduplicates final replay', () => {
+		chat.send({ body: 'Question' });
+		const [user, pending] = ctx.get(messagesAtom);
+		receive({ type: 'agent.run.started', payload: { assistantMessageId: 'server-a', requestId: user.id, runId: 'server-run', startedAt: 1000 } });
+		receive({ type: 'assistant.message.delta', payload: { assistantMessageId: 'server-a', runId: 'server-run', delta: 'Answer' } });
+		expect(ctx.get(messagesAtom)[1].text).toBe('Answer');
+		const final = { id: 'server-a', role: 'bot', requestId: user.id, text: 'Answer complete' };
+		receive(final);
+		receive(final);
+		expect(ctx.get(messagesAtom)).toHaveLength(2);
+		expect(ctx.get(messagesAtom)[1]).toMatchObject({ id: pending.id, text: 'Answer complete', extras: { agentPending: 'false', backendMessageId: 'server-a' } });
+		expect(ctx.get(isLoadingAtom)).toBe(false);
+		expect(Object.values(ctx.get(agentRunsAtom))[0].status).toBe('done');
 	});
 
-	it("should subscribe on messages on connect", () => {
-		const onConnect = vi.mocked(Client).mock.calls[1][0].onConnect;
-		onConnect();
-		expect(mockClient.subscribe).toHaveBeenCalledWith(
-			chat["subscriptionPath"],
-			expect.any(Function),
-		);
+	it('does not replace the pending assistant with a user echo', () => {
+		chat.send({ body: 'Question' });
+		const [user, pending] = ctx.get(messagesAtom);
+		receive({ ...user, requestId: user.id });
+		expect(ctx.get(messagesAtom)[1]).toEqual(pending);
 	});
 
-	it("should push message into store", () => {
-		const mockMessageData: IMessage = {
-			id: "mock-uuid",
-			role: ERoles.user,
-			text: "Hello",
-			timeCreated: new Date().toISOString(),
-			userId: mockUserId,
-		};
-		chat["pushIntoMessages"](mockMessageData);
-		expect(addMessageAction).toHaveBeenCalledWith(
-			chat["store"],
-			mockMessageData,
-			undefined,
-		);
+	it('sends feedback using the server ID while preserving the UI ID', () => {
+		const message = { id: 'local-a', role: ERoles.bot, extras: { backendMessageId: 'server-a' } };
+		addMessageAction(ctx, message);
+		chat.reactOnMessage(message, 'like');
+		expect(JSON.parse(transport.publish.mock.calls[0][0].body)).toMatchObject({ id: 'server-a', reaction: 'like' });
+		expect(ctx.get(messagesAtom)[0]).toMatchObject({ id: 'local-a', reaction: 'like' });
 	});
 
-	it("should unsubscribe from messages", () => {
-		chat.unsubscribe();
-		expect(mockClient.unsubscribe).toHaveBeenCalledWith(
-			chat["subscriptionPath"],
-		);
+	it.each([false, 'false'])('keeps pagination enabled for lastMessage=%s', (lastMessage) => {
+		receive({ id: 'history', role: 'bot', extras: { lastMessage } });
+		expect(ctx.get(canLoadHistoryAtom)).toBe(true);
 	});
-
-	it("should return correct subscription path", () => {
-		expect(chat["subscriptionPath"]).toBe(
-			"/user/user123/tenant/tenant123/chat",
-		);
+	it.each([true, 'true'])('ends pagination for lastMessage=%s', (lastMessage) => {
+		receive({ id: 'history', role: 'bot', extras: { lastMessage } });
+		expect(ctx.get(canLoadHistoryAtom)).toBe(false);
 	});
-
-	it("should send system message", () => {
-		const mockProps: ISendActionProps = {
-			body: "System message",
-			role: ERoles.system,
-		};
-		chat.send = vi.fn();
-		chat.sendSystem(mockProps);
-		expect(chat["send"]).toHaveBeenCalledWith({
-			...mockProps,
-			role: ERoles.user,
-		});
+	it('ignores events from another thread', () => {
+		Config.threadsEnabled = true;
+		activeThreadIdAtom(ctx, 'active');
+		receive({ id: 'other', role: 'bot', extras: { threadId: 'other' } });
+		expect(ctx.get(messagesAtom)).toHaveLength(0);
 	});
-
-	it("should send message", () => {
-		const mockProps: ISendActionProps = {
-			body: "Hello",
-			role: ERoles.user,
-		};
-		// @ts-ignore next-line
-		chat.pushIntoMessages = vi.fn();
-		chat.send(mockProps);
-		expect(chat["pushIntoMessages"]).toHaveBeenCalled();
-		expect(mockClient.publish).toHaveBeenCalledWith({
-			body: expect.any(String),
-			destination: chat["destination"],
-			headers: expect.any(Object),
-		});
+	it('ignores agent events when the feature is disabled', () => {
+		Config.universalAgentEnabled = false;
+		receive({ type: 'agent.run.started', payload: { assistantMessageId: 'a', requestId: 'q', runId: 'r' } });
+		expect(ctx.get(messagesAtom)).toHaveLength(0);
+		expect(ctx.get(agentRunsAtom)).toEqual({});
 	});
-
-	it("should send waiting messages if connected", () => {
-		chat["waitingMessages"] = [
-			{
-				id: "mock-uuid",
-				role: ERoles.user,
-				text: "Waiting message",
-				timeCreated: new Date().toISOString(),
-				userId: mockUserId,
-			},
-		];
-		chat["sendWaitingMessages"]();
-		expect(mockClient.publish).toHaveBeenCalledTimes(1);
-		expect(chat["waitingMessages"]).toHaveLength(0);
+	it('keeps the original thread on queued messages after switching threads', () => {
+		Config.threadsEnabled = true;
+		activeThreadIdAtom(ctx, 'first');
+		transport.connected = false;
+		chat.send({ body: 'Offline question' });
+		const user = ctx.get(messagesAtom)[0];
+		expect(chat.isMessageSending(user.id!)).toBe(true);
+		activeThreadIdAtom(ctx, 'second');
+		transport.connected = true;
+		connect();
+		expect(JSON.parse(transport.publish.mock.calls[0][0].body)).toMatchObject({ id: user.id, extras: { threadId: 'first' } });
+		expect(chat.isMessageSending(user.id!)).toBe(false);
 	});
-
-	it("should react on message", () => {
-		const mockMessageData: IMessage = {
-			id: "mock-uuid",
-			role: ERoles.user,
-			text: "Hello",
-			timeCreated: new Date().toISOString(),
-			userId: mockUserId,
-		};
-		const mockReaction: TReaction = "like";
-		chat.reactOnMessage(mockMessageData, mockReaction);
-		expect(addMessageAction).toHaveBeenCalledWith(
-			chat["store"],
-			{
-				...mockMessageData,
-				reaction: mockReaction,
-			},
-			undefined,
-		);
-		expect(mockClient.publish).toHaveBeenCalledWith({
-			body: expect.any(String),
-			destination: chat["reactionDestination"],
-			headers: expect.any(Object),
-		});
-	});
-
-	it("should load history", () => {
-		vi.mocked(canLoadHistoryAtom).mockReturnValue(true);
-		chat.loadHistory();
-		expect(mockClient.publish).toHaveBeenCalledWith({
-			body: expect.any(String),
-			destination: chat["historyDestination"],
-			headers: expect.any(Object),
-		});
-	});
-
-	it("should not load history if not connected", () => {
-		vi.spyOn(mockClient, "connected", "get").mockReturnValue(false); // Мокируем геттер
-		chat.loadHistory();
-		expect(mockClient.publish).not.toHaveBeenCalled();
-	});
-
-	it("should check if message is sending", () => {
-		chat["waitingMessages"] = [
-			{
-				id: "mock-uuid",
-				role: ERoles.user,
-				text: "Waiting message",
-				timeCreated: new Date().toISOString(),
-				userId: mockUserId,
-			},
-		];
-		expect(chat.isMessageSending("mock-uuid")).toBeTruthy();
-		expect(chat.isMessageSending("another-uuid")).toBeFalsy();
-	});
-
-	it("should disconnect", () => {
+	it('deactivates an offline client to cancel scheduled reconnects', () => {
+		transport.connected = false;
 		chat.disconnect();
-		expect(mockClient.deactivate).toHaveBeenCalled();
+		expect(transport.deactivate).toHaveBeenCalledOnce();
 	});
-
-	it("should change tenantId", () => {
-		const newTenantId = "newTenant123";
-		chat.reconnect(newTenantId);
-		expect(chat["tenantId"]).toBe(newTenantId);
-		expect(resetAction).toHaveBeenCalledWith(chat["store"]);
-		expect(mockClient.deactivate).toHaveBeenCalled();
-		expect(mockClient.activate).toHaveBeenCalled();
+	it('unsubscribes using the subscription handle', () => {
+		chat.unsubscribe();
+		expect(transport.unsubscribe).toHaveBeenCalledOnce();
 	});
-
-	it("should reinitialize", () => {
-		chat.reinitialize();
-		expect(mockClient.deactivate).toHaveBeenCalled();
-		expect(mockClient.activate).toHaveBeenCalled();
+	it('does not include server payloads in parse-error logs', () => {
+		const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		transport.receive?.({ body: 'private malformed content' } as StompMessage);
+		expect(spy).toHaveBeenCalledWith('Unable to process chat server message');
+		spy.mockRestore();
 	});
-
-	it("should handle error while parsing server message", () => {
-		// @ts-ignore next-line
-		chat.subscribeOnMessages();
-		const onMessage = mockClient.subscribe.mock.calls[0][1];
-		// @ts-ignore next-line
-		mockMessage.body = "invalid json";
-		console.error = vi.fn();
-		onMessage(mockMessage);
-		expect(console.error).toHaveBeenCalledWith(
-			"Error while parse server message:",
-			"invalid json",
-		);
+	it('executes a product action when final output replaces a pending turn, only once', () => {
+		vi.stubGlobal('location', { pathname: '/company/profile' });
+		chat.send({ body: 'Create incident' });
+		chat.loadHistory(); // History may be requested on reconnect before the live final arrives.
+		const user = ctx.get(messagesAtom)[0];
+		const final = { id: 'server-a', role: 'bot', requestId: user.id, extras: { action: 'createIncident' } };
+		receive(final);
+		receive(final);
+		expect(navigateToUrl).toHaveBeenCalledOnce();
+		expect(navigateToUrl).toHaveBeenCalledWith(`/create?requestId=${user.id}&startModalUrl=%2Fcompany%2Fprofile`);
 	});
-
-	it("should set canLoadHistoryAtom to false if lastMessage is true", () => {
-		// @ts-ignore next-line
-		chat.subscribeOnMessages();
-		const onMessage = mockClient.subscribe.mock.calls[0][1];
-		// @ts-ignore next-line
-		mockMessage.body = JSON.stringify({ extras: { lastMessage: true } });
-		onMessage(mockMessage);
-		expect(canLoadHistoryAtom).toHaveBeenCalledWith(chat["store"], false);
+	it('removes a stored message through its public action', () => {
+		addMessageAction(ctx, { id: 'a', role: ERoles.bot });
+		ctx.get(messagesAtom)[0].remove(ctx);
+		expect(ctx.get(messagesAtom)).toEqual([]);
 	});
-
-	it("should set isLoadingAtom to true when sending a message", () => {
-		const mockProps: ISendActionProps = {
-			body: "Hello",
-			role: ERoles.user,
-		};
-		chat.send(mockProps);
-		expect(isLoadingAtom).toHaveBeenCalledWith(chat["store"], true);
+	it('does not mutate prior message snapshots when sorting or appending', () => {
+		addMessageAction(ctx, { id: 'later', timeCreated: '2026-01-02' });
+		const prior = ctx.get(messagesAtom);
+		addMessageAction(ctx, { id: 'earlier', timeCreated: '2026-01-01' });
+		expect(prior).toHaveLength(1);
+		expect(ctx.get(sortMessagesAtom).map(message => message.id)).toEqual(['earlier', 'later']);
+		expect(ctx.get(messagesAtom).map(message => message.id)).toEqual(['later', 'earlier']);
 	});
-
-	it("should add message to waitingMessages if not connected", () => {
-		vi.spyOn(mockClient, "connected", "get").mockReturnValue(false); // Мокируем геттер
-		const mockProps: ISendActionProps = {
-			body: "Hello",
-			role: ERoles.user,
-		};
-		chat.send(mockProps);
-		expect(chat["waitingMessages"]).toHaveLength(1);
+	it('keeps loading active during deltas and resets it when changing the conversation', () => {
+		chat.send({ body: 'Question' });
+		const [user, pending] = ctx.get(messagesAtom);
+		receive({ type: 'assistant.message.delta', payload: { assistantMessageId: pending.id, requestId: user.id, delta: 'Part' } });
+		expect(ctx.get(isLoadingAtom)).toBe(true);
+		resetAction(ctx);
+		expect(ctx.get(isLoadingAtom)).toBe(false);
 	});
-
-	it("should not add message to waitingMessages if connected", () => {
-		const mockProps: ISendActionProps = {
-			body: "Hello",
-			role: ERoles.user,
-		};
-		chat.send(mockProps);
-		expect(chat["waitingMessages"]).toHaveLength(0);
+	it('does not publish feedback while offline', () => {
+		transport.connected = false;
+		chat.reactOnMessage({ id: 'a' }, 'like');
+		expect(transport.publish).not.toHaveBeenCalled();
 	});
-
-	it("should handle reaction removal", () => {
-		const mockMessageData: IMessage = {
-			id: "mock-uuid",
-			role: ERoles.user,
-			text: "Hello",
-			timeCreated: new Date().toISOString(),
-			userId: mockUserId,
-			reaction: "like",
-		};
-		chat.reactOnMessage(mockMessageData, "like");
-		expect(addMessageAction).toHaveBeenCalledWith(
-			chat["store"],
-			{
-				...mockMessageData,
-				reaction: undefined,
-			},
-			undefined,
-		);
-	});
-
-	it("should not send reaction if not connected", () => {
-		vi.spyOn(mockClient, "connected", "get").mockReturnValue(false); // Мокируем геттер
-		const mockMessageData: IMessage = {
-			id: "mock-uuid",
-			role: ERoles.user,
-			text: "Hello",
-			timeCreated: new Date().toISOString(),
-			userId: mockUserId,
-		};
-		chat.reactOnMessage(mockMessageData, "like");
-		expect(mockClient.publish).not.toHaveBeenCalled();
-	});
-
-	it("should not load history if canLoadHistoryAtom is false", () => {
-		vi.mocked(ctx.get).mockReturnValue(false);
-		chat.loadHistory();
-		expect(mockClient.publish).not.toHaveBeenCalled();
-	});
-
-	it("should set gettingHistory to true when loading history", () => {
-		vi.mocked(ctx.get).mockReturnValue(true);
-		chat.loadHistory();
-		expect(chat["gettingHistory"]).toBeTruthy();
-	});
-
-	it("should set gettingHistory to false when sending a message", () => {
-		const mockProps: ISendActionProps = {
-			body: "Hello",
-			role: ERoles.user,
-		};
-		chat.send(mockProps);
-		expect(chat["gettingHistory"]).toBeFalsy();
-	});
-
-	it("should handle message with insertToTop option", () => {
-		// @ts-ignore next-line
-		chat.subscribeOnMessages();
-		const onMessage = mockClient.subscribe.mock.calls[0][1];
-		// @ts-ignore next-line
-		mockMessage.body = JSON.stringify({ extras: { lastMessage: false } });
-		chat["gettingHistory"] = true;
-		onMessage(mockMessage);
-		expect(addMessageAction).toHaveBeenCalledWith(
-			chat["store"],
-			expect.any(Object),
-			{
-				insertToTop: true,
-				silent: true,
-			},
-		);
-	});
-
-	it('should send clear context message when connected', () => {
+	it('scopes history and context reset to the active thread', () => {
+		Config.threadsEnabled = true;
+		activeThreadIdAtom(ctx, 'active');
+		chat.loadHistory('cursor');
 		chat.clearContext();
-		expect(mockClient.publish).toHaveBeenCalledWith({
-			body: JSON.stringify({ userId: mockUserId }),
-			destination: chat['contextDestination'],
-			headers: chat['defaultHeaders'],
-		});
+		expect(JSON.parse(transport.publish.mock.calls[0][0].body)).toMatchObject({ id: 'cursor', extras: { threadId: 'active' } });
+		expect(JSON.parse(transport.publish.mock.calls[1][0].body)).toMatchObject({ threadId: 'active' });
 	});
-
-	it('should not send clear context message when not connected', () => {
-		vi.spyOn(mockClient, 'connected', 'get').mockReturnValue(false);
-		chat.clearContext();
-		expect(mockClient.publish).not.toHaveBeenCalled();
+	it('uses the server ID as pagination cursor for a completed streamed answer', () => {
+		addMessageAction(ctx, { id: 'local-a', extras: { backendMessageId: 'server-a' } });
+		chat.loadHistory('local-a');
+		expect(JSON.parse(transport.publish.mock.calls[0][0].body).id).toBe('server-a');
 	});
-
-	it('should include correct headers in clear context message', () => {
-		chat.clearContext();
-		const call = mockClient.publish.mock.calls[0][0];
-		expect(call.headers).toEqual({
-			'X-Sber-Auth-Session': 'mock-session-id',
-			tenantId: mockTenantId,
-		});
-	});
-
-	it('should send to correct destination', () => {
-		chat.clearContext();
-		const call = mockClient.publish.mock.calls[0][0];
-		expect(call.destination).toBe('/app/context');
-	});
-
-	it('should include correct userId in body', () => {
-		chat.clearContext();
-		const call = mockClient.publish.mock.calls[0][0];
-		expect(JSON.parse(call.body)).toEqual({ userId: mockUserId });
+	it('discards the previous tenant queue, threads and late socket events', () => {
+		Config.threadsEnabled = true;
+		activeThreadIdAtom(ctx, 'old-thread');
+		setThreadsAction(ctx, [{ id: 'old-thread', title: 'Old', updatedAt: 1, pinned: false }]);
+		threadsStatusAtom(ctx, 'loading');
+		const oldVersion = ctx.get(threadsScopeVersionAtom);
+		const oldReceive = transport.receive;
+		transport.connected = false;
+		chat.send({ body: 'Private queued question' });
+		const queuedId = ctx.get(messagesAtom)[0].id!;
+		chat.reconnect('new-tenant');
+		expect(chat.isMessageSending(queuedId)).toBe(false);
+		expect(ctx.get(threadsAtom)).toEqual([]);
+		expect(ctx.get(activeThreadIdAtom)).toBeUndefined();
+		expect(ctx.get(threadsStatusAtom)).toBe('idle');
+		expect(ctx.get(threadsScopeVersionAtom)).toBe(oldVersion + 1);
+		// Even a quick switch back must not revive the original subscription.
+		chat.reconnect('tenant');
+		Config.threadsEnabled = false;
+		oldReceive?.({ body: JSON.stringify({ id: 'late', role: 'bot', text: 'Old tenant data' }) } as StompMessage);
+		expect(ctx.get(messagesAtom)).toEqual([]);
 	});
 });

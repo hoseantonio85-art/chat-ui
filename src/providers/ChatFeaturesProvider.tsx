@@ -32,6 +32,7 @@ import {
 	setThreadsStatusAction,
 	threadsAtom,
 	threadsStatusAtom,
+	threadsScopeVersionAtom,
 	upsertThreadAction,
 } from '@/stores/threads';
 import { ctx } from '@/stores/ctx';
@@ -92,15 +93,18 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 		],
 	);
 
-	const runThreadOperation = useCallback(async (operation: () => Promise<void>) => {
+	const runThreadOperation = useCallback(async (operation: (isCurrent: () => boolean) => Promise<void>) => {
 		if (ctx.get(threadsStatusAtom) === 'loading') {
 			return;
 		}
 		setThreadsStatus('loading');
+		const scopeVersion = ctx.get(threadsScopeVersionAtom);
+		const isCurrent = () => ctx.get(threadsScopeVersionAtom) === scopeVersion;
 		try {
-			await operation();
-			setThreadsStatus('ready');
+			await operation(isCurrent);
+			if (isCurrent()) setThreadsStatus('ready');
 		} catch {
+			if (!isCurrent()) return;
 			setThreadsStatus('error');
 			notification(t('threads.operationError'), { type: 'error' });
 		}
@@ -111,8 +115,9 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 			return;
 		}
 
-		void runThreadOperation(async () => {
+		void runThreadOperation(async (isCurrent) => {
 			const loadedThreads = await getThreadRepository().list();
+			if (!isCurrent()) return;
 			setThreads(loadedThreads);
 			if (ctx.get(activeThreadIdAtom)) {
 				return;
@@ -121,9 +126,9 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 			const snapshot = latest
 				? await getThreadRepository().load(latest.id)
 				: await getThreadRepository().create({ title: t('threads.defaultTitle') });
-			applySnapshot(snapshot);
+			if (isCurrent()) applySnapshot(snapshot);
 		});
-	}, [applySnapshot, runThreadOperation, setThreads, t]);
+	}, [applySnapshot, runThreadOperation, setThreads, t, threadsStatus]);
 
 	const threadUi = useMemo(
 		() => ({
@@ -132,22 +137,24 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 			threads,
 			activeThreadId,
 			onSelect: (threadId: string) => {
-				void runThreadOperation(async () => {
-					applySnapshot(await getThreadRepository().load(threadId));
+				void runThreadOperation(async (isCurrent) => {
+					const snapshot = await getThreadRepository().load(threadId);
+					if (isCurrent()) applySnapshot(snapshot);
 				});
 			},
 			onNew: () => {
-				void runThreadOperation(async () => {
+				void runThreadOperation(async (isCurrent) => {
 					const snapshot = await getThreadRepository().create({
 						title: t('threads.defaultTitle'),
 						initialSkill: selectedSkillId,
 					});
-					applySnapshot(snapshot);
+					if (isCurrent()) applySnapshot(snapshot);
 				});
 			},
 			onRename: (threadId: string, title: string) => {
-				void runThreadOperation(async () => {
-					upsertThread(await getThreadRepository().rename(threadId, title));
+				void runThreadOperation(async (isCurrent) => {
+					const thread = await getThreadRepository().rename(threadId, title);
+					if (isCurrent()) upsertThread(thread);
 				});
 			},
 			onTogglePin: (threadId: string) => {
@@ -155,20 +162,22 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 				if (!thread) {
 					return;
 				}
-				void runThreadOperation(async () => {
-					upsertThread(
-						await getThreadRepository().setPinned(threadId, !thread.pinned),
-					);
+				void runThreadOperation(async (isCurrent) => {
+					const updatedThread = await getThreadRepository().setPinned(threadId, !thread.pinned);
+					if (isCurrent()) upsertThread(updatedThread);
 				});
 			},
 			onDelete: (threadId: string) => {
-				void runThreadOperation(async () => {
+				void runThreadOperation(async (isCurrent) => {
 					await getThreadRepository().delete(threadId);
+					if (!isCurrent()) return;
 					removeThread(threadId);
 					if (activeThreadId === threadId) {
 						resetMessages();
 						hydrateRuns({});
 						setActiveThread(undefined);
+						selectSkill(undefined);
+						setCanLoadHistory(false);
 					}
 				});
 			},
@@ -181,6 +190,8 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 			resetMessages,
 			runThreadOperation,
 			selectedSkillId,
+			selectSkill,
+			setCanLoadHistory,
 			setActiveThread,
 			t,
 			threads,
