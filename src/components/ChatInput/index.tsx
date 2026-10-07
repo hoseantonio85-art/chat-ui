@@ -1,3 +1,4 @@
+import { submitDraft } from '@/helpers/submitDraft';
 import { useAction, useAtom } from '@reatom/npm-react';
 import cn from 'classnames';
 import React, {
@@ -15,7 +16,6 @@ import { useChat } from '@/helpers/useChat';
 import { AttachmentS3UploadResponse } from '@/openapi';
 import {
 	addAttachment as addAttachmentAction,
-	addAttachmentError as addAttachmentErrorAction,
 	attachmentsAtom,
 	changeAttachmentProgress as changeAttachmentProgressAction,
 	sortMessagesAtom,
@@ -36,6 +36,8 @@ import {
 import { IAttachment } from '@/types';
 import { AssistantSkills } from '@/components/AssistantSkills';
 import { useAssistantSkills } from '@/components/AssistantSkills/context';
+import { ctx } from '@/stores/ctx';
+import { threadsScopeVersionAtom } from '@/stores/threads';
 import { activeThreadIdAtom, threadsStatusAtom } from '@/stores/threads';
 import { ERoles } from '../Chat/types';
 import { FileList } from './components';
@@ -81,11 +83,12 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 		const threadReady = !Config.threadsEnabled || (!!activeThreadId && threadsStatus !== 'loading');
 
 		const addAttachment = useAction(addAttachmentAction);
-		const addAttachmentError = useAction(addAttachmentErrorAction);
 		const changeAttachmentProgress = useAction(changeAttachmentProgressAction);
 		const validateAttachments = useAction(validateAttachmentsAction);
 
 		const [text, setText] = useState('');
+		const submittingRef = useRef(false);
+		const [submitting, setSubmitting] = useState(false);
 		const [clearingContext, setClearingContext] = useState(false);
 
 		const textDefer = useDeferredValue(text);
@@ -110,22 +113,29 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 		};
 
 		const handleSubmit = async () => {
-			if (!threadReady) return;
-			const fileIds = await handleUploadFiles();
+            if (!threadReady || submittingRef.current || !text.trim()) return;
 
-			send({
-				body: textDefer,
-				extras: {
-					...(fileIds.length > 0 ? { fileIds: JSON.stringify(fileIds) } : {}),
-					...(selectedSkill ? { skill: selectedSkill.id, skillTitle: selectedSkill.title } : {}),
-				},
-			});
-
-			setText('');
-			setAttachments([]);
-			onSubmit?.();
-			onChange?.('');
-		};
+            setSubmitting(true);
+            const scope = ctx.get(threadsScopeVersionAtom);
+            const threadId = ctx.get(activeThreadIdAtom);
+            const isCurrent = () => scope === ctx.get(threadsScopeVersionAtom) && threadId === ctx.get(activeThreadIdAtom);
+            try {
+                const sent = await submitDraft(submittingRef, () => handleUploadFiles(isCurrent),
+                    () => isCurrent() && ctx.get(threadsStatusAtom) !== 'loading',
+                    (fileIds) => send({ body: text, extras: {
+                    ...(fileIds.length ? { fileIds: JSON.stringify(fileIds) } : {}),
+                    ...(selectedSkill ? { skill: selectedSkill.id, skillTitle: selectedSkill.title } : {}),
+                } }));
+                if (!sent) return;
+                setText(''); setAttachments([]); onSubmit?.(); onChange?.('');
+            } catch {
+                notification(t('sendError'), { type: 'error' });
+            } finally {
+                submittingRef.current = false;
+                setSubmitting(false);
+                setUploadingFiles?.(false);
+            }
+        };
 
 		const handleButtonClick = (
 			event: React.MouseEvent<HTMLButtonElement, MouseEvent>,
@@ -136,12 +146,12 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 				rest?.onClick?.({} as React.MouseEvent<HTMLTextAreaElement>);
 			}
 
-			handleSubmit();
+			void handleSubmit();
 		};
 
 		const handleKeyDown = async (event: React.KeyboardEvent) => {
 			if (
-				event.key === 'Enter' &&
+				event.key === 'Enter' && !event.nativeEvent.isComposing &&
 				!(event.key === 'Enter' && event.shiftKey) &&
 				text?.trim()
 			) {
@@ -149,7 +159,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 
 				rest?.onKeyDown?.({} as React.KeyboardEvent<HTMLTextAreaElement>);
 
-				handleSubmit();
+				void handleSubmit();
 			}
 		};
 
@@ -165,18 +175,20 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 			clearContext();
 		};
 
-		const handleUploadFiles = async () => {
+		const handleUploadFiles = async (isCurrent: () => boolean): Promise<string[] | undefined> => {
 			setUploadingFiles?.(true);
 			const fileIds: string[] = [];
 
 			for (const file of attachments) {
+                if (!isCurrent()) return undefined;
+                if (file.errors.length || !file.source) return undefined;
 				if (!file.errors.length && file.source) {
 					try {
 						const response = (await methodologistService.uploadDocument(
 							file.fileId,
 							file.source,
 							(value: number) =>
-								changeAttachmentProgress(file.fileId, value < 100 ? value : 0),
+								isCurrent() && changeAttachmentProgress(file.fileId, value < 100 ? value : 0),
 						)) as AttachmentS3UploadResponse;
 
 						if (
@@ -184,22 +196,14 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 							!!response?.messages?.length ||
 							!!response.body?.notifications?.length
 						) {
-							if (response.body?.notifications?.length) {
-								for (const { text, title } of response.body.notifications) {
-									addAttachmentError(file.fileId, text ?? title ?? '');
-								}
-							} else {
-								addAttachmentError(
-									file.fileId,
-									response?.messages?.[0]?.text ?? response.error?.text ?? '',
-								);
-							}
-							notification(t('fileUploadError'), { type: 'error' });
+                            notification(t('fileUploadError'), { type: 'error' });
+                            return undefined;
 						} else {
 							fileIds.push(file.fileId);
 						}
-					} catch (error) {
-						addAttachmentError(file.fileId, error as string);
+					} catch {
+                        notification(t('fileUploadError'), { type: 'error' });
+                        return undefined;
 					}
 				}
 			}
@@ -210,6 +214,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 		};
 
 		const handleClickUpload = async (items: { file: File }[]) => {
+            if (submittingRef.current) return;
 			const files = [] as IAttachment[];
 
 			for (const f of items) {
@@ -273,7 +278,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 					[classes.wrapperShadowed]: size === 'lg',
 				})}
 			>
-				<FileList size={size} canDelete={!uploadingFiles} />
+				<FileList size={size} canDelete={!uploadingFiles && !submitting} />
 				<Row className={classes.fullWidth}>
 					{Config.filesUploadEnabled && (
 						<ButtonUploader
@@ -287,6 +292,8 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 					<AssistantSkills />
 					<textarea
 						ref={textareaRef}
+                        readOnly={submitting}
+                        aria-label={placeholder || t('defaultPlaceholder')}
 						className={cn(classes.textarea, classes[`size-${size}`])}
 						placeholder={placeholder as string}
 						value={text}
@@ -306,6 +313,8 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 							>
 								<Button
 									onClick={handleClearContext}
+                                    disabled={submitting}
+                                    aria-label={t('clearContextHint')}
 									loading={clearingContext}
 									icon="refresh"
 									variant="ghost"
@@ -317,10 +326,10 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 						<Button
 								className={classes.buttonAlign}
 								size={size === 'lg' ? 'XL' : 'L'}
-								loading={clearingContext || !!uploadingFiles}
+								loading={clearingContext || !!uploadingFiles || submitting}
 								variant="primary"
 								onClick={handleButtonClick}
-								disabled={!threadReady || !text.trim() || !!uploadingFiles}
+								disabled={!threadReady || !text.trim() || !!uploadingFiles || submitting}
 								icon={EIconName.arrowUp}
 								iconOnly
 								aria-label={buttonText}

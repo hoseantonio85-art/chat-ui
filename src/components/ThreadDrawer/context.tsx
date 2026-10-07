@@ -6,6 +6,8 @@ export type { ChatThread } from '@/stores/threads';
 interface ThreadUiValue {
 	enabled: boolean;
 	busy: boolean;
+    error?: boolean;
+    onRetry?: () => void;
 	threads: ChatThread[];
 	activeThreadId?: string;
 	onSelect: (id: string) => void;

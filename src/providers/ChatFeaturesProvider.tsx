@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AgentRunsContext } from '@/components/AgentActivity/context';
@@ -41,6 +41,7 @@ import { notification } from '@sber-orm/ui-kit';
 
 export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 	const { t } = useTranslation();
+    const retryRead = useRef<(() => void) | undefined>(undefined);
 	const [agentRuns] = useAtom(agentRunsAtom);
 	const [skills] = useAtom(skillsAtom);
 	const [selectedSkillId] = useAtom(selectedAssistantSkillIdAtom);
@@ -93,11 +94,12 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 		],
 	);
 
-	const runThreadOperation = useCallback(async (operation: (isCurrent: () => boolean) => Promise<void>) => {
+	const runThreadOperation = useCallback(async (operation: (isCurrent: () => boolean) => Promise<void>, retryable = false): Promise<void> => {
 		if (ctx.get(threadsStatusAtom) === 'loading') {
 			return;
 		}
-		setThreadsStatus('loading');
+		retryRead.current = retryable ? () => { void runThreadOperation(operation, true); } : undefined;
+        setThreadsStatus('loading');
 		const scopeVersion = ctx.get(threadsScopeVersionAtom);
 		const isCurrent = () => ctx.get(threadsScopeVersionAtom) === scopeVersion;
 		try {
@@ -127,20 +129,22 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 				? await getThreadRepository().load(latest.id)
 				: await getThreadRepository().create({ title: t('threads.defaultTitle') });
 			if (isCurrent()) applySnapshot(snapshot);
-		});
+		}, true);
 	}, [applySnapshot, runThreadOperation, setThreads, t, threadsStatus]);
 
 	const threadUi = useMemo(
 		() => ({
 			enabled: Config.threadsEnabled,
 			busy: threadsStatus === 'loading',
+            error: threadsStatus === 'error',
+            onRetry: retryRead.current,
 			threads,
 			activeThreadId,
 			onSelect: (threadId: string) => {
 				void runThreadOperation(async (isCurrent) => {
 					const snapshot = await getThreadRepository().load(threadId);
 					if (isCurrent()) applySnapshot(snapshot);
-				});
+				}, true);
 			},
 			onNew: () => {
 				void runThreadOperation(async (isCurrent) => {

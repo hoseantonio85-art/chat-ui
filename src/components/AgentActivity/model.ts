@@ -26,19 +26,19 @@ export interface AgentRun {
   events: AgentEvent[];
 }
 export const activeLabels: Record<string, string> = {
-  get_company_profile: 'Проверяю данные компании…',
-  ask_methodologist: 'Подключаю методолога…',
-  get_company_risks: 'Сверяю с реестром рисков…',
-  profiler_search: 'Изучаю профиль компании…',
-  ask_analyst: 'Подключаю аналитика…',
-  get_company_fin_indicators: 'Проверяю финансовые показатели…',
-  task: 'Подключаю профильного эксперта…',
-  write_todos: 'Составляю план проверки…',
-  get_incident_form: 'Готовлю форму события…',
-  create_incident: 'Обращаюсь к регистрации события…',
+  get_company_profile: 'agentActivity.activity1',
+  ask_methodologist: 'agentActivity.activity2',
+  get_company_risks: 'agentActivity.activity3',
+  profiler_search: 'agentActivity.activity4',
+  ask_analyst: 'agentActivity.activity5',
+  get_company_fin_indicators: 'agentActivity.activity6',
+  task: 'agentActivity.activity7',
+  write_todos: 'agentActivity.activity8',
+  get_incident_form: 'agentActivity.activity9',
+  create_incident: 'agentActivity.activity10',
 };
 export function createRun(runId: string, requestId: string, startedAt: number): AgentRun {
-  return { runId, requestId, startedAt, currentActivity: 'Начинаю проверку…', status: 'running', events: [] };
+  return { runId, requestId, startedAt, currentActivity: 'agentActivity.activity11', status: 'running', events: [] };
 }
 export function appendEvent(run: AgentRun, event: AgentEvent): AgentRun {
   // A reconnect replay must not duplicate events or reopen a completed run.
@@ -46,14 +46,14 @@ export function appendEvent(run: AgentRun, event: AgentEvent): AgentRun {
   const events = [...run.events, event];
   if (event.kind === 'finish' || (event.kind === 'error' && event.fatal)) {
     const status = event.fatal ? 'failed' : 'done';
-    return { ...run, events, status, finishedAt: event.at, currentActivity: status === 'failed' ? 'Не удалось завершить ответ' : 'Ответ готов' };
+    return { ...run, events, status, finishedAt: event.at, currentActivity: status === 'failed' ? 'agentActivity.activity12' : 'agentActivity.activity13' };
   }
   const currentActivity = event.kind === 'toolCall' || event.kind === 'delegation'
-    ? event.label || activeLabels[event.tool || ''] || 'Проверяю источник…'
-    : event.kind === 'error' ? 'Продолжаю с доступными источниками…'
-    : event.kind === 'empty' ? 'Уточняю по другим источникам…'
-    : event.kind === 'handback' ? 'Собираю итоговый ответ…'
-    : event.kind === 'plan' ? (event.todos?.every(todo => todo.status === 'completed') ? 'Формирую ответ…' : 'Составляю план проверки…')
+    ? event.label || activeLabels[event.tool || ''] || 'agentActivity.activity14'
+    : event.kind === 'error' ? 'agentActivity.activity15'
+    : event.kind === 'empty' ? 'agentActivity.activity16'
+    : event.kind === 'handback' ? 'agentActivity.activity17'
+    : event.kind === 'plan' ? (event.todos?.every(todo => todo.status === 'completed') ? 'agentActivity.activity18' : 'agentActivity.activity19')
     : run.currentActivity;
   return { ...run, events, currentActivity };
 }
@@ -78,11 +78,17 @@ export function sourcesForRun(run: AgentRun): SourceState[] {
   }
   return [...sources.values()];
 }
-export function runSummary(run: AgentRun): string {
+export function runSummary(run: AgentRun, t: (key: string, values?: Record<string, number>) => string): string {
   const sources = sourcesForRun(run);
   const successful = sources.filter(source => source.status === 'success').length;
   const incomplete = sources.length - successful;
   const experts = run.events.filter(event => event.kind === 'delegation').length;
   const seconds = Math.max(0, Math.round(((run.finishedAt || run.startedAt) - run.startedAt) / 1000));
-  return `${run.status === 'failed' ? 'Прогон прерван' : 'Ответ готов'} · источников: ${successful}/${sources.length}${incomplete ? ` · с замечаниями: ${incomplete}` : ''}${experts ? ` · экспертов: ${experts}` : ''} · ${seconds} с`;
+  return [
+    t(run.status === 'failed' ? 'agentActivity.summaryFailed' : 'agentActivity.summaryDone'),
+    t('agentActivity.summarySources', { successful, total: sources.length }),
+    ...(incomplete ? [t('agentActivity.summaryIncomplete', { count: incomplete })] : []),
+    ...(experts ? [t('agentActivity.summaryExperts', { count: experts })] : []),
+    t('agentActivity.seconds', { count: seconds }),
+  ].join(' · ');
 }

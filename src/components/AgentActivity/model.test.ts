@@ -1,5 +1,11 @@
+import ru from '@/i18n/locales/ru-RU.json';
 import { describe, it, expect } from 'vitest';
-import { appendEvent, createRun, runSummary, sourcesForRun, type AgentEvent } from './model';
+import { appendEvent, createRun, runSummary as formatSummary, sourcesForRun, type AgentEvent } from './model';
+const labels: Record<string, string> = ru.agentActivity;
+const runSummary = (run: Parameters<typeof formatSummary>[0]) => formatSummary(run, (key, values) => {
+  const template = labels[key.replace('agentActivity.', '')] ?? key;
+  return template.replace(/\{\{(\w+)\}\}/g, (_, field) => String(values?.[field] ?? ''));
+});
 const event = (id: string, kind: AgentEvent['kind'], extra: Partial<AgentEvent> = {}): AgentEvent => ({ id, kind, runId: 'run', at: 1000, ...extra });
 describe('UI run protocol', () => {
   it('isolates runs and deduplicates reconnect replay', () => {
@@ -41,6 +47,6 @@ describe('UI run protocol', () => {
       {content: 'Проверить источник', status: 'completed'},
       {content: 'Подготовить ответ', status: 'completed'},
     ]}));
-    expect(run.currentActivity).toBe('Формирую ответ…');
+    expect(run.currentActivity).toBe('agentActivity.activity18');
   });
 });
