@@ -31,8 +31,10 @@ import {
 	setThreadsAction,
 	setThreadsStatusAction,
 	threadsAtom,
+	threadsStatusAtom,
 	upsertThreadAction,
 } from '@/stores/threads';
+import { ctx } from '@/stores/ctx';
 import { useAction, useAtom } from '@reatom/npm-react';
 import { notification } from '@sber-orm/ui-kit';
 
@@ -43,6 +45,7 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 	const [selectedSkillId] = useAtom(selectedAssistantSkillIdAtom);
 	const [threads] = useAtom(threadsAtom);
 	const [activeThreadId] = useAtom(activeThreadIdAtom);
+	const [threadsStatus] = useAtom(threadsStatusAtom);
 
 	const hydrateRuns = useAction(hydrateAgentRunsAction);
 	const selectSkill = useAction(selectAssistantSkillAction);
@@ -90,6 +93,9 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 	);
 
 	const runThreadOperation = useCallback(async (operation: () => Promise<void>) => {
+		if (ctx.get(threadsStatusAtom) === 'loading') {
+			return;
+		}
 		setThreadsStatus('loading');
 		try {
 			await operation();
@@ -101,19 +107,28 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 	}, [setThreadsStatus, t]);
 
 	useEffect(() => {
-		if (!Config.threadsEnabled) {
+		if (!Config.threadsEnabled || ctx.get(threadsStatusAtom) !== 'idle') {
 			return;
 		}
 
 		void runThreadOperation(async () => {
 			const loadedThreads = await getThreadRepository().list();
 			setThreads(loadedThreads);
+			if (ctx.get(activeThreadIdAtom)) {
+				return;
+			}
+			const latest = [...loadedThreads].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+			const snapshot = latest
+				? await getThreadRepository().load(latest.id)
+				: await getThreadRepository().create({ title: t('threads.defaultTitle') });
+			applySnapshot(snapshot);
 		});
-	}, [runThreadOperation, setThreads]);
+	}, [applySnapshot, runThreadOperation, setThreads, t]);
 
 	const threadUi = useMemo(
 		() => ({
 			enabled: Config.threadsEnabled,
+			busy: threadsStatus === 'loading',
 			threads,
 			activeThreadId,
 			onSelect: (threadId: string) => {
@@ -169,6 +184,7 @@ export function ChatFeaturesProvider({ children }: React.PropsWithChildren) {
 			setActiveThread,
 			t,
 			threads,
+			threadsStatus,
 			upsertThread,
 		],
 	);

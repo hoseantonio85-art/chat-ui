@@ -4,6 +4,7 @@ import { getCookie } from '@/helpers/cookie';
 import { Config } from '@/config';
 import { adaptUniversalAgentPayload } from '@/services/universalAgent/adapter';
 import type { UniversalAgentInboundUpdate } from '@/services/universalAgent/types';
+import { belongsToActiveThread } from '@/services/universalAgent/routing';
 import {
 	addMessageAction,
 	canLoadHistoryAtom,
@@ -136,6 +137,10 @@ export class Chat extends ChatStore {
 	}
 
 	private applyInboundUpdate(update: UniversalAgentInboundUpdate) {
+		if (!belongsToActiveThread(update, Config.threadsEnabled, this.store.get(activeThreadIdAtom))) {
+			return;
+		}
+
 		if (update.kind === 'message') {
 			if (update.message.extras?.lastMessage) {
 				canLoadHistoryAtom(this.store, false);
@@ -227,6 +232,7 @@ export class Chat extends ChatStore {
 		const assistantMessageId = this.resolveAssistantMessageId(
 			update.assistantMessageId,
 			update.requestId,
+			update.runId,
 		);
 		const existing = this.store
 			.get(messagesAtom)
@@ -398,6 +404,9 @@ export class Chat extends ChatStore {
 		const message = {
 			...data,
 			reaction: messageReaction,
+			...(Config.threadsEnabled && this.store.get(activeThreadIdAtom)
+				? { extras: { ...data.extras, threadId: this.store.get(activeThreadIdAtom) } }
+				: {}),
 		};
 
 		this.pushIntoMessages(message);
@@ -413,12 +422,19 @@ export class Chat extends ChatStore {
 		if (!this.stompClient?.connected || !this.store.get(canLoadHistoryAtom)) {
 			return;
 		}
+		const activeThreadId = Config.threadsEnabled
+			? this.store.get(activeThreadIdAtom)
+			: undefined;
+		if (Config.threadsEnabled && !activeThreadId) {
+			return;
+		}
 
 		this.gettingHistory = true;
 
 		const message = {
 			extras: {
 				loadLast: this.LOAD_LIMIT,
+				...(activeThreadId ? { threadId: activeThreadId } : {}),
 			},
 			id: messageId,
 			role: ERoles.system,
@@ -442,6 +458,9 @@ export class Chat extends ChatStore {
 		this.stompClient.publish({
 			body: JSON.stringify({
 				userId: this.userId,
+				...(Config.threadsEnabled && this.store.get(activeThreadIdAtom)
+					? { threadId: this.store.get(activeThreadIdAtom) }
+					: {}),
 			}),
 			destination: this.contextDestination,
 			headers: this.defaultHeaders,

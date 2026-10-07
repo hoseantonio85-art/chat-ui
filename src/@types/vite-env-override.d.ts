@@ -13,5 +13,6 @@ declare global {
 		readonly FF_UNIVERSAL_AGENT_ENABLED?: number;
 		readonly FF_CHAT_THREADS_ENABLED?: number;
 		readonly FF_CHAT_ASSISTANT_SKILLS_ENABLED?: number;
+		readonly SBERORM_CHAT_THREADS_API_URL?: string;
 	}
 }

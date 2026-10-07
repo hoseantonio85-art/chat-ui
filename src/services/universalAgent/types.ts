@@ -1,7 +1,7 @@
 import type { AgentEvent, AgentRun } from '@/components/AgentActivity/model';
 import type { IMessage } from '@/types';
 
-export type UniversalAgentInboundUpdate =
+export type UniversalAgentInboundUpdate = (
 	| { kind: 'message'; message: IMessage; persistedRun?: AgentRun }
 	| {
 			kind: 'runStarted';
@@ -15,7 +15,9 @@ export type UniversalAgentInboundUpdate =
 			kind: 'assistantDelta';
 			assistantMessageId: string;
 			requestId?: string;
+			runId?: string;
 			text: string;
 			append: boolean;
 	  }
-	| { kind: 'runSnapshot'; assistantMessageId: string; run: AgentRun };
+	| { kind: 'runSnapshot'; assistantMessageId: string; run: AgentRun }
+) & { threadId?: string };

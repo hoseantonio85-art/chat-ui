@@ -1,5 +1,10 @@
 node_modules/
-pilot/dist/
+dist/
+coverage/
+pilot/
+.env
+.env.*
+!.env.example
 .npm-cache/
 *.log
 *.local

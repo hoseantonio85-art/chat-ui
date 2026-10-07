@@ -36,6 +36,7 @@ import {
 import { IAttachment } from '@/types';
 import { AssistantSkills } from '@/components/AssistantSkills';
 import { useAssistantSkills } from '@/components/AssistantSkills/context';
+import { activeThreadIdAtom } from '@/stores/threads';
 import { ERoles } from '../Chat/types';
 import { FileList } from './components';
 import classes from './styles.module.scss';
@@ -75,6 +76,8 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 		const [userText, setUserTextAtom] = useAtom(textAtom);
 		const [attachments, setAttachments] = useAtom(attachmentsAtom);
 		const { selectedSkill } = useAssistantSkills();
+		const [activeThreadId] = useAtom(activeThreadIdAtom);
+		const threadReady = !Config.threadsEnabled || !!activeThreadId;
 
 		const addAttachment = useAction(addAttachmentAction);
 		const addAttachmentError = useAction(addAttachmentErrorAction);
@@ -106,6 +109,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 		};
 
 		const handleSubmit = async () => {
+			if (!threadReady) return;
 			const fileIds = await handleUploadFiles();
 
 			send({
@@ -315,7 +319,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 								loading={clearingContext || !!uploadingFiles}
 								variant="primary"
 								onClick={handleButtonClick}
-								disabled={!text.trim() || !!uploadingFiles}
+								disabled={!threadReady || !text.trim() || !!uploadingFiles}
 								icon={EIconName.arrowUp}
 								iconOnly
 								aria-label={buttonText}

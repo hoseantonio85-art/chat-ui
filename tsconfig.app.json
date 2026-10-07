@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+
+    "paths": {
+      "@/*": ["src/*"],
+      "@sber-orm/components": ["node_modules/@sber-orm/types__components/dist/index.d.ts"],
+      "@sber-orm/ui-kit": ["node_modules/@sber-orm/types__ui-kit/dist/index.d.ts"]
+    },
+    "jsx": "react-jsx",
+    "types": [
+      "node",
+      "single-spa",
+      "@sber-orm/types__auth-mf-app",
+      "@sber-orm/types__ui-kit",
+      "@sber-orm/types__components",
+      "vitest/globals"
+    ],
+
+    "allowImportingTsExtensions": true,
+		"noEmit": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "src/*.stories.tsx", "src/tests", "*.json"],
+  "extends": "@sber-orm/tsconfig-config/tsconfig.base.json"
+}

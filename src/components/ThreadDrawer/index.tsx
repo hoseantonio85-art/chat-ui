@@ -39,15 +39,15 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 		<button className={classes.scrim} type="button" aria-label={t('threads.close')} onClick={onClose}/>
 		<aside className={classes.drawer} aria-label={t('threads.ariaLabel')}>
 			<header><div><strong>{t('threads.title')}</strong><span>{t('threads.subtitle')}</span></div></header>
-			<Button className={classes.newButton} icon={EIconName.message} variant="secondary" onClick={() => { ui.onNew(); onClose(); }}>{t('threads.newChat')}</Button>
+			<Button className={classes.newButton} icon={EIconName.message} variant="secondary" disabled={ui.busy} onClick={() => { ui.onNew(); onClose(); }}>{t('threads.newChat')}</Button>
 			<div className={classes.groups}>{[
 				{ id: 'pinned', title: t('threads.pinned'), items: threads.filter(thread => thread.pinned) },
 				{ id: 'recent', title: t('threads.recent'), items: threads.filter(thread => !thread.pinned) },
 			].filter(group => group.items.length > 0).map(group => <section key={group.id} aria-label={group.title}>
 				<h3 className={classes.groupTitle}>{group.title}</h3>
 			<ul className={classes.list}>{group.items.map(thread => <li key={thread.id} data-active={thread.id === ui.activeThreadId} data-menu-open={menu?.threadId === thread.id}>
-				{renaming === thread.id ? <form onSubmit={event => { event.preventDefault(); if (draft.trim()) ui.onRename(thread.id, draft.trim()); setRenaming(undefined); }}><input autoFocus value={draft} onChange={event => setDraft(event.target.value)} aria-label={t('threads.threadName')}/><Button size="S" icon={EIconName.check} iconOnly aria-label={t('threads.save')}/></form> : <button className={classes.thread} type="button" onClick={() => { ui.onSelect(thread.id); onClose(); }}><span>{thread.title}</span></button>}
-				{renaming !== thread.id && <button className={classes.more} type="button" aria-label={t('threads.actionsFor', { title: thread.title })} aria-haspopup="menu" aria-expanded={menu?.threadId === thread.id} onClick={event => { event.stopPropagation(); const anchor = event.currentTarget; setMenu(current => current?.threadId === thread.id ? undefined : {threadId:thread.id, anchor}); }}><Icon name={EIconName.kebabMenu} width={18} height={18}/></button>}
+				{renaming === thread.id ? <form onSubmit={event => { event.preventDefault(); if (draft.trim() && !ui.busy) ui.onRename(thread.id, draft.trim()); setRenaming(undefined); }}><input autoFocus value={draft} onChange={event => setDraft(event.target.value)} aria-label={t('threads.threadName')}/><Button size="S" icon={EIconName.check} iconOnly disabled={ui.busy} aria-label={t('threads.save')}/></form> : <button className={classes.thread} type="button" disabled={ui.busy} onClick={() => { ui.onSelect(thread.id); onClose(); }}><span>{thread.title}</span></button>}
+				{renaming !== thread.id && <button className={classes.more} type="button" disabled={ui.busy} aria-label={t('threads.actionsFor', { title: thread.title })} aria-haspopup="menu" aria-expanded={menu?.threadId === thread.id} onClick={event => { event.stopPropagation(); const anchor = event.currentTarget; setMenu(current => current?.threadId === thread.id ? undefined : {threadId:thread.id, anchor}); }}><Icon name={EIconName.kebabMenu} width={18} height={18}/></button>}
 			{menu?.threadId === thread.id && <div ref={menuRef} className={classes.menu} role="menu" aria-label={t('threads.actions')} onKeyDown={event => {
                   const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button'));
                   const index = items.indexOf(document.activeElement as HTMLButtonElement);

@@ -14,7 +14,8 @@ export { default as SkillList } from './chat.skills.component';
 export { default as ChatModal } from './chat.chatModal.component';
 export { type ISendActionProps } from './services/types';
 export { configureThreadRepository } from './services/threads/repository';
-export { createMemoryThreadRepository } from './services/threads/memory';
+export { createHttpThreadRepository } from './services/threads/http';
+export type { HttpThreadRepositoryOptions } from './services/threads/http';
 export type {
 	CreateThreadInput,
 	ThreadRepository,

@@ -8,6 +8,7 @@ describe('adaptUniversalAgentPayload', () => {
 			type: 'agent_run_event',
 			payload: {
 				messageId: 'assistant-1',
+				threadId: 'thread-1',
 				runId: 'run-1',
 				event: {
 					eventId: 'event-1',
@@ -30,6 +31,7 @@ describe('adaptUniversalAgentPayload', () => {
 				runId: 'run-1',
 				tool: 'get_company_profile',
 			},
+			threadId: 'thread-1',
 		});
 	});
 
@@ -54,6 +56,21 @@ describe('adaptUniversalAgentPayload', () => {
 		expect(updates[0]).toMatchObject({
 			kind: 'message',
 			persistedRun: { runId: 'run-1', requestId: 'request-1', status: 'done' },
+		});
+	});
+
+	it('keeps the thread id on a final message for reactions and routing', () => {
+		const updates = adaptUniversalAgentPayload({
+			type: 'chat.message',
+			payload: {
+				threadId: 'thread-1',
+				message: { id: 'assistant-1', role: 'bot', text: 'Ответ' },
+			},
+		});
+		expect(updates[0]).toMatchObject({
+			kind: 'message',
+			threadId: 'thread-1',
+			message: { extras: { threadId: 'thread-1' } },
 		});
 	});
 

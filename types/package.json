@@ -1,0 +1,31 @@
+{
+  "name": "@sber-orm/types__chat-mf-app",
+  "version": "0.5.0",
+  "type": "module",
+  "description": "Type declarations for chat microfrontend application",
+  "types": "./dist/index.d.ts",
+  "main": "",
+  "exports": {
+    ".": {
+      "default": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/*"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@release-it/conventional-changelog": "^10.0.0",
+    "@sber-orm/config-release-it": "*",
+    "esbuild-sass-plugin": "^3.3.1",
+    "release-it": "^18.1.2",
+    "tsup": "^7.3.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "debug:release": "npx release-it --ci -VV --dry-run",
+    "release": "npx release-it --ci -VV"
+  }
+}

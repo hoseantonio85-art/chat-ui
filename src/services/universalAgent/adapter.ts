@@ -206,15 +206,19 @@ export const adaptUniversalAgentPayload = (
 		const message = adaptMessage(raw);
 
 		return message
-			? [{ kind: 'message', message, persistedRun: persistedRunFromMessage(message) }]
+			? [{ kind: 'message', message, threadId: stringValue(message.extras?.threadId), persistedRun: persistedRunFromMessage(message) }]
 			: [];
 	}
+	const threadId = stringValue(payload.threadId ?? raw.threadId);
 
 	if (type === 'chat.message') {
 		const message = adaptMessage(payload.message ?? payload);
+		const scopedMessage = message && threadId
+			? { ...message, extras: { ...message.extras, threadId } }
+			: message;
 
-		return message
-			? [{ kind: 'message', message, persistedRun: persistedRunFromMessage(message) }]
+		return scopedMessage
+			? [{ kind: 'message', message: scopedMessage, threadId: threadId ?? stringValue(scopedMessage.extras?.threadId), persistedRun: persistedRunFromMessage(scopedMessage) }]
 			: [];
 	}
 
@@ -233,6 +237,7 @@ export const adaptUniversalAgentPayload = (
 				requestId,
 				runId,
 				startedAt: numberValue(payload.startedAt ?? payload.timestamp) ?? Date.now(),
+				threadId,
 			}]
 			: [];
 	}
@@ -241,7 +246,7 @@ export const adaptUniversalAgentPayload = (
 		const event = adaptAgentEvent(payload.event ?? payload, stringValue(payload.runId));
 
 		return assistantMessageId && event
-			? [{ kind: 'runEvent', assistantMessageId, event }]
+			? [{ kind: 'runEvent', assistantMessageId, event, threadId }]
 			: [];
 	}
 
@@ -249,7 +254,7 @@ export const adaptUniversalAgentPayload = (
 		const run = adaptAgentRunSnapshot(payload.run ?? payload);
 
 		return assistantMessageId && run
-			? [{ kind: 'runSnapshot', assistantMessageId, run }]
+			? [{ kind: 'runSnapshot', assistantMessageId, run, threadId }]
 			: [];
 	}
 
@@ -265,8 +270,10 @@ export const adaptUniversalAgentPayload = (
 				kind: 'assistantDelta',
 				assistantMessageId,
 				requestId: stringValue(payload.requestId),
+				runId: stringValue(payload.runId),
 				text,
 				append: payload.append !== false,
+				threadId,
 			}]
 			: [];
 	}

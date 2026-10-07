@@ -58,9 +58,8 @@ export const Chat = React.memo(
 		const threadUi = useThreadUi();
 		const [historyOpen, setHistoryOpen] = useState(false);
 		const activeThread = threadUi.threads.find(item => item.id === threadUi.activeThreadId);
-		const canCreateIncident = threadUi.enabled
-			? activeThread?.initialSkill === 'createIncident'
-			: createIncidentAvailable;
+		const canCreateIncident =
+			activeThread?.initialSkill === 'createIncident' || createIncidentAvailable;
 
 		const { trackEvent } = useTracking();
 
