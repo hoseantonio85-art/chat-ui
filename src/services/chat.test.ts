@@ -172,11 +172,13 @@ describe('Chat transport integration', () => {
 		chat.send({ body: 'Offline question' });
 		const user = ctx.get(messagesAtom)[0];
 		expect(chat.isMessageSending(user.id!)).toBe(true);
+		expect(ctx.get(isLoadingAtom)).toBe(false);
 		activeThreadIdAtom(ctx, 'second');
 		transport.connected = true;
 		connect();
 		expect(JSON.parse(transport.publish.mock.calls[0][0].body)).toMatchObject({ id: user.id, extras: { threadId: 'first' } });
 		expect(chat.isMessageSending(user.id!)).toBe(false);
+		expect(ctx.get(isLoadingAtom)).toBe(true);
 	});
 	it('deactivates an offline client to cancel scheduled reconnects', () => {
 		transport.connected = false;

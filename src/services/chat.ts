@@ -388,6 +388,9 @@ export class Chat extends ChatStore {
 
 	private sendWaitingMessages() {
 		if (this.stompClient?.connected) {
+			if (this.waitingMessages.length) {
+				isLoadingAtom(this.store, true);
+			}
 			for (const message of this.waitingMessages) {
 				this.stompClient.publish({
 					body: JSON.stringify({

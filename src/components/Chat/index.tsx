@@ -16,7 +16,6 @@ import {
 	isLoadingAtom,
 	sortMessagesAtom,
 } from '@/stores';
-import { hasRunningAgentRunAtom } from '@/stores/agentRuns';
 import { Config } from '@/config';
 import { ERoles, type IMessage } from '@/types';
 import {
@@ -54,9 +53,8 @@ export const Chat = React.memo(
 		const [isLoading] = useAtom(isLoadingAtom);
 		const [canLoadHistory] = useAtom(canLoadHistoryAtom);
 		const [createIncidentAvailable] = useAtom(isCreateIncidentAvailable);
-		const [hasRunningAgentRun] = useAtom(hasRunningAgentRunAtom);
-		const hasStreamingAssistant = messages.some(message =>
-			message.role === ERoles.bot && message.extras?.agentPending === 'true' && !!message.text,
+		const hasPendingAssistant = messages.some(message =>
+			message.role === ERoles.bot && message.extras?.agentPending === 'true',
 		);
 		const threadUi = useThreadUi();
 		const [historyOpen, setHistoryOpen] = useState(false);
@@ -227,7 +225,7 @@ export const Chat = React.memo(
 				<div className={classes.content}>
 					<div className={classes.messages} ref={messageContainerRef}>
 						{isLoading &&
-								(!Config.universalAgentEnabled || (!hasRunningAgentRun && !hasStreamingAssistant)) && (
+								(!Config.universalAgentEnabled || !hasPendingAssistant) && (
 								<Message key="loader" loader />
 							)}
 						{[...messages].reverse().map((message, index) => (

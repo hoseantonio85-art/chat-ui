@@ -51,7 +51,9 @@ export const Message = React.memo((props: IMessageProps) => {
 	const [files, setFiles] = useState([]);
 	const messageRef = useRef<HTMLDivElement | null>(null);
 
-	const { reactOnMessage } = useChat();
+	const { reactOnMessage, isMessageSending } = useChat();
+	const isQueued = isAgentPending && !!message.requestId && isMessageSending(message.requestId);
+	const hasAgentTrace = !!agentRun?.events.some(event => event.kind !== 'finish');
 
 	const handleClick = (reaction: TReaction) => {
 		reactOnMessage(message as IMessage, reaction);
@@ -144,7 +146,7 @@ export const Message = React.memo((props: IMessageProps) => {
 			onMouseLeave={onMouseLeave}
 			onMouseOver={onMouseOver}
 		>
-			{agentRun && agentRun.events.some(event => event.kind !== 'finish') && <AgentActivity run={agentRun} />}
+			{(hasAgentTrace || (isAgentPending && !isQueued)) && <AgentActivity run={hasAgentTrace ? agentRun : undefined} />}
 			{(loader || text || fileIds.length > 0 || !!graphsData) && <div
 				className={cn(classes.message, {
 					[classes.messageBot]: role === ERoles.bot || loader,
