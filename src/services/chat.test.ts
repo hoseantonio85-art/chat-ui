@@ -4,7 +4,7 @@ import type { IMessage as StompMessage, StompConfig } from '@stomp/stompjs';
 import { Config } from '@/config';
 import { addMessageAction, canLoadHistoryAtom, isLoadingAtom, messagesAtom, resetAction, sortMessagesAtom } from '@/stores';
 import { ctx } from '@/stores/ctx';
-import { agentRunsAtom, clearAgentRunsAction } from '@/stores/agentRuns';
+import { agentRunsAtom, clearAgentRunsAction, hasRunningAgentRunAtom } from '@/stores/agentRuns';
 import { activeThreadIdAtom, setThreadsAction, threadsAtom, threadsScopeVersionAtom, threadsStatusAtom } from '@/stores/threads';
 import { ERoles } from '@/types';
 import { Chat } from './chat';
@@ -71,6 +71,9 @@ describe('Chat transport integration', () => {
 		chat.send({ body: 'Question' });
 		const [user, pending] = ctx.get(messagesAtom);
 		receive({ type: 'agent.run.started', payload: { assistantMessageId: 'server-a', requestId: user.id, runId: 'server-run', startedAt: 1000 } });
+		expect(ctx.get(hasRunningAgentRunAtom)).toBe(false);
+		receive({ type: 'agent.run.event', payload: { assistantMessageId: 'server-a', runId: 'server-run', event: { id: 'step-1', runId: 'server-run', kind: 'thinking', text: 'Проверяю данные' } } });
+		expect(ctx.get(hasRunningAgentRunAtom)).toBe(true);
 		receive({ type: 'assistant.message.delta', payload: { assistantMessageId: 'server-a', runId: 'server-run', delta: 'Answer' } });
 		expect(ctx.get(messagesAtom)[1].text).toBe('Answer');
 		const final = { id: 'server-a', role: 'bot', requestId: user.id, text: 'Answer complete' };
@@ -80,6 +83,51 @@ describe('Chat transport integration', () => {
 		expect(ctx.get(messagesAtom)[1]).toMatchObject({ id: pending.id, text: 'Answer complete', extras: { agentPending: 'false', backendMessageId: 'server-a' } });
 		expect(ctx.get(isLoadingAtom)).toBe(false);
 		expect(Object.values(ctx.get(agentRunsAtom))[0].status).toBe('done');
+	});
+	it('keeps a final-only answer without an empty agent run', () => {
+		chat.send({ body: 'Question' });
+		const [user, pending] = ctx.get(messagesAtom);
+		expect(ctx.get(agentRunsAtom)).toEqual({});
+		receive({ id: 'server-a', role: 'bot', requestId: user.id, text: 'Готовый ответ' });
+		expect(ctx.get(messagesAtom)[1]).toMatchObject({
+			id: pending.id, text: 'Готовый ответ', extras: { agentPending: 'false' },
+		});
+		expect(ctx.get(agentRunsAtom)).toEqual({});
+		expect(ctx.get(isLoadingAtom)).toBe(false);
+	});
+	it('does not treat a start signal alone as live activity', () => {
+		chat.send({ body: 'Question' });
+		const [user] = ctx.get(messagesAtom);
+		receive({ type: 'agent.run.started', payload: {
+			assistantMessageId: 'server-a', requestId: user.id, runId: 'server-run', startedAt: 1000,
+		} });
+		expect(ctx.get(hasRunningAgentRunAtom)).toBe(false);
+		receive({ id: 'server-a', role: 'bot', requestId: user.id, text: 'Ответ целиком' });
+		expect(ctx.get(hasRunningAgentRunAtom)).toBe(false);
+		expect(Object.values(ctx.get(agentRunsAtom))[0].events.map(event => event.kind)).toEqual(['finish']);
+	});
+	it('keeps progress messages separate from the pending final answer', () => {
+		chat.send({ body: 'Question' });
+		const [user, pending] = ctx.get(messagesAtom);
+		receive({ id: 'step', role: 'bot', requestId: user.id, text: 'Спросил методолога', extras: { type: 'system' } });
+		expect(ctx.get(messagesAtom)[1]).toMatchObject({ id: pending.id, extras: { agentPending: 'true' } });
+		expect(ctx.get(isLoadingAtom)).toBe(true);
+		receive({ id: 'answer', role: 'bot', requestId: user.id, text: 'Ответ' });
+		expect(ctx.get(messagesAtom)).toHaveLength(3);
+		expect(ctx.get(messagesAtom)[1]).toMatchObject({ id: pending.id, text: 'Ответ', extras: { agentPending: 'false' } });
+		expect(ctx.get(isLoadingAtom)).toBe(false);
+	});
+	it('completes a pending answer on the current supervisor failure reply', () => {
+		chat.send({ body: 'Question' });
+		const [user, pending] = ctx.get(messagesAtom);
+		receive({
+			id: 'failure', role: 'bot', requestId: user.id,
+			text: 'Упс! Кажется что-то сломалось, я уже разбираюсь. Попробуй ещё раз немного позже.',
+			extras: { type: 'system' },
+		});
+		expect(ctx.get(messagesAtom)).toHaveLength(2);
+		expect(ctx.get(messagesAtom)[1]).toMatchObject({ id: pending.id, extras: { agentPending: 'false' } });
+		expect(ctx.get(isLoadingAtom)).toBe(false);
 	});
 
 	it('does not replace the pending assistant with a user echo', () => {

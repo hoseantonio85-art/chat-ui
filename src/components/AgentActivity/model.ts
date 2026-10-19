@@ -83,12 +83,10 @@ export function runSummary(run: AgentRun, t: (key: string, values?: Record<strin
   const successful = sources.filter(source => source.status === 'success').length;
   const incomplete = sources.length - successful;
   const experts = run.events.filter(event => event.kind === 'delegation').length;
-  const seconds = Math.max(0, Math.round(((run.finishedAt || run.startedAt) - run.startedAt) / 1000));
   return [
     t(run.status === 'failed' ? 'agentActivity.summaryFailed' : 'agentActivity.summaryDone'),
     t('agentActivity.summarySources', { successful, total: sources.length }),
     ...(incomplete ? [t('agentActivity.summaryIncomplete', { count: incomplete })] : []),
     ...(experts ? [t('agentActivity.summaryExperts', { count: experts })] : []),
-    t('agentActivity.seconds', { count: seconds }),
   ].join(' · ');
 }

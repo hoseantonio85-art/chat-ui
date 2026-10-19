@@ -157,7 +157,9 @@ export class Chat extends ChatStore {
 			}
 
 			// Match only assistant messages. A user echo may carry the same requestId.
-			const pending = update.message.role === ERoles.bot
+			const isTerminalReply = update.message.extras?.type !== 'system' ||
+				update.message.extras?.agentTerminal === 'true';
+			const pending = update.message.role === ERoles.bot && isTerminalReply
 				? this.findPendingAssistant(update.message.requestId) ?? this.store.get(messagesAtom).find(
 					(message) => message.role === ERoles.bot && !!update.message.id &&
 						message.extras?.backendMessageId === update.message.id,
@@ -355,12 +357,6 @@ export class Chat extends ChatStore {
 				message.id,
 				startedAt,
 			);
-			startAgentRunAction(this.store, {
-				assistantMessageId: localAgentRun.assistantMessageId,
-				requestId: message.id,
-				runId: localAgentRun.runId,
-				startedAt,
-			});
 		}
 
 		if (!this.stompClient?.connected) {

@@ -125,7 +125,13 @@ export const addMessageAction = action(
 			} else {
 				list[existingMessageIndex] = newMessage;
 			}
-			if (lastUserMessageIndex !== -1 && newMessage.role === ERoles.bot && newMessage.extras?.agentPending !== 'true') {
+			const hasPendingAssistant = list.some(item =>
+				item.role === ERoles.bot && item.requestId === newMessage.requestId &&
+				item.extras?.agentPending === 'true',
+			);
+			if (lastUserMessageIndex !== -1 && newMessage.role === ERoles.bot &&
+				newMessage.extras?.agentPending !== 'true' &&
+				(newMessage.extras?.type !== 'system' || !hasPendingAssistant)) {
 				isLoadingAtom(context, false);
 			}
 			if (

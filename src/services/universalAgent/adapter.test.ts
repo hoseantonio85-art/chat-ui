@@ -12,6 +12,14 @@ describe('adaptUniversalAgentPayload', () => {
 		});
 		if (update.kind === 'message') expect(update.message.extras).not.toHaveProperty('invalid');
 	});
+	it('preserves an object chart for the existing chart viewer', () => {
+		const chart = {
+			metadata: { colors: { revenue: 'seriesColor' }, categories: ['2026'], series: ['revenue'] },
+			data: [{ category: '2026', values: { revenue: 12 } }],
+		};
+		const [update] = adaptUniversalAgentPayload({ id: 'answer', role: 'bot', extras: { chart } });
+		expect(update).toMatchObject({ kind: 'message', message: { extras: { chart: JSON.stringify(chart) } } });
+	});
 	it('normalizes a backend run event without exposing its envelope to UI', () => {
 		const updates = adaptUniversalAgentPayload({
 			type: 'agent_run_event',

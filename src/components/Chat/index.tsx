@@ -18,7 +18,7 @@ import {
 } from '@/stores';
 import { hasRunningAgentRunAtom } from '@/stores/agentRuns';
 import { Config } from '@/config';
-import type { IMessage } from '@/types';
+import { ERoles, type IMessage } from '@/types';
 import {
 	EChatState,
 	type IChatState,
@@ -55,6 +55,9 @@ export const Chat = React.memo(
 		const [canLoadHistory] = useAtom(canLoadHistoryAtom);
 		const [createIncidentAvailable] = useAtom(isCreateIncidentAvailable);
 		const [hasRunningAgentRun] = useAtom(hasRunningAgentRunAtom);
+		const hasStreamingAssistant = messages.some(message =>
+			message.role === ERoles.bot && message.extras?.agentPending === 'true' && !!message.text,
+		);
 		const threadUi = useThreadUi();
 		const [historyOpen, setHistoryOpen] = useState(false);
 		const activeThread = threadUi.threads.find(item => item.id === threadUi.activeThreadId);
@@ -224,7 +227,7 @@ export const Chat = React.memo(
 				<div className={classes.content}>
 					<div className={classes.messages} ref={messageContainerRef}>
 						{isLoading &&
-							(!Config.universalAgentEnabled || !hasRunningAgentRun) && (
+								(!Config.universalAgentEnabled || (!hasRunningAgentRun && !hasStreamingAssistant)) && (
 								<Message key="loader" loader />
 							)}
 						{[...messages].reverse().map((message, index) => (

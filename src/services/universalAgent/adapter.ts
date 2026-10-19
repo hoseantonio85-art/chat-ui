@@ -11,6 +11,10 @@ import type { UniversalAgentInboundUpdate } from './types';
 
 type JsonRecord = Record<string, unknown>;
 
+// The current supervisor sends a system-only failure without a terminal flag.
+// Keep this transport-specific fallback until the chat backend marks final replies.
+const CHAT_FAILED = 'Упс! Кажется что-то сломалось, я уже разбираюсь. Попробуй ещё раз немного позже.';
+
 const eventKinds = new Set<AgentEventKind>([
 	'thinking',
 	'message',
@@ -163,8 +167,15 @@ const adaptMessage = (value: unknown): IMessage | undefined => {
 				extras[key] = item;
 			} else if (typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item))) {
 				extras[key] = String(item);
+			} else if (key === 'chart' && isRecord(item)) {
+				// Preserve the existing string-valued extras contract; the chart viewer
+				// validates and parses this payload before rendering it.
+				extras.chart = JSON.stringify(item);
 			}
 		}
+	}
+	if (extras?.type === 'system' && value.text === CHAT_FAILED) {
+		extras.agentTerminal = 'true';
 	}
 
 	return {

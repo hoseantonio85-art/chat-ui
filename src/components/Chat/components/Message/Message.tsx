@@ -27,6 +27,7 @@ import {
 
 import { Graphs } from '@/components/UniversalChart/components/Graphs';
 import { IChartData } from '@/components/UniversalChart/types';
+import { parseChartData } from '@/components/UniversalChart/parseChartData';
 import { ERoles } from '../../types';
 import { Table } from '../Table';
 import classes from './styles.module.scss';
@@ -57,7 +58,7 @@ export const Message = React.memo((props: IMessageProps) => {
 	};
 
 	const graphsData = useMemo(
-		() => message.extras?.chart,
+		() => parseChartData(message.extras?.chart),
 		[message.extras?.chart],
 	);
 
@@ -143,7 +144,7 @@ export const Message = React.memo((props: IMessageProps) => {
 			onMouseLeave={onMouseLeave}
 			onMouseOver={onMouseOver}
 		>
-			{agentRun && <AgentActivity run={agentRun} />}
+			{agentRun && agentRun.events.some(event => event.kind !== 'finish') && <AgentActivity run={agentRun} />}
 			{(loader || text || fileIds.length > 0 || !!graphsData) && <div
 				className={cn(classes.message, {
 					[classes.messageBot]: role === ERoles.bot || loader,
@@ -195,7 +196,7 @@ export const Message = React.memo((props: IMessageProps) => {
 				{!!graphsData && accessControl$.userHasAccess('Chat.Graphs') && (
 					<Graphs
 						onFullScreen={onOpenChart ? handleOpenChart : undefined}
-						data={graphsData as IChartData}
+						data={graphsData}
 					/>
 				)}
 			</div>}

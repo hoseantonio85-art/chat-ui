@@ -22,7 +22,7 @@ export interface AppendAgentEventPayload {
 export const agentRunsAtom = atom<Readonly<Record<string, AgentRun>>>({}, 'agentRunsAtom');
 
 export const hasRunningAgentRunAtom = atom(
-	(context) => Object.values(context.spy(agentRunsAtom)).some((run) => run.status === 'running'),
+	(context) => Object.values(context.spy(agentRunsAtom)).some((run) => run.status === 'running' && run.events.length > 0),
 	'hasRunningAgentRunAtom',
 );
 

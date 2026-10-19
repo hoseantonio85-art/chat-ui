@@ -11,8 +11,7 @@ export function AgentActivity({ run }: { run: AgentRun }) {
   const [expanded, setExpanded] = useState(false);
   const traceId = useId();
 
-  const duration = Math.max(1, Math.round(((run.finishedAt || run.startedAt) - run.startedAt) / 1000));
-  const label = run.status === 'running' ? t(run.currentActivity, { defaultValue: run.currentActivity }) : run.status === 'failed' ? t('agentActivity.failed') : t('agentActivity.duration', { count: duration });
+  const label = run.status === 'running' ? t(run.currentActivity, { defaultValue: run.currentActivity }) : run.status === 'failed' ? t('agentActivity.failed') : t('agentActivity.summaryDone');
   return <section className={classes.activity} aria-label={t('agentActivity.aria')} data-status={run.status} data-expanded={expanded}>
     <button type="button" className={classes.live} aria-label={label} aria-expanded={expanded} aria-controls={traceId} onClick={() => setExpanded(value => !value)}>
       <ChatLogoSVG className={classes.agentIcon}/><span role="status" aria-live="polite">{label}</span><Icon className={classes.chevron} name={expanded ? EIconName.chevronFillUp : EIconName.chevronFillDown} width={16} height={16}/>
