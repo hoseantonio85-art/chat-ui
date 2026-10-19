@@ -12,7 +12,7 @@ export function AgentActivity({ run }: { run?: AgentRun }) {
   const traceId = useId();
 
   const canExpand = !!run?.events.some(event => event.kind !== 'finish');
-  const label = !run || !canExpand ? t('agentActivity.pending') : run.status === 'running' ? t(run.currentActivity, { defaultValue: run.currentActivity }) : run.status === 'failed' ? t('agentActivity.failed') : t('agentActivity.summaryDone');
+  const label = !run || !canExpand ? t('agentActivity.preparingAnswer') : run.status === 'running' ? t(run.currentActivity, { defaultValue: run.currentActivity }) : run.status === 'failed' ? t('agentActivity.failed') : t('agentActivity.summaryDone');
   const content = <><ChatLogoSVG className={classes.agentIcon}/><span role="status" aria-live="polite">{label}</span>{canExpand && <Icon className={classes.chevron} name={expanded ? EIconName.chevronFillUp : EIconName.chevronFillDown} width={16} height={16}/>}</>;
   return <section className={classes.activity} aria-label={t('agentActivity.aria')} data-status={run?.status ?? 'running'} data-expanded={canExpand && expanded}>
     {canExpand

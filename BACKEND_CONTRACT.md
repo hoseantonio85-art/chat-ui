@@ -31,6 +31,17 @@
 
 Затем backend посылает `agent.run.event` с `{threadId, assistantMessageId, runId, event}`. `event` содержит `id`, `runId`, `at`, `kind` и поля конкретного шага: `callId`, `parentCallId`, `tool`, `source`, `label`, `text`, `args`, `result`, `todos`, `fatal`. Поддерживаемые `kind`: `thinking`, `message`, `plan`, `toolCall`, `toolResult`, `delegation`, `handback`, `error`, `empty`, `finish`. `args` и `result` сохраняют подробность trace.
 
+### Текст для пользователя принадлежит backend
+
+Текущий pilot использует вымышленные события, а frontend пока содержит справочник `tool → подпись`, подписи типов шагов и вычисление итогов по событиям. Это временное поведение **не является данными агента**. Для production-контракта backend/chat adapter должен передавать готовый для показа текст; frontend не должен угадывать его по `tool`, `kind` или содержимому результата.
+
+- У каждого отображаемого шага backend передаёт `label` (заголовок) и, при необходимости, `text` (пояснение). Для текущей pill backend передаёт `activity` — действие в настоящем времени. Например, `tool: "get_company_risks"` остаётся машинным полем, а `label: "Проверяю реестр рисков"` и `source: "Реестр рисков"` задаёт backend.
+- Для плана backend передаёт текст каждого пункта и готовую подпись его состояния (`statusLabel`). Машинные `write_todos`, `pending`, `in_progress`, `completed` нужны для связывания событий, а не как пользовательский текст.
+- Для итогового блока backend передаёт `summaryText` и `sources` с готовыми именами, подписями состояний и количеством обращений. Frontend не должен выводить итог по собственной карте инструментов или вычислять источники из tool calls.
+- Если этих полей нет, frontend может показывать только нейтральное состояние ожидания и полученный финальный ответ; он не должен создавать якобы агентские действия. Технические идентификаторы не выводятся в пользовательском trace по умолчанию.
+
+Пока `/ainvoke` отправляет один callback после завершения прогона с уже подготовленными backend текстовыми шагами. Он **не** отправляет перечисленные структурированные поля для `AgentActivity`. Чат-бэкенд должен пробросить их в STOMP и сохранять в истории; после этого frontend удаляет временные справочники и вычисления из `AgentActivity/model.ts` и `AgentTrace.tsx`.
+
 Текст ответа поступает как `assistant.message.delta` с `{threadId, requestId, assistantMessageId, runId?, delta, append?: true}`. Если backend назначает собственный `assistantMessageId`, он повторяет `requestId` или `runId` для сопоставления с pending-сообщением. Завершение — обычное `chat.message` с итоговым `IMessage`, `requestId` и `threadId` (в envelope или `extras`). Для восстановления истории backend возвращает `agent.run.snapshot` или `extras.agentRun` вместе с финальным сообщением. События одного run идут в порядке возникновения.
 
 Пагинация через `/app/history` получает `extras.threadId` и `extras.loadLast`; очистка контекста через `/app/context` получает `threadId`. Reaction и файловые API сохраняют существующие контракты.
