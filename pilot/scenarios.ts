@@ -1,7 +1,8 @@
 import type { AgentEvent } from '../src/components/AgentActivity/model';
 import type { IChartData } from '../src/components/UniversalChart/types';
 export const scenarios = [
-  {id: 'vnd', title: 'Проверка ВНД', question: 'Проверь ВНД на соответствие стандартам группы.'},
+  {id: 'vnd', title: 'ВНД · сам пишу в чат', question: 'Проверь ВНД на соответствие стандартам группы.'},
+  {id: 'vndWelcome', title: 'ВНД · пришёл по кнопке', question: 'Проверь ВНД на соответствие стандартам группы.'},
   {id: 'normal', title: 'Обычная проверка', question: 'Проверь операционные риски компании и подскажи, на что обратить внимание.'},
   {id: 'subagent', title: 'Работа с экспертом', question: 'Подключи методолога и проверь, как оценить риск сбоя поставок.'},
   {id: 'empty', title: 'Источник без данных', question: 'Есть ли в реестре риски для нового направления компании?'},

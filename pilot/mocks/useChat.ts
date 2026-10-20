@@ -19,7 +19,7 @@ export function setDemoOnline(value: boolean) {
 }
 const api = {
   send(request: Request) {
-    if (!request.body.trim()) return;
+    if (!request.body.trim() && !request.extras?.fileIds) return;
     if (online) sender(request);
     else {
       const id = `pending-${crypto.randomUUID()}`;

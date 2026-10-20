@@ -138,7 +138,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 			if (
 				event.key === 'Enter' &&
 				!(event.key === 'Enter' && event.shiftKey) &&
-				text?.trim()
+				(text?.trim() || attachments.length > 0)
 			) {
 				event.preventDefault();
 
@@ -315,7 +315,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 								loading={clearingContext || !!uploadingFiles}
 								variant="primary"
 								onClick={handleButtonClick}
-								disabled={!text.trim() || !!uploadingFiles}
+								disabled={(!text.trim() && attachments.length === 0) || !!uploadingFiles}
 								icon={EIconName.arrowUp}
 								iconOnly
 								aria-label={buttonText}
