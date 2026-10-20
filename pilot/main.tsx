@@ -12,14 +12,15 @@ import { AssistantSkillsContext, type AssistantSkill } from '../src/components/A
 import { ThreadUiContext, type ChatThread } from '../src/components/ThreadDrawer/context';
 import { chat$, EChatState } from './mocks/auth';
 import { resetPending, setDemoOnline, setDemoSender } from './mocks/useChat';
-import { chart, fixture, scenarios, type ScenarioId } from './scenarios';
+import { chart, fixture, scenarios, type ScenarioId, vndCorrectedAnswer, vndResultAnswer, vndStandardPrompt } from './scenarios';
 import modalClasses from '@/components/ModalContainer/styles.module.scss';
 import chatClasses from '@/components/Chat/styles.module.scss';
 import '@/i18n';
 import './vendor/ui-kit/dist/index.css';
 import './styles.css';
 
-interface DemoThread extends ChatThread { scenario: ScenarioId; messages: IMessage[]; runs: Record<string, AgentRun>; }
+type VndStage = 'start' | 'chooseStandard' | 'reviewed' | 'complete';
+interface DemoThread extends ChatThread { scenario: ScenarioId; messages: IMessage[]; runs: Record<string, AgentRun>; vndStage?: VndStage; }
 const assistantSkills: AssistantSkill[] = [
   {id: 'methodologist', title: 'Методолог'}, {id: 'risk-review', title: 'Проверка рисков'}, {id: 'createIncident', title: 'Регистрация события'},
 ];
@@ -38,6 +39,19 @@ function historicalThread(id: string, title: string, scenario: ScenarioId, minut
   ]};
 }
 const initialThreads = () => [
+  {
+    id: 'vnd',
+    title: 'Проверка ВНД',
+    scenario: 'vnd',
+    pinned: true,
+    updatedAt: Date.now(),
+    runs: {},
+    vndStage: 'chooseStandard',
+    messages: [
+      {id:'vnd-question', role:ERoles.user, text:'Проверь ВНД на соответствие стандартам группы.', timeCreated:new Date(Date.now() - 2_000).toISOString(), extras:{fileIds:'["vnd-draft"]'}},
+      {id:'vnd-prompt', requestId:'vnd-question', role:ERoles.bot, text:vndStandardPrompt, timeCreated:new Date(Date.now() - 1_000).toISOString()},
+    ],
+  } satisfies DemoThread,
   historicalThread('risk', 'Анализ рисков компании', 'normal', 8, true),
   historicalThread('registration', 'Регистрация события', 'registration', 22, false, 'createIncident'),
   historicalThread('expert', 'Проверка поставщика', 'subagent', 65, true),
@@ -47,9 +61,10 @@ const initialThreads = () => [
 
 function App() {
   const [threads, setThreads] = useState<DemoThread[]>(initialThreads); const threadsRef = useRef(threads);
-  const [activeThreadId, setActiveThreadId] = useState('risk'); const activeIdRef = useRef(activeThreadId);
-  const [scenario, setScenario] = useState<ScenarioId>('normal');
+  const [activeThreadId, setActiveThreadId] = useState('vnd'); const activeIdRef = useRef(activeThreadId);
+  const [scenario, setScenario] = useState<ScenarioId>('vnd');
   const [runs, setRunsState] = useState<Record<string, AgentRun>>({}); const runsRef = useRef(runs);
+  const vndStageRef = useRef<VndStage>('chooseStandard');
   const [selectedSkillId, setSelectedSkillId] = useState<string>();
   const [playing, setPlaying] = useState(false); const [online, setOnline] = useState(true); const [actionUrl, setActionUrl] = useState('');
   const generation = useRef(0); const timeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -58,17 +73,116 @@ function App() {
   const later = (callback: () => void, delay: number) => { const current = generation.current; timeouts.current.push(setTimeout(() => {if (current === generation.current) callback();}, delay)); };
   const updateThreads = (change: (items: DemoThread[]) => DemoThread[]) => { const next = change(threadsRef.current); threadsRef.current = next; setThreads(next); };
   const storeCurrent = () => {
-    const next = threadsRef.current.map(thread => thread.id === activeIdRef.current ? {...thread, messages: ctx.get(messagesAtom).map(({remove: _remove, ...message}) => message), runs: runsRef.current, updatedAt: Date.now()} : thread);
+    const next = threadsRef.current.map(thread => thread.id === activeIdRef.current ? {...thread, messages: ctx.get(messagesAtom).map(({remove: _remove, ...message}) => message), runs: runsRef.current, vndStage: thread.scenario === 'vnd' ? vndStageRef.current : thread.vndStage, updatedAt: Date.now()} : thread);
     threadsRef.current = next; setThreads(next); return next;
   };
   const loadThread = (thread: DemoThread) => {
     clearTimers(); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); thread.messages.forEach(message => addMessageAction(ctx, message));
     canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false); contextChatAtom(ctx, thread.initialSkill === 'createIncident' ? {intent:'createIncident', company_id:'demo-company'} : {company_id:'demo-company'});
-    activeIdRef.current = thread.id; setActiveThreadId(thread.id); setScenario(thread.scenario); setRuns(thread.runs); setPlaying(false); setSelectedSkillId(thread.initialSkill === 'createIncident' ? 'createIncident' : undefined);
+    activeIdRef.current = thread.id; setActiveThreadId(thread.id); setScenario(thread.scenario); setRuns(thread.runs); setPlaying(false); setSelectedSkillId(thread.initialSkill === 'createIncident' ? 'createIncident' : undefined); vndStageRef.current = thread.vndStage || 'start';
   };
   const selectThread = (id: string) => { const saved = storeCurrent(); const thread = saved.find(item => item.id === id); if (thread) loadThread(thread); };
   const newThread = () => { const saved = storeCurrent(); const id = `thread-${crypto.randomUUID()}`; const thread: DemoThread = {id, title:'Новый диалог', pinned:false, updatedAt:Date.now(), scenario:'ordinary', messages:[], runs:{}}; const next = [...saved, thread]; threadsRef.current = next; setThreads(next); loadThread(thread); };
   const deleteThread = (id: string) => { const remaining = threadsRef.current.filter(item => item.id !== id); if (!remaining.length) { newThread(); return; } updateThreads(() => remaining); if (id === activeIdRef.current) loadThread(remaining[0]); };
+
+  const setVndStage = (stage: VndStage) => {
+    vndStageRef.current = stage;
+    updateThreads(items => items.map(thread => thread.id === activeIdRef.current ? {...thread, vndStage:stage, updatedAt:Date.now()} : thread));
+  };
+
+  function runVndReview(corrected: boolean, instant = false) {
+    const startedAt = Date.now();
+    const requestId = `vnd-request-${crypto.randomUUID()}`;
+    const responseId = `vnd-answer-${crypto.randomUUID()}`;
+    const base: IMessage = {id:responseId, requestId, role:ERoles.bot, timeCreated:new Date(startedAt).toISOString()};
+    const plan = corrected
+      ? [{content:'Проверить исправления',status:'in_progress' as const},{content:'Подтвердить соответствие',status:'pending' as const}]
+      : [{content:'Изучить ВНД',status:'in_progress' as const},{content:'Сверить с групповым стандартом',status:'pending' as const},{content:'Подготовить отчёт',status:'pending' as const}];
+    let run = createRun(responseId, requestId, startedAt);
+    run = appendEvent(run, {id:`${responseId}-plan`, runId:responseId, at:startedAt, kind:'plan', tool:'write_todos', todos:plan});
+    const updateRun = () => setRuns({...runsRef.current, [responseId]:run});
+    const finish = () => {
+      const completedTodos = plan.map(item => ({...item,status:'completed' as const}));
+      run = appendEvent(run, {id:`${responseId}-complete`, runId:responseId, at:Date.now(), kind:'plan', tool:'write_todos', todos:completedTodos});
+      run = appendEvent(run, {id:`${responseId}-finish`, runId:responseId, at:Date.now() + 1, kind:'finish'});
+      updateRun();
+      addMessageAction(ctx, {...base, text:corrected ? vndCorrectedAnswer : vndResultAnswer});
+      setVndStage(corrected ? 'complete' : 'reviewed');
+      setPlaying(false);
+      queueMicrotask(storeCurrent);
+    };
+    updateRun();
+    if (instant) { finish(); return; }
+    setPlaying(true);
+    addMessageAction(ctx, {...base, text:'', extras:{agentPending:'true'}});
+    later(() => {
+      run = appendEvent(run, {id:`${responseId}-accepted`, runId:responseId, at:Date.now(), kind:'message', label:'Документ принят в работу'});
+      updateRun();
+    }, 650);
+    later(() => {
+      run = appendEvent(run, {id:`${responseId}-compare`, runId:responseId, at:Date.now(), kind:'message', label:corrected ? 'Проверяю внесённые изменения' : 'Сверяю документ с требованиями'});
+      updateRun();
+    }, 1_350);
+    later(finish, 2_400);
+  }
+
+  function playVndFlow(instant = false) {
+    clearTimers(); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false);
+    setActionUrl(''); setScenario('vnd'); setPlaying(!instant); setRuns({});
+    updateThreads(items => items.map(thread => thread.id === activeIdRef.current ? {...thread, title:'Проверка ВНД', scenario:'vnd', vndStage:'start', updatedAt:Date.now()} : thread));
+    vndStageRef.current = 'start';
+    const startedAt = Date.now();
+    addMessageAction(ctx, {id:`vnd-start-${crypto.randomUUID()}`, role:ERoles.user, text:'Проверь ВНД на соответствие стандартам группы.', timeCreated:new Date(startedAt).toISOString(), extras:{fileIds:'["vnd-draft"]'}});
+    const addPrompt = () => {
+      addMessageAction(ctx, {id:`vnd-prompt-${crypto.randomUUID()}`, role:ERoles.bot, text:vndStandardPrompt, timeCreated:new Date().toISOString()});
+      setVndStage('chooseStandard');
+    };
+    const addChoice = () => {
+      addMessageAction(ctx, {id:`vnd-choice-${crypto.randomUUID()}`, role:ERoles.user, text:'2', timeCreated:new Date().toISOString()});
+      runVndReview(false, instant);
+    };
+    if (instant) {
+      addPrompt(); addChoice();
+      addMessageAction(ctx, {id:`vnd-corrected-${crypto.randomUUID()}`, role:ERoles.user, text:'Загрузил исправленную версию. Проверь повторно.', timeCreated:new Date().toISOString(), extras:{fileIds:'["vnd-corrected"]'}});
+      addMessageAction(ctx, {id:`vnd-corrected-note-${crypto.randomUUID()}`, role:ERoles.bot, text:'Исправленная версия получена. Повторяю проверку по ранее выбранному стандарту.', timeCreated:new Date().toISOString()});
+      runVndReview(true, true);
+      return;
+    }
+    later(addPrompt, 700);
+    later(addChoice, 1_800);
+  }
+
+  function sendVnd(request: {body: string; extras?: Record<string, string>}) {
+    const sentAt = Date.now();
+    addMessageAction(ctx, {id:`vnd-user-${crypto.randomUUID()}`, role:ERoles.user, text:request.body, timeCreated:new Date(sentAt).toISOString(), extras:request.extras});
+    const hasFile = Boolean(request.extras?.fileIds);
+    if (vndStageRef.current === 'start') {
+      addMessageAction(ctx, {id:`vnd-reply-${crypto.randomUUID()}`, role:ERoles.bot, text:hasFile ? vndStandardPrompt : 'Я помогу проверить ВНД на соответствие стандартам группы. Загрузите документ, который хотите проверить.', timeCreated:new Date(sentAt + 1).toISOString()});
+      if (hasFile) setVndStage('chooseStandard');
+      return;
+    }
+    if (vndStageRef.current === 'chooseStandard') {
+      const number = request.body.trim().match(/^[1-4]$/)?.[0];
+      if (!number) {
+        addMessageAction(ctx, {id:`vnd-error-${crypto.randomUUID()}`, role:ERoles.bot, text:'Не удалось определить выбранный документ. Отправьте номер от 1 до 4.', timeCreated:new Date(sentAt + 1).toISOString()});
+        return;
+      }
+      runVndReview(false);
+      return;
+    }
+    if (vndStageRef.current === 'reviewed') {
+      if (!hasFile) {
+        addMessageAction(ctx, {id:`vnd-upload-${crypto.randomUUID()}`, role:ERoles.bot, text:'Прикрепите исправленную версию ВНД, и я повторю проверку по ранее выбранному стандарту.', timeCreated:new Date(sentAt + 1).toISOString()});
+        return;
+      }
+      addMessageAction(ctx, {id:`vnd-corrected-note-${crypto.randomUUID()}`, role:ERoles.bot, text:'Исправленная версия получена. Повторяю проверку по ранее выбранному стандарту.', timeCreated:new Date(sentAt + 1).toISOString()});
+      runVndReview(true);
+      return;
+    }
+    addMessageAction(ctx, {id:`vnd-complete-${crypto.randomUUID()}`, role:ERoles.bot, text:'Документ уже прошёл повторную проверку и соответствует выбранному стандарту.', timeCreated:new Date(sentAt + 1).toISOString()});
+  }
+
+  const runScenario = (id: ScenarioId, instant = false) => id === 'vnd' ? playVndFlow(instant) : play(id, instant);
 
   function play(id: ScenarioId, instant = false, body?: string, extras?: Record<string,string>) {
     clearTimers(); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false);
@@ -107,12 +221,12 @@ function App() {
     chat$.openChat();
   }
   useEffect(() => { const listener = (event: Event) => setActionUrl((event as CustomEvent<string>).detail); window.addEventListener('pilot:navigate',listener); later(() => {loadThread(threadsRef.current[0]); if (window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen); chat$.openChat();}, 50); return () => {clearTimers(); window.removeEventListener('pilot:navigate',listener);}; }, []);
-  useEffect(() => {setDemoSender(request => play(selectedSkillId === 'methodologist' ? 'subagent' : scenario, false, request.body, request.extras));}, [scenario, selectedSkillId]);
+  useEffect(() => {setDemoSender(request => scenario === 'vnd' ? sendVnd(request) : play(selectedSkillId === 'methodologist' ? 'subagent' : scenario, false, request.body, request.extras));}, [scenario, selectedSkillId]);
   const threadUi = {enabled:true, threads, activeThreadId, onSelect:selectThread, onNew:newThread, onRename:(id:string,title:string) => updateThreads(items => items.map(item => item.id === id ? {...item,title,updatedAt:Date.now()} : item)), onTogglePin:(id:string) => updateThreads(items => items.map(item => item.id === id ? {...item,pinned:!item.pinned,updatedAt:Date.now()} : item)), onDelete:deleteThread};
   const selectedSkill = demoFlags.assistantSkills ? assistantSkills.find(item => item.id === selectedSkillId) : undefined;
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><AgentRunsContext.Provider value={runs}>
     <style>{`.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:22px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child),.${chatClasses.headerDivider}{display:none}}`}</style>
-    <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Демонстрационные данные'}</span></div><label className="scenario-picker"><span className="sr-only">Сценарий</span><select aria-label="Сценарий" value={scenario} onChange={event => play(event.target.value as ScenarioId)}>{scenarios.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><Button size="S" variant="secondary" onClick={() => play(scenario)}>Воспроизвести</Button><Button size="S" variant="secondary" onClick={() => play(scenario, true)}>Сразу результат</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role === ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : playing ? 'Агент работает' : 'Готово'}</span></div>
+    <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario === 'vnd' ? 'Проверка ВНД · диалог в продуктовом чате' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Демонстрационные данные'}</span></div><label className="scenario-picker"><span className="sr-only">Сценарий</span><select aria-label="Сценарий" value={scenario} onChange={event => runScenario(event.target.value as ScenarioId)}>{scenarios.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>Воспроизвести</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>Сразу результат</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role === ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : playing ? 'Агент работает' : 'Готово'}</span></div>
     <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div><div><small>Источники</small><strong>4</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main><ModalContainer/>
     {actionUrl && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Переход в НОРМ"><h2>Переход в форму НОРМ</h2><p>Продуктовый чат передал команду открытия формы. В демо она перехвачена локально.</p><code>{actionUrl}</code><Button onClick={() => {setActionUrl('');chat$.openChat();}}>Вернуться в чат</Button></div>}
   </AgentRunsContext.Provider></AssistantSkillsContext.Provider></ThreadUiContext.Provider></reatomContext.Provider>;
