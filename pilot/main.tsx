@@ -89,7 +89,14 @@ function App() {
     updateThreads(items => items.map(thread => thread.id === activeIdRef.current ? {...thread, vndStage:stage, updatedAt:Date.now()} : thread));
   };
 
-  const background = useVndBackground<DemoThread>({activeId:activeIdRef,getThreads:()=>threadsRef.current,update:updateThreads,snapshot:storeCurrent,append:message=>addMessageAction(ctx,message),open:selectThread});
+  const background = useVndBackground<DemoThread>({
+    activeId:activeIdRef,getThreads:()=>threadsRef.current,update:updateThreads,snapshot:storeCurrent,
+    append:message=>addMessageAction(ctx,message),open:selectThread,
+    publishRun:(id,run)=>{
+      if (activeIdRef.current===id) setRuns({...runsRef.current,[run.runId]:run});
+      updateThreads(items=>items.map(item=>item.id===id?{...item,runs:{...item.runs,[run.runId]:run}}:item));
+    },
+  });
 
   function runVndReview(corrected: boolean, instant = false) {
     const startedAt = Date.now();
@@ -166,8 +173,13 @@ function App() {
     addMessageAction(ctx, {id:`vnd-user-${crypto.randomUUID()}`, role:ERoles.user, text:request.body, timeCreated:new Date(sentAt).toISOString(), extras:request.extras});
     const hasFile = Boolean(request.extras?.fileIds);
     const jobState=threadsRef.current.find(item=>item.id===activeIdRef.current)?.jobState;
-    if(jobState === 'ready' || jobState === 'saved') {
-      addMessageAction(ctx,{id:crypto.randomUUID(),role:ERoles.bot,text:jobState === 'ready' ? 'Отклонений не найдено. Нажмите «Сохранить ВНД» или выберите другую папку для сохранения актуального файла.' : 'Актуальный ВНД уже сохранён. Его можно открыть в базе знаний.',timeCreated:new Date().toISOString()});
+    if (jobState === 'ready') {
+      if (background.saveFromChat(activeIdRef.current,request.body)) return;
+      addMessageAction(ctx,{id:crypto.randomUUID(),role:ERoles.bot,text:'Отклонений не найдено. Сохранить актуальный ВНД в папку «Операционные риски»? Напишите «Да» или назовите другую папку: «Внутренние нормативные документы» либо «Методология».',timeCreated:new Date().toISOString()});
+      return;
+    }
+    if (jobState === 'saved') {
+      addMessageAction(ctx,{id:crypto.randomUUID(),role:ERoles.bot,text:'Актуальный ВНД уже сохранён в базе знаний.',timeCreated:new Date().toISOString()});
       return;
     }
     if (vndStageRef.current === 'start') {
