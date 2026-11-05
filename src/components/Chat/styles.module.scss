@@ -211,3 +211,12 @@
     border-radius: 24px 24px 24px 4px;
   }
 }
+
+/* A ready background result is discoverable before opening the history drawer. */
+.historyTrigger { position:relative; display:inline-flex; flex-shrink:0; }
+.historySparkle {
+  position:absolute; z-index:1; top:-3px; right:-3px;
+  pointer-events:none; width:13px; height:13px;
+  background:linear-gradient(135deg, #1570ef, #32d5a7 58%, #67bdf7);
+  clip-path:polygon(50% 0%,60% 39%,100% 50%,60% 61%,50% 100%,40% 61%,0% 50%,40% 39%);
+}
