@@ -71,14 +71,14 @@ export function useVndBackground<T extends BackgroundThread>(options: {
     setFolderDialog(undefined);
   };
   const saveFromChat = (id:string, text:string): boolean => {
-    const input=text.trim().toLowerCase().replace(/[«»\"'.!?]/g,'').replace(/\\s+/g,' ');
+    const input=text.trim().toLowerCase().replace(/[«»\"'.!?]/g,'').replace(/\s+/g,' ');
     if (/^(нет|не надо|отмена|не сохранять|пока не сохраняй)/.test(input)) {
       latest.current.append({id:crypto.randomUUID(),role:ERoles.bot,text:'Хорошо, пока не сохраняю. Если решите сохранить ВНД позднее, напишите «Сохрани».',timeCreated:new Date().toISOString()});
       latest.current.snapshot();
       return true;
     }
     const targetFolder=folders.find(item=>input.includes(item.toLowerCase()));
-    if (targetFolder || /^(да|давай|подтверждаю|сохранить|сохрани|сохраняй|ок|окей|хорошо)(\\b|$)/u.test(input)) {
+    if (targetFolder || /^(да|давай|подтверждаю|сохранить|сохрани|сохраняй|ок|окей|хорошо)(\b|$)/u.test(input)) {
       save(id,targetFolder || folders[0]);
       return true;
     }
