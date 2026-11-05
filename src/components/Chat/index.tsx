@@ -170,7 +170,10 @@ export const Chat = React.memo(
 					<div className={classes.headerLeading}>
 						{threadUi.enabled && (
 							<>
-								<Button variant="ellipse" icon={EIconName.burgerMenu} iconOnly aria-label="История диалогов" aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)} />
+								<span className={classes.historyTrigger}>
+                  <Button variant="ellipse" icon={EIconName.burgerMenu} iconOnly aria-label={threadUi.threads.some(item => item.unread && item.jobState === 'ready') ? 'История диалогов — есть новый результат' : 'История диалогов'} aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)} />
+                  {threadUi.threads.some(item => item.unread && item.jobState === 'ready') && <i className={classes.historySparkle} aria-hidden="true"/>}
+                </span>
 								<div className={classes.navigationDivider} aria-hidden="true" />
 							</>
 						)}
