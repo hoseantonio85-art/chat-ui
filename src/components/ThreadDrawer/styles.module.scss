@@ -29,3 +29,22 @@
 .list li[data-menu-open='true'] { z-index: 2; }
 .menu { position: absolute; top: calc(100% + 4px); right: 4px; z-index: 3; background: var(--backgroundBasicDefault); border: 1px solid var(--borderDefault); border-radius: 16px; box-shadow: 0 8px 24px rgba(9,32,55,.12); }
 @media (hover: none) { .more { opacity: 1; } }
+
+/* Background agent states: quiet by default, visible only when actionable. */
+.threadLabel { display:flex !important; align-items:center; gap:10px; min-width:0; width:100%; overflow:hidden; }
+.threadTitle { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.readySparkle {
+  flex:0 0 14px; width:14px; height:14px; display:inline-block;
+  background:linear-gradient(135deg, #1570ef 0%, #32d5a7 58%, #67bdf7 100%);
+  clip-path:polygon(50% 0%,60% 39%,100% 50%,60% 61%,50% 100%,40% 61%,0% 50%,40% 39%);
+}
+.threadRunning {
+  color:transparent;
+  background-image:linear-gradient(100deg, var(--textBaseDefault) 0%, #139a81 22%, #24c69e 45%, #3699dd 58%, var(--textBaseDefault) 82%);
+  background-size:250% 100%;
+  background-clip:text;
+  -webkit-background-clip:text;
+  animation:vndThreadFlow 2.7s linear infinite;
+}
+@keyframes vndThreadFlow { from {background-position:120% 0;} to {background-position:-120% 0;} }
+@media (prefers-reduced-motion:reduce) { .threadRunning {animation:none; background-position:50% 0;} }
