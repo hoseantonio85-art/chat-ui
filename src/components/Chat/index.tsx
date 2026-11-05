@@ -213,6 +213,7 @@ export const Chat = React.memo(
 						<Button
 							variant="ellipse"
 							icon={EIconName.cross}
+							aria-label="Закрыть чат"
 							iconOnly
 							onClick={handleClose}
 							disabled={uploadingFiles}

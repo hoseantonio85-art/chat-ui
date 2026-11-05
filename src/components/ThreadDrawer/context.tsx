@@ -6,6 +6,8 @@ export interface ChatThread {
 	pinned: boolean;
 	updatedAt: number;
 	initialSkill?: string;
+	unread?: boolean;
+	jobState?: 'running' | 'ready' | 'saved';
 }
 
 interface ThreadUiValue {
