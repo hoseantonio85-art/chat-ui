@@ -30,21 +30,49 @@
 .menu { position: absolute; top: calc(100% + 4px); right: 4px; z-index: 3; background: var(--backgroundBasicDefault); border: 1px solid var(--borderDefault); border-radius: 16px; box-shadow: 0 8px 24px rgba(9,32,55,.12); }
 @media (hover: none) { .more { opacity: 1; } }
 
-/* System agent states: quiet by default, visible only when actionable. */
-.threadLabel { display:flex !important; align-items:center; gap:10px; min-width:0; width:100%; overflow:hidden; }
-.threadTitle { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* System agent states follow the quiet, spatial hierarchy of Alice history. */
+.threadLabel { display:flex !important; align-items:center; gap:12px; min-width:0; width:100%; overflow:hidden; }
+.threadTitle { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .readySparkle {
-  flex:0 0 14px; width:14px; height:14px; display:inline-block;
-  background:linear-gradient(135deg, #1570ef 0%, #32d5a7 58%, #67bdf7 100%);
+  position:relative; margin-left:auto; flex:0 0 18px; width:18px; height:18px; display:inline-block;
+  filter:drop-shadow(0 1px 3px rgba(9,32,55,.12));
+  animation:readySparkleReveal .38s cubic-bezier(.2,.85,.3,1.25) both;
+}
+.readySparkle::before,
+.readySparkle::after {
+  content:''; position:absolute;
   clip-path:polygon(50% 0%,60% 39%,100% 50%,60% 61%,50% 100%,40% 61%,0% 50%,40% 39%);
 }
+.readySparkle::before { inset:0; background:var(--backgroundBasicDefault, #fff); }
+.readySparkle::after { inset:2px; background:linear-gradient(135deg, #2d75f0 0%, #4cddba 54%, #20a789 100%); }
 .threadRunning {
   color:transparent;
-  background-image:linear-gradient(100deg, var(--textBaseDefault) 0%, #139a81 22%, #24c69e 45%, #3699dd 58%, var(--textBaseDefault) 82%);
-  background-size:250% 100%;
+  background-image:linear-gradient(100deg, var(--textBaseDefault) 0 24%, #175cd3 38%, #0b7562 51%, #096b5b 63%, var(--textBaseDefault) 79% 100%);
+  background-size:300% 100%;
   background-clip:text;
   -webkit-background-clip:text;
-  animation:agentThreadFlow 2.7s linear infinite;
+  animation:agentThreadFlow 2.45s linear infinite;
 }
 @keyframes agentThreadFlow { from {background-position:120% 0;} to {background-position:-120% 0;} }
-@media (prefers-reduced-motion:reduce) { .threadRunning {animation:none; background-position:50% 0;} }
+@keyframes readySparkleReveal { from { opacity:0; transform:scale(.45) rotate(-18deg); } to { opacity:1; transform:scale(1) rotate(0); } }
+@media (prefers-reduced-motion:reduce) {
+  .threadRunning { animation:none; background-position:50% 0; }
+  .readySparkle { animation:none; }
+}
+@media (forced-colors:active) {
+  .thread .threadRunning {
+    color:CanvasText;
+    background-image:none;
+    animation:none;
+    font-weight:600;
+    text-decoration:underline dotted CanvasText;
+    text-underline-offset:3px;
+  }
+  .readySparkle {
+    forced-color-adjust:none;
+    filter:none;
+    animation:none;
+  }
+  .readySparkle::before { background:Canvas; }
+  .readySparkle::after { background:CanvasText; }
+}

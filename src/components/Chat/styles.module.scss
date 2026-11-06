@@ -212,23 +212,54 @@
   }
 }
 
-/* System activity remains discoverable before opening the history drawer. */
-.historyTrigger { position:relative; display:inline-flex; flex-shrink:0; }
+/* Alice-style status marks live on the history trigger, not beside it. */
+.historyTrigger { position:relative; display:inline-flex; flex-shrink:0; isolation:isolate; }
 .historyIndicators {
-  position:absolute; z-index:1; top:-5px; right:-5px;
-  pointer-events:none; display:flex; align-items:center; gap:2px;
+  position:absolute; z-index:2; top:-2px; right:-2px;
+  pointer-events:none; display:flex; align-items:flex-start; gap:3px;
+  min-height:18px;
 }
 .historySpinner {
-  width:12px; height:12px; flex:0 0 12px; border-radius:50%;
-  background:conic-gradient(from 20deg, #1570ef, #32d5a7 58%, transparent 78%);
-  mask:radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
-  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
-  animation:historySpinnerRotation .9s linear infinite;
+  position:relative; width:16px; height:16px; flex:0 0 16px; border-radius:50%;
+  background:conic-gradient(from 25deg, #2d75f0 0 28%, #4cddba 52%, #20a789 72%, transparent 73% 100%);
+  box-shadow:0 0 0 2px var(--backgroundBasicDefault, #fff), 0 2px 5px rgba(9,32,55,.16);
+  animation:historySpinnerRotation .82s linear infinite;
+}
+.historySpinner::after {
+  content:''; position:absolute; inset:3px; border-radius:inherit;
+  background:var(--backgroundBasicDefault, #fff);
 }
 .historySparkle {
-  width:13px; height:13px; flex:0 0 13px;
-  background:linear-gradient(135deg, #1570ef, #32d5a7 58%, #67bdf7);
+  position:relative; width:18px; height:18px; flex:0 0 18px;
+  filter:drop-shadow(0 2px 4px rgba(9,32,55,.16));
+  animation:historySparkleReveal .38s cubic-bezier(.2,.85,.3,1.25) both;
+}
+.historySparkle::before,
+.historySparkle::after {
+  content:''; position:absolute;
   clip-path:polygon(50% 0%,60% 39%,100% 50%,60% 61%,50% 100%,40% 61%,0% 50%,40% 39%);
 }
+.historySparkle::before { inset:0; background:var(--backgroundBasicDefault, #fff); }
+.historySparkle::after { inset:2px; background:linear-gradient(135deg, #2d75f0 0%, #4cddba 54%, #20a789 100%); }
 @keyframes historySpinnerRotation { to { transform:rotate(360deg); } }
-@media (prefers-reduced-motion:reduce) { .historySpinner { animation-duration:1.8s; } }
+@keyframes historySparkleReveal { from { opacity:0; transform:scale(.45) rotate(-18deg); } to { opacity:1; transform:scale(1) rotate(0); } }
+@media (prefers-reduced-motion:reduce) {
+  .historySpinner, .historySparkle { animation:none; }
+}
+@media (forced-colors:active) {
+  .historySpinner {
+    forced-color-adjust:none;
+    box-sizing:border-box;
+    border:2px solid CanvasText;
+    border-right-color:transparent;
+    background:none;
+    box-shadow:none;
+  }
+  .historySpinner::after { display:none; }
+  .historySparkle {
+    forced-color-adjust:none;
+    filter:none;
+  }
+  .historySparkle::before { background:Canvas; }
+  .historySparkle::after { background:CanvasText; }
+}
