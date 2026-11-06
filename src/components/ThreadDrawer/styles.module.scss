@@ -30,7 +30,7 @@
 .menu { position: absolute; top: calc(100% + 4px); right: 4px; z-index: 3; background: var(--backgroundBasicDefault); border: 1px solid var(--borderDefault); border-radius: 16px; box-shadow: 0 8px 24px rgba(9,32,55,.12); }
 @media (hover: none) { .more { opacity: 1; } }
 
-/* Background agent states: quiet by default, visible only when actionable. */
+/* System agent states: quiet by default, visible only when actionable. */
 .threadLabel { display:flex !important; align-items:center; gap:10px; min-width:0; width:100%; overflow:hidden; }
 .threadTitle { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .readySparkle {
@@ -44,7 +44,7 @@
   background-size:250% 100%;
   background-clip:text;
   -webkit-background-clip:text;
-  animation:vndThreadFlow 2.7s linear infinite;
+  animation:agentThreadFlow 2.7s linear infinite;
 }
-@keyframes vndThreadFlow { from {background-position:120% 0;} to {background-position:-120% 0;} }
+@keyframes agentThreadFlow { from {background-position:120% 0;} to {background-position:-120% 0;} }
 @media (prefers-reduced-motion:reduce) { .threadRunning {animation:none; background-position:50% 0;} }

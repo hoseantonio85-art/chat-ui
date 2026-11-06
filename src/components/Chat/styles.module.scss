@@ -212,11 +212,23 @@
   }
 }
 
-/* A ready background result is discoverable before opening the history drawer. */
+/* System activity remains discoverable before opening the history drawer. */
 .historyTrigger { position:relative; display:inline-flex; flex-shrink:0; }
+.historyIndicators {
+  position:absolute; z-index:1; top:-5px; right:-5px;
+  pointer-events:none; display:flex; align-items:center; gap:2px;
+}
+.historySpinner {
+  width:12px; height:12px; flex:0 0 12px; border-radius:50%;
+  background:conic-gradient(from 20deg, #1570ef, #32d5a7 58%, transparent 78%);
+  mask:radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
+  animation:historySpinnerRotation .9s linear infinite;
+}
 .historySparkle {
-  position:absolute; z-index:1; top:-3px; right:-3px;
-  pointer-events:none; width:13px; height:13px;
+  width:13px; height:13px; flex:0 0 13px;
   background:linear-gradient(135deg, #1570ef, #32d5a7 58%, #67bdf7);
   clip-path:polygon(50% 0%,60% 39%,100% 50%,60% 61%,50% 100%,40% 61%,0% 50%,40% 39%);
 }
+@keyframes historySpinnerRotation { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .historySpinner { animation-duration:1.8s; } }

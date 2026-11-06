@@ -98,6 +98,8 @@ describe('applyVndBackgroundEvent', () => {
 
     expect(result[0]).toMatchObject({
       jobState: 'running',
+      agentState: 'running',
+      agentUnread: false,
       documentIds: '["draft"]',
       documentName: 'Регламент.docx',
       unread: false,
@@ -124,16 +126,20 @@ describe('applyVndBackgroundEvent', () => {
       at: 21,
     });
 
-    expect(first[0]).toMatchObject({ jobState: 'ready', unread: true, updatedAt: 20 });
+    expect(first[0]).toMatchObject({
+      jobState: 'ready', unread: true,
+      agentState: 'ready', agentUnread: true,
+      updatedAt: 20,
+    });
     expect(first[0].messages).toEqual([message]);
     expect(second).toBe(first);
   });
 
   it('marks a result read without changing its content or state', () => {
-    const ready = thread({ jobState: 'ready', unread: true, documentName: 'Регламент.docx', messages: [{ id: 'result' }] });
+    const ready = thread({ jobState: 'ready', unread: true, agentState: 'ready', agentUnread: true, documentName: 'Регламент.docx', messages: [{ id: 'result' }] });
     const result = applyVndBackgroundEvent([ready], 'vnd', { type: 'markRead' });
 
-    expect(result[0]).toEqual({ ...ready, unread: false });
+    expect(result[0]).toEqual({ ...ready, unread: false, agentUnread: false });
   });
 
   it('saves only a ready result into the selected folder', () => {
@@ -150,7 +156,7 @@ describe('applyVndBackgroundEvent', () => {
       at: 31,
     });
 
-    expect(saved[0]).toMatchObject({ jobState: 'saved', folder: 'Методология', unread: false, updatedAt: 30 });
+    expect(saved[0]).toMatchObject({ jobState: 'saved', folder: 'Методология', unread: false, agentUnread: false, updatedAt: 30 });
     expect(unchanged).toBe(saved);
   });
 

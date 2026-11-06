@@ -6,6 +6,8 @@ export interface ChatThread {
 	pinned: boolean;
 	updatedAt: number;
 	initialSkill?: string;
+	agentState?: 'running' | 'ready';
+	agentUnread?: boolean;
 	unread?: boolean;
 	jobState?: 'running' | 'ready' | 'saved';
 }

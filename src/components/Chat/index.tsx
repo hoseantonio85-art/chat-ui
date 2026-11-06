@@ -6,6 +6,7 @@ import { navigateToUrl } from 'single-spa';
 import { ChatInput } from '@/components/ChatInput';
 import { ChatLogoSVG } from '@/components/ChatLogoSVG';
 import { ThreadDrawer } from '@/components/ThreadDrawer';
+import { getHistoryIndicatorState } from '@/components/ThreadDrawer/activity';
 import { useThreadUi } from '@/components/ThreadDrawer/context';
 import { useChat } from '@/helpers/useChat';
 import {
@@ -54,6 +55,14 @@ export const Chat = React.memo(
 		const [createIncidentAvailable] = useAtom(isCreateIncidentAvailable);
 		const threadUi = useThreadUi();
 		const [historyOpen, setHistoryOpen] = useState(false);
+		const historyIndicators = getHistoryIndicatorState(threadUi.threads);
+		const historyLabel = historyIndicators.running && historyIndicators.unreadReady
+			? 'История диалогов — агент работает, есть новый результат'
+			: historyIndicators.running
+				? 'История диалогов — агент работает'
+				: historyIndicators.unreadReady
+					? 'История диалогов — есть новый результат'
+					: 'История диалогов';
 		const activeThread = threadUi.threads.find(item => item.id === threadUi.activeThreadId);
 		const canCreateIncident = threadUi.enabled
 			? activeThread?.initialSkill === 'createIncident'
@@ -171,8 +180,11 @@ export const Chat = React.memo(
 						{threadUi.enabled && (
 							<>
 								<span className={classes.historyTrigger}>
-                  <Button variant="ellipse" icon={EIconName.burgerMenu} iconOnly aria-label={threadUi.threads.some(item => item.unread && item.jobState === 'ready') ? 'История диалогов — есть новый результат' : 'История диалогов'} aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)} />
-                  {threadUi.threads.some(item => item.unread && item.jobState === 'ready') && <i className={classes.historySparkle} aria-hidden="true"/>}
+                  <Button variant="ellipse" icon={EIconName.burgerMenu} iconOnly aria-label={historyLabel} aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)} />
+                  {(historyIndicators.running || historyIndicators.unreadReady) && <span className={classes.historyIndicators} aria-hidden="true">
+                    {historyIndicators.unreadReady && <i className={classes.historySparkle}/>}
+                    {historyIndicators.running && <i className={classes.historySpinner}/>}
+                  </span>}
                 </span>
 								<div className={classes.navigationDivider} aria-hidden="true" />
 							</>

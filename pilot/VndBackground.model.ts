@@ -25,6 +25,8 @@ export interface VndBackgroundThreadState {
   id: string;
   updatedAt: number;
   messages: VndBackgroundMessage[];
+  agentState?: 'running' | 'ready';
+  agentUnread?: boolean;
   jobState?: 'running' | 'ready' | 'saved';
   documentIds?: string;
   documentName?: string;
@@ -92,6 +94,8 @@ export function applyVndBackgroundEvent<T extends VndBackgroundThreadState>(
       if (current.jobState === 'running') return threads;
       next = {
         ...current,
+        agentState: 'running',
+        agentUnread: false,
         jobState: 'running',
         documentIds: event.documentIds,
         documentName: event.documentName,
@@ -110,6 +114,8 @@ export function applyVndBackgroundEvent<T extends VndBackgroundThreadState>(
         : current.messages;
       next = {
         ...current,
+        agentState: 'ready',
+        agentUnread: event.unread,
         jobState: 'ready',
         unread: event.unread,
         updatedAt: event.at,
@@ -118,8 +124,8 @@ export function applyVndBackgroundEvent<T extends VndBackgroundThreadState>(
       break;
     }
     case 'markRead':
-      if (!current.unread) return threads;
-      next = { ...current, unread: false };
+      if (!current.unread && !current.agentUnread) return threads;
+      next = { ...current, unread: false, agentUnread: false };
       break;
     case 'save':
       if (current.jobState !== 'ready') return threads;
@@ -128,6 +134,7 @@ export function applyVndBackgroundEvent<T extends VndBackgroundThreadState>(
         jobState: 'saved',
         folder: event.folder,
         unread: false,
+        agentUnread: false,
         updatedAt: event.at,
       };
       break;

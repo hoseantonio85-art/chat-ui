@@ -23,5 +23,5 @@ export default defineConfig({
   esbuild: { tsconfigRaw: JSON.stringify({ compilerOptions: { jsx: 'react-jsx', useDefineForClassFields: true } }) },
   server: { fs: { allow: [path('..')] } },
   build: { outDir: 'dist', emptyOutDir: true },
-  test: { include: ['../src/components/AgentActivity/*.test.ts', './*.model.test.ts'], environment: 'node' },
+  test: { include: ['../src/components/AgentActivity/*.test.ts', '../src/components/ThreadDrawer/*.test.ts', './*.model.test.ts'], environment: 'node' },
 });

@@ -17,6 +17,8 @@
     "../src/components/AgentActivity/**/*.ts",
     "../src/components/AgentActivity/**/*.tsx",
     "../src/components/ChatLogoSVG/**/*.tsx",
+    "../src/components/ThreadDrawer/activity.ts",
+    "../src/components/ThreadDrawer/activity.test.ts",
     "./VndBackground.model.ts",
     "./VndBackground.model.test.ts"
   ]
