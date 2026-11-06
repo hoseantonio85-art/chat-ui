@@ -12,5 +12,12 @@
       "vitest": ["node_modules/vitest"]
     }
   },
-  "include": ["../src/@types/**/*.d.ts", "../src/components/AgentActivity/**/*.ts", "../src/components/AgentActivity/**/*.tsx", "../src/components/ChatLogoSVG/**/*.tsx"]
+  "include": [
+    "../src/@types/**/*.d.ts",
+    "../src/components/AgentActivity/**/*.ts",
+    "../src/components/AgentActivity/**/*.tsx",
+    "../src/components/ChatLogoSVG/**/*.tsx",
+    "./VndBackground.model.ts",
+    "./VndBackground.model.test.ts"
+  ]
 }

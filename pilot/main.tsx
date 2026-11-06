@@ -19,6 +19,7 @@ import '@/i18n';
 import './vendor/ui-kit/dist/index.css';
 import './styles.css';
 import {useVndBackground, type BackgroundThread} from './VndBackground';
+import {canResolveVndAttachmentLookup} from './VndBackground.model';
 import {methodologistService} from './mocks/files';
 
 type VndStage = 'start' | 'chooseStandard' | 'reviewed' | 'complete';
@@ -67,6 +68,7 @@ function App() {
   const [selectedSkillId, setSelectedSkillId] = useState<string>();
   const [playing, setPlaying] = useState(false); const [online, setOnline] = useState(true); const [actionUrl, setActionUrl] = useState('');
   const generation = useRef(0); const timeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const attachmentLookups = useRef(new Map<string, string>());
   const setRuns = (value: Record<string, AgentRun>) => { runsRef.current = value; setRunsState(value); };
   const clearTimers = () => { generation.current++; timeouts.current.forEach(clearTimeout); timeouts.current = []; };
   const later = (callback: () => void, delay: number) => { const current = generation.current; timeouts.current.push(setTimeout(() => {if (current === generation.current) callback();}, delay)); };
@@ -75,6 +77,16 @@ function App() {
     const next = threadsRef.current.map(thread => thread.id === activeIdRef.current ? {...thread, messages: ctx.get(messagesAtom).map(({remove: _remove, ...message}) => message), runs: runsRef.current, vndStage: thread.scenario.startsWith('vnd') ? vndStageRef.current : thread.vndStage, updatedAt: Date.now()} : thread);
     threadsRef.current = next; setThreads(next); return next;
   };
+  const appendToThread = (id: string, message: IMessage) => {
+    if (activeIdRef.current === id) {
+      addMessageAction(ctx, message);
+      queueMicrotask(storeCurrent);
+      return;
+    }
+    updateThreads(items => items.map(thread => thread.id === id
+      ? {...thread, messages:[...thread.messages, message], updatedAt:Date.now()}
+      : thread));
+  };
   const loadThread = (thread: DemoThread) => {
     clearTimers(); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); thread.messages.forEach(message => addMessageAction(ctx, message));
     canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false); contextChatAtom(ctx, thread.initialSkill === 'createIncident' ? {intent:'createIncident', company_id:'demo-company'} : {company_id:'demo-company'});
@@ -82,7 +94,7 @@ function App() {
   };
   const selectThread = (id: string) => { const saved = storeCurrent(); const thread = saved.find(item => item.id === id); if (thread) { loadThread(thread); background.markRead(id); } };
   const newThread = () => { const saved = storeCurrent(); const id = `thread-${crypto.randomUUID()}`; const thread: DemoThread = {id, title:'Новый диалог', pinned:false, updatedAt:Date.now(), scenario:'ordinary', messages:[], runs:{}}; const next = [...saved, thread]; threadsRef.current = next; setThreads(next); loadThread(thread); };
-  const deleteThread = (id: string) => { const remaining = threadsRef.current.filter(item => item.id !== id); if (!remaining.length) { newThread(); return; } updateThreads(() => remaining); if (id === activeIdRef.current) loadThread(remaining[0]); };
+  const deleteThread = (id: string) => { attachmentLookups.current.delete(id); const remaining = threadsRef.current.filter(item => item.id !== id); if (!remaining.length) { newThread(); return; } updateThreads(() => remaining); if (id === activeIdRef.current) loadThread(remaining[0]); };
 
   const setVndStage = (stage: VndStage) => {
     vndStageRef.current = stage;
@@ -91,7 +103,7 @@ function App() {
 
   const background = useVndBackground<DemoThread>({
     activeId:activeIdRef,getThreads:()=>threadsRef.current,update:updateThreads,snapshot:storeCurrent,
-    append:message=>addMessageAction(ctx,message),open:selectThread,
+    append:message=>addMessageAction(ctx,message),
     publishRun:(id,run)=>{
       if (activeIdRef.current===id) setRuns({...runsRef.current,[run.runId]:run});
       updateThreads(items=>items.map(item=>item.id===id?{...item,runs:{...item.runs,[run.runId]:run}}:item));
@@ -135,6 +147,7 @@ function App() {
   }
 
   function playVndFlow(instant = false, entry: ScenarioId = scenario) {
+    attachmentLookups.current.delete(activeIdRef.current);
     background.cancel(activeIdRef.current);
     clearTimers(); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false);
     setActionUrl(''); setScenario(entry); setPlaying(false); setRuns({});
@@ -168,11 +181,15 @@ function App() {
   }
 
   function sendVnd(request: {body: string; extras?: Record<string, string>}) {
-    if (threadsRef.current.find(item=>item.id===activeIdRef.current)?.jobState==='running') return;
     const sentAt = Date.now();
     addMessageAction(ctx, {id:`vnd-user-${crypto.randomUUID()}`, role:ERoles.user, text:request.body, timeCreated:new Date(sentAt).toISOString(), extras:request.extras});
     const hasFile = Boolean(request.extras?.fileIds);
     const jobState=threadsRef.current.find(item=>item.id===activeIdRef.current)?.jobState;
+    if (jobState === 'running') {
+      addMessageAction(ctx, {id:crypto.randomUUID(), role:ERoles.bot, text:'Проверка уже выполняется в фоне. Я сообщу о результате в этом диалоге.', timeCreated:new Date(sentAt + 1).toISOString()});
+      queueMicrotask(storeCurrent);
+      return;
+    }
     if (jobState === 'ready') {
       if (background.saveFromChat(activeIdRef.current,request.body)) return;
       addMessageAction(ctx,{id:crypto.randomUUID(),role:ERoles.bot,text:'Отклонений не найдено. Сохранить актуальный ВНД в папку «Операционные риски»? Напишите «Да» или назовите другую папку: «Внутренние нормативные документы» либо «Методология».',timeCreated:new Date().toISOString()});
@@ -197,9 +214,31 @@ function App() {
         const id=activeIdRef.current;
         const userFiles=ctx.get(messagesAtom).filter(item=>item.role===ERoles.user && item.extras?.fileIds);
         const fileIds=userFiles[userFiles.length-1]?.extras?.fileIds as string || '[]';
-        methodologistService.getAttachmentList((JSON.parse(fileIds) as string[]).join(',')).then(result=>{
+        let attachmentIds: string[];
+        try {
+          const parsed = JSON.parse(fileIds);
+          if (!Array.isArray(parsed) || parsed.some(item => typeof item !== 'string')) throw new Error('Invalid attachment ids');
+          attachmentIds = parsed;
+        } catch {
+          appendToThread(id, {id:crypto.randomUUID(), role:ERoles.bot, text:'Не удалось прочитать данные вложения. Прикрепите ВНД ещё раз.', timeCreated:new Date().toISOString()});
+          return;
+        }
+        const lookupToken = crypto.randomUUID();
+        attachmentLookups.current.set(id, lookupToken);
+        const canResolveLookup = () => canResolveVndAttachmentLookup(
+          attachmentLookups.current.get(id),
+          lookupToken,
+          threadsRef.current.find(item => item.id === id),
+        );
+        methodologistService.getAttachmentList(attachmentIds.join(',')).then(result=>{
+          if (!canResolveLookup()) return;
+          attachmentLookups.current.delete(id);
           const name=result.body.userDocuments[0]?.fields.fileName.value || 'ВНД.docx';
-          if(activeIdRef.current===id) background.start(id,fileIds,name);
+          background.start(id,fileIds,name);
+        }).catch(() => {
+          if (!canResolveLookup()) return;
+          attachmentLookups.current.delete(id);
+          appendToThread(id, {id:crypto.randomUUID(), role:ERoles.bot, text:'Не удалось получить сведения о вложении. Попробуйте начать проверку ещё раз.', timeCreated:new Date().toISOString()});
         });
       } else runVndReview(false);
       return;
@@ -216,7 +255,10 @@ function App() {
     addMessageAction(ctx, {id:`vnd-complete-${crypto.randomUUID()}`, role:ERoles.bot, text:'Документ уже прошёл повторную проверку и соответствует выбранному стандарту.', timeCreated:new Date(sentAt + 1).toISOString()});
   }
 
-  const runScenario = (id: ScenarioId, instant = false) => id.startsWith('vnd') ? playVndFlow(instant, id) : play(id, instant);
+  const runScenario = (id: ScenarioId, instant = false) => {
+    attachmentLookups.current.delete(activeIdRef.current);
+    return id.startsWith('vnd') ? playVndFlow(instant, id) : play(id, instant);
+  };
 
   function play(id: ScenarioId, instant = false, body?: string, extras?: Record<string,string>) {
     clearTimers(); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false);

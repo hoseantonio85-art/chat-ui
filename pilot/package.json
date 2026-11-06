@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4410 --strictPort",
     "build": "vite build",
-    "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.activity.json"
+    "build:pages": "vite build --base=/chat-ui/",
+    "test": "node --test scripts/*.test.mjs && vitest run",
+    "typecheck": "tsc -p tsconfig.activity.json",
+    "deploy:pages": "npm run typecheck && npm test && npm run build:pages && node scripts/deploy-pages.mjs",
+    "deploy:pages:dry-run": "npm run typecheck && npm test && npm run build:pages && node scripts/deploy-pages.mjs --dry-run"
   },
   "dependencies": {
     "@reatom/framework": "3.4.52",
