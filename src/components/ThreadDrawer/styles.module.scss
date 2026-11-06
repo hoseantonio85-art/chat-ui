@@ -44,7 +44,13 @@
   clip-path:polygon(50% 0%,60% 39%,100% 50%,60% 61%,50% 100%,40% 61%,0% 50%,40% 39%);
 }
 .readySparkle::before { inset:0; background:var(--backgroundBasicDefault, #fff); }
-.readySparkle::after { inset:2px; background:linear-gradient(135deg, #2d75f0 0%, #4cddba 54%, #20a789 100%); }
+.readySparkle::after { inset:0; transform:scale(.76); background:linear-gradient(135deg, #2d75f0 0%, #4cddba 54%, #20a789 100%); }
+@supports (clip-path:path('M9 0 C9.7 5.2 12.8 8.3 18 9 C12.8 9.7 9.7 12.8 9 18 C8.3 12.8 5.2 9.7 0 9 C5.2 8.3 8.3 5.2 9 0 Z')) {
+  .readySparkle::before,
+  .readySparkle::after {
+    clip-path:path('M9 0 C9.7 5.2 12.8 8.3 18 9 C12.8 9.7 9.7 12.8 9 18 C8.3 12.8 5.2 9.7 0 9 C5.2 8.3 8.3 5.2 9 0 Z');
+  }
+}
 .threadRunning {
   color:transparent;
   background-image:linear-gradient(100deg, var(--textBaseDefault) 0 24%, #175cd3 38%, #0b7562 51%, #096b5b 63%, var(--textBaseDefault) 79% 100%);

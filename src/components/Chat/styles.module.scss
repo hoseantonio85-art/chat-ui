@@ -240,7 +240,13 @@
   clip-path:polygon(50% 0%,60% 39%,100% 50%,60% 61%,50% 100%,40% 61%,0% 50%,40% 39%);
 }
 .historySparkle::before { inset:0; background:var(--backgroundBasicDefault, #fff); }
-.historySparkle::after { inset:2px; background:linear-gradient(135deg, #2d75f0 0%, #4cddba 54%, #20a789 100%); }
+.historySparkle::after { inset:0; transform:scale(.76); background:linear-gradient(135deg, #2d75f0 0%, #4cddba 54%, #20a789 100%); }
+@supports (clip-path:path('M9 0 C9.7 5.2 12.8 8.3 18 9 C12.8 9.7 9.7 12.8 9 18 C8.3 12.8 5.2 9.7 0 9 C5.2 8.3 8.3 5.2 9 0 Z')) {
+  .historySparkle::before,
+  .historySparkle::after {
+    clip-path:path('M9 0 C9.7 5.2 12.8 8.3 18 9 C12.8 9.7 9.7 12.8 9 18 C8.3 12.8 5.2 9.7 0 9 C5.2 8.3 8.3 5.2 9 0 Z');
+  }
+}
 @keyframes historySpinnerRotation { to { transform:rotate(360deg); } }
 @keyframes historySparkleReveal { from { opacity:0; transform:scale(.45) rotate(-18deg); } to { opacity:1; transform:scale(1) rotate(0); } }
 @media (prefers-reduced-motion:reduce) {
