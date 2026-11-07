@@ -35,7 +35,6 @@
 .threadTitle { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .readySparkle {
   position:relative; margin-left:auto; flex:0 0 18px; width:18px; height:18px; display:inline-block;
-  filter:drop-shadow(0 1px 3px rgba(9,32,55,.12));
   animation:readySparkleReveal .38s cubic-bezier(.2,.85,.3,1.25) both;
 }
 .readySparkle::before,
