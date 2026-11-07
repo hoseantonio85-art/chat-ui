@@ -125,3 +125,11 @@
 - Browser QA подтвердил: auto-focus на «Отмена», Escape закрывает только Popover, cancel возвращает фокус anchor, удаление факта переводит фокус на стабильный заголовок, очистка чатов оставляет один новый чат и сохраняет память.
 - На viewport `390×844` Popover полностью остаётся в границах экрана; `prefers-reduced-motion` отключает анимацию второго слоя, forced colors сохраняет явные границы секций.
 - Локально прошли strict typecheck, `54 Vitest + 1 node:test` и production Pages build. Перед публикацией остаются staged diff, независимое ревью, commit/deploy и live QA.
+
+## Публикация
+
+- Независимое ревью прошло без security concerns и logic errors.
+- Source commit: `e15384ff12c8ee536ebbead2fae61bdfec90142a`.
+- Deployment commit: `108ba199715d1b006ccbc49546c35d35a7efdb40`.
+- GitHub Pages run: `42373235289`, статус `success`.
+- Live QA: `https://hoseantonio85-art.github.io/chat-ui/?build=e15384f`; загружены `index-C85zLr9x.js` и `index-z30HsSWK.css`, console/runtime errors отсутствуют, порядок секций, full-width controls, gap `16px` и Popover проверены в браузере.
