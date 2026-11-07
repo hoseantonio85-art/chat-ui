@@ -45,9 +45,10 @@
 .settingsIcon { width: 38px; height: 38px; display: grid; place-items: center; color: var(--iconBaseDefault); border-radius: 12px; background: var(--backgroundSecondaryDefault); }
 .settingsHeader { align-items: center !important; justify-content: flex-start !important; gap: 16px !important; }
 .settingsHeader > div { min-width: 0; }
+.drawer .settingsHeader strong { font-size: 20px; line-height: 28px; }
 .settingsContent { min-height: 0; display: grid; align-content: start; gap: 16px; overflow-y: auto; padding: 2px 2px 12px; }
 .settingsSection { padding: 18px; display: grid; gap: 14px; border: 1px solid var(--borderDefault); border-radius: 18px; background: var(--backgroundSecondaryDefault); }
-.sectionHeading h2 { margin: 0; color: var(--textBaseDefault); font-size: 16px; line-height: 22px; font-weight: 600; }
+.sectionHeading h2 { margin: 0; color: var(--textBaseDefault); font-size: 20px; line-height: 28px; font-weight: 600; }
 .sectionHeading span { color: var(--textBaseSecondary); font-size: 12px; line-height: 18px; }
 .sectionNote { margin: 0; color: var(--textBaseSecondary); font-size: 13px; line-height: 19px; }
 .memoryList { margin: 0; padding: 0; display: grid; gap: 6px; list-style: none; }

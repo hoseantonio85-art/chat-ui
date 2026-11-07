@@ -124,7 +124,7 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 			{view === 'history' ? <HistoryView ui={ui} threads={threads} menu={menu} menuRef={menuRef} renaming={renaming} draft={draft} onClose={onClose} setDraft={setDraft} setMenu={setMenu} setRenaming={setRenaming} settingsEntryRef={settingsEntryRef} onOpenSettings={() => setView('settings')}/> : <>
 				<header className={classes.settingsHeader}>
 					<Button ref={settingsBackRef} variant="ellipse" size="S" icon={EIconName.previousLarge} iconOnly aria-label="Вернуться к истории" onClick={returnToHistory}/>
-					<div><strong>Настройки</strong><span>Память агента и история чатов</span></div>
+					<div><strong>Настройки</strong></div>
 				</header>
 				<div className={classes.settingsContent}>
 					<section className={classes.settingsSection} aria-labelledby="chat-history-title">
