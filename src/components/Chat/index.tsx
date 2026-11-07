@@ -181,9 +181,8 @@ export const Chat = React.memo(
 							<>
 								<span className={classes.historyTrigger}>
                   <Button variant="ellipse" icon={EIconName.burgerMenu} iconOnly aria-label={historyLabel} aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)} />
-                  {(historyIndicators.running || historyIndicators.unreadReady) && <span className={classes.historyIndicators} aria-hidden="true">
+                  {historyIndicators.unreadReady && <span className={classes.historyIndicators} aria-hidden="true">
                     {historyIndicators.unreadReady && <i className={classes.historySparkle}/>}
-                    {historyIndicators.running && <i className={classes.historySpinner}/>}
                   </span>}
                 </span>
 								<div className={classes.navigationDivider} aria-hidden="true" />

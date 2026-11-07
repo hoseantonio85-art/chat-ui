@@ -70,7 +70,7 @@ describe('thread activity lifecycle', () => {
 });
 
 describe('history trigger indicators', () => {
-  it('shows spinner and sparkle together for independent thread states', () => {
+  it('reports running and unread-ready states independently', () => {
     expect(getHistoryIndicatorState([
       thread('running', { agentState: 'running' }),
       thread('ready', { agentState: 'ready', agentUnread: true }),

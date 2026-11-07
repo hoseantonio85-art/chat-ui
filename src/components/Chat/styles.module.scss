@@ -219,16 +219,7 @@
   pointer-events:none; display:flex; align-items:flex-start; gap:3px;
   min-height:18px;
 }
-.historySpinner {
-  position:relative; width:16px; height:16px; flex:0 0 16px; border-radius:50%;
-  background:conic-gradient(from 25deg, #2d75f0 0 28%, #4cddba 52%, #20a789 72%, transparent 73% 100%);
-  box-shadow:0 0 0 2px var(--backgroundBasicDefault, #fff), 0 2px 5px rgba(9,32,55,.16);
-  animation:historySpinnerRotation .82s linear infinite;
-}
-.historySpinner::after {
-  content:''; position:absolute; inset:3px; border-radius:inherit;
-  background:var(--backgroundBasicDefault, #fff);
-}
+
 .historySparkle {
   position:relative; width:18px; height:18px; flex:0 0 18px;
   filter:drop-shadow(0 2px 4px rgba(9,32,55,.16));
@@ -247,21 +238,11 @@
     clip-path:path('M9 0 C9.7 5.2 12.8 8.3 18 9 C12.8 9.7 9.7 12.8 9 18 C8.3 12.8 5.2 9.7 0 9 C5.2 8.3 8.3 5.2 9 0 Z');
   }
 }
-@keyframes historySpinnerRotation { to { transform:rotate(360deg); } }
 @keyframes historySparkleReveal { from { opacity:0; transform:scale(.45) rotate(-18deg); } to { opacity:1; transform:scale(1) rotate(0); } }
 @media (prefers-reduced-motion:reduce) {
-  .historySpinner, .historySparkle { animation:none; }
+  .historySparkle { animation:none; }
 }
 @media (forced-colors:active) {
-  .historySpinner {
-    forced-color-adjust:none;
-    box-sizing:border-box;
-    border:2px solid CanvasText;
-    border-right-color:transparent;
-    background:none;
-    box-shadow:none;
-  }
-  .historySpinner::after { display:none; }
   .historySparkle {
     forced-color-adjust:none;
     filter:none;
