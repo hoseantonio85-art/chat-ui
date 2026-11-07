@@ -26,7 +26,7 @@ import {
 } from '@n-orm/auth-mf-app';
 import { useAction, useAtom } from '@reatom/npm-react';
 import { useTracking } from '@sber-orm/components';
-import { Button, EIconName, Row, Title } from '@sber-orm/ui-kit';
+import { Button, EIconName, Row, Title, Tooltip } from '@sber-orm/ui-kit';
 
 import { IChartData } from '@/components/UniversalChart/types';
 import { useMobileDetect } from '@/helpers/useMobileDetect';
@@ -79,6 +79,7 @@ export const Chat = React.memo(
 		const [chatState, setChatState] = useState(chat$.value.state);
 		const [sendingMessage, setSendingMessage] = useState(true);
 		const [uploadingFiles, setUploadingFiles] = useState(false);
+		const resizeLabel = chatState === EChatState.fullScreen ? 'Свернуть чат' : 'Развернуть чат';
 
 		const messageContainerRef = useRef<HTMLDivElement | null>(null);
 		const { t } = useTranslation();
@@ -180,7 +181,9 @@ export const Chat = React.memo(
 						{threadUi.enabled && (
 							<>
 								<span className={classes.historyTrigger}>
-                  <Button variant="ellipse" icon={EIconName.burgerMenu} iconOnly aria-label={historyLabel} aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)} />
+                  <Tooltip content="История чатов" placement="bottom-start" showOnChildFocus>
+                    <Button variant="ellipse" icon={EIconName.burgerMenu} iconOnly aria-label={historyLabel} aria-expanded={historyOpen} onClick={() => setHistoryOpen(true)} />
+                  </Tooltip>
                   {historyIndicators.unreadReady && <span className={classes.historyIndicators} aria-hidden="true">
                     {historyIndicators.unreadReady && <i className={classes.historySparkle}/>}
                   </span>}
@@ -196,52 +199,61 @@ export const Chat = React.memo(
 					</div>
 					</div>
 					<Row justify="end" gutter={16}>
-						{threadUi.enabled && <>
-							<Button
-								variant="ellipse"
-								icon={EIconName.message}
-								iconOnly
-								aria-label="Новый чат"
-								onClick={threadUi.onNew}
-							/>
-							<div className={classes.headerDivider} aria-hidden="true" />
-						</>}
 						{!!canCreateIncident && !hideCreatingForm && !isPhone && (
 							<>
-								<Button
-									variant="ellipse"
-									icon={chatState === EChatState.small ? EIconName.fill : undefined}
-									iconAfter={chatState === EChatState.small ? undefined : EIconName.fill}
-									iconOnly={chatState === EChatState.small}
-									aria-label={t('openForm')}
-									onClick={createIncident}
-									disabled={uploadingFiles}
-								>
-									{chatState === EChatState.small ? null : t('openForm')}
-								</Button>
+								<Tooltip content={t('openForm')} placement="bottom" showOnChildFocus>
+									<Button
+										variant="ellipse"
+										icon={chatState === EChatState.small ? EIconName.fill : undefined}
+										iconAfter={chatState === EChatState.small ? undefined : EIconName.fill}
+										iconOnly={chatState === EChatState.small}
+										aria-label={t('openForm')}
+										onClick={createIncident}
+										disabled={uploadingFiles}
+									>
+										{chatState === EChatState.small ? null : t('openForm')}
+									</Button>
+								</Tooltip>
 								<div className={classes.headerDivider} />
 							</>
 						)}
+						{threadUi.enabled && <>
+							<Tooltip content="Новый чат" placement="bottom" showOnChildFocus>
+								<Button
+									variant="ellipse"
+									icon={EIconName.message}
+									iconOnly
+									aria-label="Новый чат"
+									onClick={threadUi.onNew}
+								/>
+							</Tooltip>
+							<div className={classes.headerDivider} aria-hidden="true" />
+						</>}
 						{!chat$.value.showResizeButton && !isPhone && (
+							<Tooltip content={resizeLabel} placement="bottom" showOnChildFocus>
+								<Button
+									variant="ellipse"
+									icon={
+										chatState === EChatState.fullScreen
+											? EIconName.minimumScreen
+											: EIconName.fullScreen
+									}
+									iconOnly
+									aria-label={resizeLabel}
+									onClick={handleResize}
+								/>
+							</Tooltip>
+						)}
+						<Tooltip content="Закрыть чат" placement="bottom-end" showOnChildFocus>
 							<Button
 								variant="ellipse"
-								icon={
-									chatState === EChatState.fullScreen
-										? EIconName.minimumScreen
-										: EIconName.fullScreen
-								}
+								icon={EIconName.cross}
+								aria-label="Закрыть чат"
 								iconOnly
-								onClick={handleResize}
+								onClick={handleClose}
+								disabled={uploadingFiles}
 							/>
-						)}
-						<Button
-							variant="ellipse"
-							icon={EIconName.cross}
-							aria-label="Закрыть чат"
-							iconOnly
-							onClick={handleClose}
-							disabled={uploadingFiles}
-						/>
+						</Tooltip>
 					</Row>
 				</div>
 				<div className={classes.content}>

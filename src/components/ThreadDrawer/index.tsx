@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, EIconName, Icon, Popover, Row, Text, Title } from '@sber-orm/ui-kit';
+import { Button, EIconName, Icon, Popover, Row, Text, Title, Tooltip } from '@sber-orm/ui-kit';
 import { useThreadUi } from './context';
 import { groupThreadsForHistory } from './history';
 import { getDeletionCopy, type SettingsDeletionTarget } from './settings';
@@ -124,7 +124,9 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 		<aside className={`${classes.drawer} ${view === 'settings' ? classes.drawerSecond : ''}`} aria-label={view === 'settings' ? 'Настройки агента' : 'История диалогов'}>
 			{view === 'history' ? <HistoryView ui={ui} threads={threads} menu={menu} menuRef={menuRef} renaming={renaming} draft={draft} onClose={onClose} setDraft={setDraft} setMenu={setMenu} setRenaming={setRenaming} settingsEntryRef={settingsEntryRef} onOpenSettings={() => setView('settings')}/> : <>
 				<header className={classes.settingsHeader}>
-					<Button ref={settingsBackRef} variant="ellipse" size="S" icon={EIconName.previousLarge} iconOnly aria-label="Вернуться к истории" onClick={returnToHistory}/>
+					<Tooltip content="Вернуться к истории" placement="bottom-start" showOnChildFocus>
+						<Button ref={settingsBackRef} variant="ellipse" size="S" icon={EIconName.previousLarge} iconOnly aria-label="Вернуться к истории" onClick={returnToHistory}/>
+					</Tooltip>
 					<div><strong>Настройки</strong></div>
 				</header>
 				<div className={classes.settingsContent}>
@@ -136,7 +138,7 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 					<section className={classes.settingsSection} aria-labelledby="agent-memory-title">
 						<div className={classes.sectionHeading}><div><h2 ref={memoryHeadingRef} tabIndex={-1} id="agent-memory-title">Память агента</h2><span>{ui.agentMemory.length ? `Сохранено: ${ui.agentMemory.length}` : 'Память пуста'}</span></div></div>
 						<p className={classes.sectionNote}>Факты о вас и предпочтениях, которые агент использует во всех чатах.</p>
-						{ui.agentMemory.length ? <ul className={classes.memoryList}>{ui.agentMemory.map((fact, index) => <li key={`${index}-${fact}`}><span>{fact}</span><Button variant="ellipse" size="XS" icon={EIconName.trash} iconOnly aria-label={`Удалить из памяти: ${fact}`} onClick={event => setDeletion({ target: { kind: 'memory-fact', fact }, anchor: event.currentTarget })}/></li>)}</ul> : <div className={classes.emptyMemory}>Пока ничего. Агент запомнит только то, что вы сообщите о себе и предпочитаемом формате работы.</div>}
+						{ui.agentMemory.length ? <ul className={classes.memoryList}>{ui.agentMemory.map((fact, index) => <li key={`${index}-${fact}`}><span>{fact}</span><Tooltip content="Удалить из памяти" placement="left" showOnChildFocus><Button variant="ellipse" size="XS" icon={EIconName.trash} iconOnly aria-label={`Удалить из памяти: ${fact}`} onClick={event => setDeletion({ target: { kind: 'memory-fact', fact }, anchor: event.currentTarget })}/></Tooltip></li>)}</ul> : <div className={classes.emptyMemory}>Пока ничего. Агент запомнит только то, что вы сообщите о себе и предпочитаемом формате работы.</div>}
 						<Button variant="danger" size="S" fullWidth disabled={!ui.agentMemory.length} onClick={event => setDeletion({ target: { kind: 'memory-all' }, anchor: event.currentTarget })}>Очистить память</Button>
 					</section>
 				</div>
@@ -189,8 +191,8 @@ function HistoryView({ ui, threads, menu, menuRef, renaming, draft, onClose, set
 		<div className={classes.groups}>{groups.map(group => <section key={group.title} aria-label={group.title}>
 			<h3 className={classes.groupTitle}>{group.title}</h3>
 			<ul className={classes.list}>{group.items.map(thread => <li key={thread.id} data-active={thread.id === ui.activeThreadId} data-menu-open={menu?.threadId === thread.id}>
-				{renaming === thread.id ? <form onSubmit={event => { event.preventDefault(); if (draft.trim()) ui.onRename(thread.id, draft.trim()); setRenaming(undefined); }}><input autoFocus value={draft} onChange={event => setDraft(event.target.value)} aria-label="Название диалога"/><Button size="S" icon={EIconName.check} iconOnly aria-label="Сохранить"/></form> : <button className={classes.thread} type="button" onClick={() => { ui.onSelect(thread.id); onClose(); }}><span className={classes.threadLabel}><span className={`${classes.threadTitle} ${thread.agentState === 'running' ? classes.threadRunning : ''}`}>{thread.title}</span>{thread.agentUnread && thread.agentState === 'ready' && <i className={classes.readySparkle} aria-label="Новый результат работы агента"/>}</span></button>}
-				{renaming !== thread.id && <button className={classes.more} type="button" aria-label={`Действия: ${thread.title}`} aria-haspopup="menu" aria-expanded={menu?.threadId === thread.id} onClick={event => { event.stopPropagation(); const anchor = event.currentTarget; setMenu(current => current?.threadId === thread.id ? undefined : {threadId:thread.id, anchor}); }}><Icon name={EIconName.kebabMenu} width={18} height={18}/></button>}
+				{renaming === thread.id ? <form onSubmit={event => { event.preventDefault(); if (draft.trim()) ui.onRename(thread.id, draft.trim()); setRenaming(undefined); }}><input autoFocus value={draft} onChange={event => setDraft(event.target.value)} aria-label="Название диалога"/><Tooltip content="Сохранить название" placement="top" showOnChildFocus><Button size="S" icon={EIconName.check} iconOnly aria-label="Сохранить"/></Tooltip></form> : <button className={classes.thread} type="button" onClick={() => { ui.onSelect(thread.id); onClose(); }}><span className={classes.threadLabel}><span className={`${classes.threadTitle} ${thread.agentState === 'running' ? classes.threadRunning : ''}`}>{thread.title}</span>{thread.agentUnread && thread.agentState === 'ready' && <i className={classes.readySparkle} aria-label="Новый результат работы агента"/>}</span></button>}
+				{renaming !== thread.id && <Tooltip content="Действия с чатом" placement="left" showOnChildFocus><button className={classes.more} type="button" aria-label={`Действия: ${thread.title}`} aria-haspopup="menu" aria-expanded={menu?.threadId === thread.id} onClick={event => { event.stopPropagation(); const anchor = event.currentTarget; setMenu(current => current?.threadId === thread.id ? undefined : {threadId:thread.id, anchor}); }}><Icon name={EIconName.kebabMenu} width={18} height={18}/></button></Tooltip>}
 				{menu?.threadId === thread.id && <div ref={menuRef} className={classes.menu} role="menu" aria-label="Действия с диалогом" onKeyDown={event => {
 					const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button'));
 					const index = items.indexOf(document.activeElement as HTMLButtonElement);
