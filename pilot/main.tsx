@@ -11,6 +11,7 @@ import { appendEvent, createRun, type AgentRun } from '../src/components/AgentAc
 import { AssistantSkillsContext, type AssistantSkill } from '../src/components/AssistantSkills/context';
 import { ThreadUiContext, type ChatThread } from '../src/components/ThreadDrawer/context';
 import { completeThreadActivity, markThreadActivityRead, startThreadActivity } from '../src/components/ThreadDrawer/activity';
+import { clearMemoryFacts, forgetMemoryFact, resetThreads } from '../src/components/ThreadDrawer/settings';
 import { chat$, EChatState } from './mocks/auth';
 import { resetPending, setDemoOnline, setDemoSender } from './mocks/useChat';
 import { chart, fixture, scenarios, type ScenarioId, vndCorrectedAnswer, vndResultAnswer, vndStandardPrompt } from './scenarios';
@@ -29,6 +30,11 @@ const assistantSkills: AssistantSkill[] = [
   {id: 'methodologist', title: 'Методолог'}, {id: 'risk-review', title: 'Проверка рисков'}, {id: 'createIncident', title: 'Регистрация события'},
 ];
 const demoFlags = { assistantSkills: false } as const;
+const initialAgentMemory = [
+  'Предпочитает краткие ответы с выводом в начале',
+  'Работает с внутренними нормативными документами и операционными рисками',
+  'Для итоговых материалов использует деловой стиль',
+];
 
 function historicalThread(id: string, title: string, scenario: ScenarioId, minutesAgo: number, pinned = false, initialSkill?: string): DemoThread {
   const startedAt = Date.now() - minutesAgo * 60_000;
@@ -62,6 +68,7 @@ const initialThreads = () => [
 
 function App() {
   const [threads, setThreads] = useState<DemoThread[]>(initialThreads); const threadsRef = useRef(threads);
+  const [agentMemory, setAgentMemory] = useState(initialAgentMemory);
   const [activeThreadId, setActiveThreadId] = useState('vnd'); const activeIdRef = useRef(activeThreadId);
   const [scenario, setScenario] = useState<ScenarioId>('vnd');
   const [runs, setRunsState] = useState<Record<string, AgentRun>>({}); const runsRef = useRef(runs);
@@ -123,6 +130,17 @@ function App() {
   const selectThread = (id: string) => { const saved = storeCurrent(); const thread = saved.find(item => item.id === id); if (thread) { loadThread(thread); updateThreads(items => markThreadActivityRead(items, id)); background.markRead(id); } };
   const newThread = () => { const saved = storeCurrent(); const id = `thread-${crypto.randomUUID()}`; const thread: DemoThread = {id, title:'Новый диалог', pinned:false, updatedAt:Date.now(), scenario:'ordinary', messages:[], runs:{}}; const next = [...saved, thread]; threadsRef.current = next; setThreads(next); loadThread(thread); };
   const deleteThread = (id: string) => { attachmentLookups.current.delete(id); clearThreadTimers(id); background.cancel(id); const remaining = threadsRef.current.filter(item => item.id !== id); if (!remaining.length) { newThread(); return; } updateThreads(() => remaining); if (id === activeIdRef.current) loadThread(remaining[0]); };
+  const clearAllThreads = () => {
+    threadsRef.current.forEach(thread => { attachmentLookups.current.delete(thread.id); background.cancel(thread.id); });
+    clearAllTimers();
+    attachmentLookups.current.clear();
+    const thread: DemoThread = {id:`thread-${crypto.randomUUID()}`, title:'Новый диалог', pinned:false, updatedAt:Date.now(), scenario:'ordinary', messages:[], runs:{}};
+    const next = resetThreads(thread);
+    threadsRef.current = next;
+    setThreads(next);
+    loadThread(thread);
+    chat$.openChat();
+  };
 
   const setVndStage = (stage: VndStage, id = activeIdRef.current) => {
     if (activeIdRef.current === id) vndStageRef.current = stage;
@@ -328,7 +346,20 @@ function App() {
   }
   useEffect(() => { const listener = (event: Event) => setActionUrl((event as CustomEvent<string>).detail); window.addEventListener('pilot:navigate',listener); const bootstrap = setTimeout(() => {loadThread(threadsRef.current[0]); if (window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen); chat$.openChat();}, 50); return () => {clearTimeout(bootstrap); clearAllTimers(); window.removeEventListener('pilot:navigate',listener);}; }, []);
   useEffect(() => {setDemoSender(request => scenario.startsWith('vnd') ? sendVnd(request) : play(selectedSkillId === 'methodologist' ? 'subagent' : scenario, false, request.body, request.extras));}, [scenario, selectedSkillId]);
-  const threadUi = {enabled:true, threads, activeThreadId, onSelect:selectThread, onNew:newThread, onRename:(id:string,title:string) => updateThreads(items => items.map(item => item.id === id ? {...item,title,updatedAt:Date.now()} : item)), onTogglePin:(id:string) => updateThreads(items => items.map(item => item.id === id ? {...item,pinned:!item.pinned,updatedAt:Date.now()} : item)), onDelete:deleteThread};
+  const threadUi = {
+    enabled:true,
+    threads,
+    agentMemory,
+    activeThreadId,
+    onSelect:selectThread,
+    onNew:newThread,
+    onRename:(id:string,title:string) => updateThreads(items => items.map(item => item.id === id ? {...item,title,updatedAt:Date.now()} : item)),
+    onTogglePin:(id:string) => updateThreads(items => items.map(item => item.id === id ? {...item,pinned:!item.pinned,updatedAt:Date.now()} : item)),
+    onDelete:deleteThread,
+    onForgetMemory:(fact:string) => setAgentMemory(items => forgetMemoryFact(items, fact)),
+    onClearMemory:() => setAgentMemory(clearMemoryFacts()),
+    onClearAll:clearAllThreads,
+  };
   const selectedSkill = demoFlags.assistantSkills ? assistantSkills.find(item => item.id === selectedSkillId) : undefined;
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><AgentRunsContext.Provider value={runs}>
     <style>{`.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:22px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child),.${chatClasses.headerDivider}{display:none}}`}</style>

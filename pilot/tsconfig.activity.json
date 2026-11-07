@@ -19,6 +19,10 @@
     "../src/components/ChatLogoSVG/**/*.tsx",
     "../src/components/ThreadDrawer/activity.ts",
     "../src/components/ThreadDrawer/activity.test.ts",
+    "../src/components/ThreadDrawer/context.tsx",
+    "../src/components/ThreadDrawer/index.tsx",
+    "../src/components/ThreadDrawer/settings.ts",
+    "../src/components/ThreadDrawer/settings.test.ts",
     "./VndBackground.model.ts",
     "./VndBackground.model.test.ts"
   ]
