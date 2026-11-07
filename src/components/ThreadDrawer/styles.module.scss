@@ -4,7 +4,7 @@
 .drawer header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .drawer header > div { display: grid; gap: 4px; }
 .drawer header strong { font-size: 24px; line-height: 32px; }
-.drawer header span { color: var(--textBaseSecondary); font-size: 13px; }
+.drawer header span { color: var(--textBaseSecondary); font-size: 14px; }
 .newButton { width: 100%; }
 .groups { flex: 1 1 auto; display: flex; flex-direction: column; gap: 24px; min-height: 0; overflow-y: auto; padding-bottom: 8px; }
 .groupTitle { margin: 0 0 8px; color: var(--textBaseSecondary); font-size: 12px; line-height: 18px; font-weight: 400; }
@@ -53,12 +53,12 @@
 .sectionNote { margin: 0; color: var(--textBaseSecondary); font-size: 14px; line-height: 20px; }
 .memoryList { margin: 0; padding: 0; display: grid; gap: 6px; list-style: none; }
 .memoryList li { padding: 9px 8px 9px 11px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; border: 1px solid var(--borderDefault); border-radius: 12px; background: var(--backgroundBasicDefault); }
-.memoryList li > span { overflow-wrap: anywhere; color: var(--textBaseDefault); font-size: 13px; line-height: 19px; }
+.memoryList li > span { overflow-wrap: anywhere; color: var(--textBaseDefault); font-size: 14px; line-height: 20px; }
 .sectionHeading h2:focus-visible { outline: 2px solid var(--borderFocus); outline-offset: 2px; }
-.emptyMemory { padding: 14px; color: var(--textBaseSecondary); border: 1px dashed var(--borderDefault); border-radius: 12px; background: var(--backgroundBasicDefault); font-size: 13px; line-height: 19px; }
+.emptyMemory { padding: 14px; color: var(--textBaseSecondary); border: 1px dashed var(--borderDefault); border-radius: 12px; background: var(--backgroundBasicDefault); font-size: 14px; line-height: 20px; }
 .deletePopover { z-index: 40; }
 .deletePopoverContent { width: min(304px, calc(100vw - 40px)); display: grid; gap: 8px; }
-.deletePopoverContent > span { color: var(--textBaseSecondary); font-size: 13px; line-height: 18px; }
+.deletePopoverContent > span { color: var(--textBaseSecondary); font-size: 14px; line-height: 20px; }
 .deletePopoverButtons { width: 100%; margin-top: 8px; }
 @keyframes drawerLayerIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
 

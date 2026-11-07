@@ -155,7 +155,7 @@ export const Message = React.memo((props: IMessageProps) => {
 				})}
 			>
 				<Title
-					size="H500"
+					size="H400"
 					thin
 					className={classes.messageTitle}
 					ref={messageRef}

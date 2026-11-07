@@ -193,7 +193,7 @@ export const Chat = React.memo(
 						)}
 					<div className={classes.title}>
 						<ChatLogoSVG className={classes.titleLogo} />
-						<Title size="H800" className={classes.titleText}>
+						<Title size="H700" className={classes.titleText}>
 							{t('modalTitle')}
 						</Title>
 					</div>

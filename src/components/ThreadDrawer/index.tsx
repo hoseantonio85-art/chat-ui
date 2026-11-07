@@ -157,7 +157,7 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 			aria-label={deletionCopy.title}
 		>
 			<div className={classes.deletePopoverContent}>
-				<Title size="H500">{deletionCopy.title}</Title>
+				<Title size="H600">{deletionCopy.title}</Title>
 				<Text>{deletionCopy.text}</Text>
 				<Row className={classes.deletePopoverButtons} gutter={8} noFlex>
 					<Button ref={popoverCancelRef} autoFocus variant="secondary" size="XS" fullWidth onClick={closeDeletion}>Отмена</Button>
