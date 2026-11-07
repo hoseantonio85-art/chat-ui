@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, EIconName, Icon } from '@sber-orm/ui-kit';
+import { Button, EIconName, Icon, Popover, Row, Text, Title } from '@sber-orm/ui-kit';
 import { useThreadUi } from './context';
+import { getDeletionCopy, type SettingsDeletionTarget } from './settings';
 import classes from './styles.module.scss';
 
 type DrawerView = 'history' | 'settings';
-type Confirmation = 'memory' | 'chats';
-type FocusTarget = 'settings' | 'memory-heading' | 'memory-clear' | 'chats-clear';
+type FocusTarget = 'settings' | 'memory-heading' | HTMLElement;
+type ActiveDeletion = { target: SettingsDeletionTarget; anchor: HTMLButtonElement };
 
 export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 	const ui = useThreadUi();
@@ -13,11 +14,11 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 	const settingsBackRef = useRef<HTMLButtonElement>(null);
 	const settingsEntryRef = useRef<HTMLButtonElement>(null);
 	const memoryHeadingRef = useRef<HTMLHeadingElement>(null);
-	const memoryClearRef = useRef<HTMLButtonElement>(null);
-	const chatsClearRef = useRef<HTMLButtonElement>(null);
+	const popoverRef = useRef<HTMLDivElement>(null);
+	const popoverCancelRef = useRef<HTMLButtonElement>(null);
 	const pendingFocusRef = useRef<FocusTarget>();
 	const [view, setView] = useState<DrawerView>('history');
-	const [confirmation, setConfirmation] = useState<Confirmation>();
+	const [deletion, setDeletion] = useState<ActiveDeletion>();
 	const [renaming, setRenaming] = useState<string>();
 	const [draft, setDraft] = useState('');
 	const [menu, setMenu] = useState<{ threadId: string; anchor: HTMLElement }>();
@@ -27,19 +28,19 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 	);
 	const returnToHistory = () => {
 		pendingFocusRef.current = 'settings';
-		setConfirmation(undefined);
+		setDeletion(undefined);
 		setView('history');
 	};
-	const dismissConfirmation = () => {
-		pendingFocusRef.current = confirmation === 'memory' ? 'memory-clear' : 'chats-clear';
-		setConfirmation(undefined);
+	const closeDeletion = () => {
+		if (deletion?.anchor.isConnected) pendingFocusRef.current = deletion.anchor;
+		setDeletion(undefined);
 	};
 
 	useEffect(() => {
 		if (!open) {
 			setMenu(undefined);
 			setRenaming(undefined);
-			setConfirmation(undefined);
+			setDeletion(undefined);
 			setView('history');
 		}
 	}, [open]);
@@ -48,28 +49,45 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 		const closeOnEscape = (event: KeyboardEvent) => {
 			if (event.key !== 'Escape') return;
 			event.preventDefault();
-			if (confirmation) dismissConfirmation();
-			else if (view === 'settings') returnToHistory();
+			if (deletion) return;
+			if (view === 'settings') returnToHistory();
 			else onClose();
 		};
 		document.addEventListener('keydown', closeOnEscape);
 		return () => document.removeEventListener('keydown', closeOnEscape);
-	}, [confirmation, open, menu, onClose, view]);
+	}, [deletion, open, menu, onClose, view]);
 	useEffect(() => {
 		if (open && view === 'settings') settingsBackRef.current?.focus();
 	}, [open, view]);
 	useEffect(() => {
 		const target = pendingFocusRef.current;
 		if (!target) return;
-		const elements: Record<FocusTarget, HTMLElement | null> = {
-			settings: settingsEntryRef.current,
-			'memory-heading': memoryHeadingRef.current,
-			'memory-clear': memoryClearRef.current,
-			'chats-clear': chatsClearRef.current,
-		};
-		elements[target]?.focus();
+		const element = typeof target === 'string'
+			? target === 'settings' ? settingsEntryRef.current : memoryHeadingRef.current
+			: target;
+		(element?.isConnected ? element : memoryHeadingRef.current)?.focus();
 		pendingFocusRef.current = undefined;
-	}, [confirmation, ui.agentMemory.length, ui.threads.length, view]);
+	}, [deletion, ui.agentMemory.length, ui.threads.length, view]);
+	useEffect(() => {
+		if (!deletion) return;
+		const outside = (event: PointerEvent) => {
+			const target = event.target as Node;
+			if (!popoverRef.current?.contains(target) && !deletion.anchor.contains(target)) closeDeletion();
+		};
+		const escape = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			event.preventDefault();
+			event.stopPropagation();
+			closeDeletion();
+		};
+		document.addEventListener('pointerdown', outside);
+		document.addEventListener('keydown', escape);
+		requestAnimationFrame(() => popoverCancelRef.current?.focus());
+		return () => {
+			document.removeEventListener('pointerdown', outside);
+			document.removeEventListener('keydown', escape);
+		};
+	}, [deletion]);
 	useEffect(() => {
 		if (!menu) return;
 		const outside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node) && !menu.anchor.contains(event.target as Node)) setMenu(undefined); };
@@ -81,42 +99,69 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 	}, [menu]);
 	if (!open) return null;
 
-	const confirmAction = () => {
-		if (confirmation === 'memory') {
+	const confirmDeletion = () => {
+		if (!deletion) return;
+		if (deletion.target.kind === 'memory-fact') {
 			pendingFocusRef.current = 'memory-heading';
-			ui.onClearMemory();
-			setConfirmation(undefined);
+			ui.onForgetMemory(deletion.target.fact);
+			setDeletion(undefined);
 			return;
 		}
-		if (confirmation === 'chats') {
-			ui.onClearAll();
-			returnToHistory();
+		if (deletion.target.kind === 'memory-all') {
+			pendingFocusRef.current = 'memory-heading';
+			ui.onClearMemory();
+			setDeletion(undefined);
+			return;
 		}
+		ui.onClearAll();
+		returnToHistory();
 	};
+	const deletionCopy = deletion ? getDeletionCopy(deletion.target, ui.threads.length) : undefined;
 
 	return <div className={classes.layer}>
 		<button className={classes.scrim} type="button" aria-label="Закрыть панель" onClick={onClose}/>
 		<aside className={`${classes.drawer} ${view === 'settings' ? classes.drawerSecond : ''}`} aria-label={view === 'settings' ? 'Настройки агента' : 'История диалогов'}>
 			{view === 'history' ? <HistoryView ui={ui} threads={threads} menu={menu} menuRef={menuRef} renaming={renaming} draft={draft} onClose={onClose} setDraft={setDraft} setMenu={setMenu} setRenaming={setRenaming} settingsEntryRef={settingsEntryRef} onOpenSettings={() => setView('settings')}/> : <>
 				<header className={classes.settingsHeader}>
-					<button ref={settingsBackRef} className={classes.backButton} type="button" aria-label="Вернуться к истории" onClick={returnToHistory}><Icon name={EIconName.arrowLeft} width={20} height={20}/></button>
+					<Button ref={settingsBackRef} variant="ellipse" size="S" icon={EIconName.previousLarge} iconOnly aria-label="Вернуться к истории" onClick={returnToHistory}/>
 					<div><strong>Настройки</strong><span>Память агента и история чатов</span></div>
 				</header>
 				<div className={classes.settingsContent}>
-					<section className={classes.settingsSection} aria-labelledby="agent-memory-title">
-						<div className={classes.sectionHeading}><div><h2 ref={memoryHeadingRef} tabIndex={-1} id="agent-memory-title">Память агента</h2><span>{ui.agentMemory.length ? `Сохранено: ${ui.agentMemory.length}` : 'Память пуста'}</span></div></div>
-						<p className={classes.sectionNote}>Факты о вас и предпочтениях, которые агент использует во всех чатах.</p>
-						{ui.agentMemory.length ? <ul className={classes.memoryList}>{ui.agentMemory.map((fact, index) => <li key={`${index}-${fact}`}><span>{fact}</span><button type="button" aria-label={`Забыть: ${fact}`} onClick={() => { pendingFocusRef.current = 'memory-heading'; ui.onForgetMemory(fact); }}><Icon name={EIconName.trash} width={17} height={17}/></button></li>)}</ul> : <div className={classes.emptyMemory}>Пока ничего. Агент запомнит только то, что вы сообщите о себе и предпочитаемом формате работы.</div>}
-						{confirmation === 'memory' ? <ConfirmationBox title="Очистить память агента?" text="Все сохранённые факты будут удалены. Это действие нельзя отменить." confirmLabel="Очистить память" onCancel={dismissConfirmation} onConfirm={confirmAction}/> : <button ref={memoryClearRef} className={classes.dangerButton} type="button" disabled={!ui.agentMemory.length} onClick={() => setConfirmation('memory')}>Очистить память</button>}
-					</section>
 					<section className={classes.settingsSection} aria-labelledby="chat-history-title">
 						<div className={classes.sectionHeading}><div><h2 id="chat-history-title">История чатов</h2><span>{ui.threads.length} в истории</span></div></div>
 						<p className={classes.sectionNote}>Удалятся все диалоги и результаты работы агента. Память агента останется без изменений.</p>
-						{confirmation === 'chats' ? <ConfirmationBox title="Удалить все чаты?" text={`Будут удалены все диалоги (${ui.threads.length}) и остановлены фоновые задачи. Действие нельзя отменить.`} confirmLabel="Удалить все" onCancel={dismissConfirmation} onConfirm={confirmAction}/> : <button ref={chatsClearRef} className={classes.dangerButton} type="button" onClick={() => setConfirmation('chats')}>Удалить все чаты</button>}
+						<Button variant="danger" size="S" fullWidth onClick={event => setDeletion({ target: { kind: 'chats-all' }, anchor: event.currentTarget })}>Удалить все чаты</Button>
+					</section>
+					<section className={classes.settingsSection} aria-labelledby="agent-memory-title">
+						<div className={classes.sectionHeading}><div><h2 ref={memoryHeadingRef} tabIndex={-1} id="agent-memory-title">Память агента</h2><span>{ui.agentMemory.length ? `Сохранено: ${ui.agentMemory.length}` : 'Память пуста'}</span></div></div>
+						<p className={classes.sectionNote}>Факты о вас и предпочтениях, которые агент использует во всех чатах.</p>
+						{ui.agentMemory.length ? <ul className={classes.memoryList}>{ui.agentMemory.map((fact, index) => <li key={`${index}-${fact}`}><span>{fact}</span><Button variant="ellipse" size="XS" icon={EIconName.trash} iconOnly aria-label={`Удалить из памяти: ${fact}`} onClick={event => setDeletion({ target: { kind: 'memory-fact', fact }, anchor: event.currentTarget })}/></li>)}</ul> : <div className={classes.emptyMemory}>Пока ничего. Агент запомнит только то, что вы сообщите о себе и предпочитаемом формате работы.</div>}
+						<Button variant="danger" size="S" fullWidth disabled={!ui.agentMemory.length} onClick={event => setDeletion({ target: { kind: 'memory-all' }, anchor: event.currentTarget })}>Очистить память</Button>
 					</section>
 				</div>
 			</>}
 		</aside>
+		{deletion && deletionCopy && <Popover
+			ref={popoverRef}
+			className={classes.deletePopover}
+			open
+			anchor={deletion.anchor}
+			placement="top-end"
+			fallbackPlacements={['bottom-end']}
+			offset={8}
+			withArrow
+			role="dialog"
+			aria-label={deletionCopy.title}
+		>
+			<div className={classes.deletePopoverContent}>
+				<Title size="H500">{deletionCopy.title}</Title>
+				<Text>{deletionCopy.text}</Text>
+				<Row className={classes.deletePopoverButtons} gutter={8} noFlex>
+					<Button ref={popoverCancelRef} autoFocus variant="secondary" size="XS" fullWidth onClick={closeDeletion}>Отмена</Button>
+					<Button variant="danger" size="XS" fullWidth onClick={confirmDeletion}>{deletionCopy.confirmLabel}</Button>
+				</Row>
+			</div>
+		</Popover>}
 	</div>;
 }
 
@@ -166,14 +211,4 @@ function HistoryView({ ui, threads, menu, menuRef, renaming, draft, onClose, set
 			</button>
 		</footer>
 	</>;
-}
-
-function ConfirmationBox({ title, text, confirmLabel, onCancel, onConfirm }: { title: string; text: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void }) {
-	const cancelRef = useRef<HTMLButtonElement>(null);
-	useEffect(() => { cancelRef.current?.focus(); }, []);
-	return <div className={classes.confirmation} role="alert">
-		<strong>{title}</strong>
-		<p>{text}</p>
-		<div><button ref={cancelRef} type="button" onClick={onCancel}>Отмена</button><button className={classes.confirmDanger} type="button" onClick={onConfirm}>{confirmLabel}</button></div>
-	</div>;
 }

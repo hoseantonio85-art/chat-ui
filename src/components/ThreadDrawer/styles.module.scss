@@ -43,37 +43,22 @@
 .settingsEntry strong { font-size: 14px; line-height: 20px; font-weight: 500; }
 .settingsEntry small { overflow: hidden; color: var(--textBaseSecondary); font-size: 12px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .settingsIcon { width: 38px; height: 38px; display: grid; place-items: center; color: var(--iconBaseDefault); border-radius: 12px; background: var(--backgroundSecondaryDefault); }
-.settingsHeader { align-items: center !important; }
+.settingsHeader { align-items: center !important; justify-content: flex-start !important; gap: 16px !important; }
 .settingsHeader > div { min-width: 0; }
-.backButton {
-  flex: 0 0 38px; width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
-  color: var(--iconBaseDefault); border: 0; border-radius: 12px; background: var(--backgroundSecondaryDefault); cursor: pointer;
-}
-.backButton:hover, .backButton:focus-visible { background: var(--backgroundSecondaryHover); outline: 2px solid var(--borderFocus); outline-offset: 2px; }
 .settingsContent { min-height: 0; display: grid; align-content: start; gap: 16px; overflow-y: auto; padding: 2px 2px 12px; }
 .settingsSection { padding: 18px; display: grid; gap: 14px; border: 1px solid var(--borderDefault); border-radius: 18px; background: var(--backgroundSecondaryDefault); }
 .sectionHeading h2 { margin: 0; color: var(--textBaseDefault); font-size: 16px; line-height: 22px; font-weight: 600; }
 .sectionHeading span { color: var(--textBaseSecondary); font-size: 12px; line-height: 18px; }
 .sectionNote { margin: 0; color: var(--textBaseSecondary); font-size: 13px; line-height: 19px; }
 .memoryList { margin: 0; padding: 0; display: grid; gap: 6px; list-style: none; }
-.memoryList li { padding: 9px 8px 9px 11px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; border: 1px solid var(--borderDefault); border-radius: 12px; background: var(--backgroundBasicDefault); }
+.memoryList li { padding: 9px 8px 9px 11px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; border: 1px solid var(--borderDefault); border-radius: 12px; background: var(--backgroundBasicDefault); }
 .memoryList li > span { overflow-wrap: anywhere; color: var(--textBaseDefault); font-size: 13px; line-height: 19px; }
-.memoryList button { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; color: var(--iconBaseSecondary); border: 0; border-radius: 9px; background: transparent; cursor: pointer; }
-.memoryList button:hover, .memoryList button:focus-visible { color: var(--textTechDanger); background: var(--backgroundSecondaryDefault); }
-.memoryList button:focus-visible, .dangerButton:focus-visible, .confirmation button:focus-visible, .sectionHeading h2:focus-visible { outline: 2px solid var(--borderFocus); outline-offset: 2px; }
+.sectionHeading h2:focus-visible { outline: 2px solid var(--borderFocus); outline-offset: 2px; }
 .emptyMemory { padding: 14px; color: var(--textBaseSecondary); border: 1px dashed var(--borderDefault); border-radius: 12px; background: var(--backgroundBasicDefault); font-size: 13px; line-height: 19px; }
-.dangerButton {
-  justify-self: start; min-height: 36px; padding: 8px 12px; color: var(--textTechDanger); border: 1px solid currentColor;
-  border-radius: 11px; background: transparent; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
-}
-.dangerButton:hover, .dangerButton:focus-visible { background: rgba(224, 64, 64, .08); }
-.dangerButton:disabled { opacity: .4; cursor: default; background: transparent; }
-.confirmation { padding: 12px; display: grid; gap: 8px; border: 1px solid var(--textTechDanger); border-radius: 12px; background: var(--backgroundBasicDefault); }
-.confirmation > strong { color: var(--textBaseDefault); font-size: 13px; line-height: 18px; }
-.confirmation > p { margin: 0; color: var(--textBaseSecondary); font-size: 12px; line-height: 17px; }
-.confirmation > div { display: flex; flex-wrap: wrap; gap: 8px; }
-.confirmation button { min-height: 34px; padding: 7px 11px; color: var(--textBaseDefault); border: 1px solid var(--borderDefault); border-radius: 10px; background: var(--backgroundSecondaryDefault); font: inherit; font-size: 12px; cursor: pointer; }
-.confirmation .confirmDanger { color: var(--backgroundBasicDefault); border-color: var(--textTechDanger); background: var(--textTechDanger); }
+.deletePopover { z-index: 40; }
+.deletePopoverContent { width: min(304px, calc(100vw - 40px)); display: grid; gap: 8px; }
+.deletePopoverContent > span { color: var(--textBaseSecondary); font-size: 13px; line-height: 18px; }
+.deletePopoverButtons { width: 100%; margin-top: 8px; }
 @keyframes drawerLayerIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
 
 /* System agent states follow the quiet, spatial hierarchy of Alice history. */
@@ -112,9 +97,8 @@
   .readySparkle { animation:none; }
 }
 @media (forced-colors:active) {
-  .settingsEntry, .backButton, .settingsSection, .memoryList li, .emptyMemory, .dangerButton, .confirmation, .confirmation button { border: 1px solid CanvasText; }
-  .settingsEntry:focus-visible, .backButton:focus-visible, .memoryList button:focus-visible, .dangerButton:focus-visible, .confirmation button:focus-visible { outline: 2px solid Highlight; }
-  .confirmation .confirmDanger { color: HighlightText; background: Highlight; }
+  .settingsEntry, .settingsSection, .memoryList li, .emptyMemory { border: 1px solid CanvasText; }
+  .settingsEntry:focus-visible, .sectionHeading h2:focus-visible { outline: 2px solid Highlight; }
   .thread .threadRunning {
     color:CanvasText;
     background-image:none;

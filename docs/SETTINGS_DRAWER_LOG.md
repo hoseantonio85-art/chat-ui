@@ -113,3 +113,15 @@
 - Back — UI-kit ellipse icon-only Button; между ним и заголовком ровно 16 px.
 - Drawer не переполняется по горизонтали на mobile.
 - Typecheck, тесты, production build и browser QA проходят.
+
+## Реализация и локальная проверка — 7 ноября 2026
+
+- Секции переставлены: «История чатов» теперь выше «Памяти агента».
+- Глобальные destructive-действия заменены на `Button variant='danger' size='S' fullWidth` из UI kit.
+- Для удаления факта, всей памяти и всех чатов используется один controlled UI-kit `Popover`; до явного подтверждения данные не меняются.
+- Кнопки удаления фактов переведены на UI-kit ellipse/icon-only Button.
+- Back заменён на `Button variant='ellipse' size='S' icon={EIconName.previousLarge} iconOnly`; browser-computed расстояние до текстового блока — `16px`.
+- Добавлена типизированная модель цели удаления и проверяемые тексты подтверждения в `settings.ts`; тест прошёл цикл RED → GREEN.
+- Browser QA подтвердил: auto-focus на «Отмена», Escape закрывает только Popover, cancel возвращает фокус anchor, удаление факта переводит фокус на стабильный заголовок, очистка чатов оставляет один новый чат и сохраняет память.
+- На viewport `390×844` Popover полностью остаётся в границах экрана; `prefers-reduced-motion` отключает анимацию второго слоя, forced colors сохраняет явные границы секций.
+- Локально прошли strict typecheck, `54 Vitest + 1 node:test` и production Pages build. Перед публикацией остаются staged diff, независимое ревью, commit/deploy и live QA.
