@@ -20,6 +20,8 @@
     "../src/components/ThreadDrawer/activity.ts",
     "../src/components/ThreadDrawer/activity.test.ts",
     "../src/components/ThreadDrawer/context.tsx",
+    "../src/components/ThreadDrawer/history.ts",
+    "../src/components/ThreadDrawer/history.test.ts",
     "../src/components/ThreadDrawer/index.tsx",
     "../src/components/ThreadDrawer/settings.ts",
     "../src/components/ThreadDrawer/settings.test.ts",

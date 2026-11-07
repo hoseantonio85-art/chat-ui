@@ -7,7 +7,7 @@
 .drawer header span { color: var(--textBaseSecondary); font-size: 13px; }
 .newButton { width: 100%; }
 .groups { flex: 1 1 auto; display: flex; flex-direction: column; gap: 24px; min-height: 0; overflow-y: auto; padding-bottom: 8px; }
-.groupTitle { margin: 0 12px 8px; color: var(--textBaseSecondary); font-size: 12px; line-height: 18px; font-weight: 400; }
+.groupTitle { margin: 0 0 8px; color: var(--textBaseSecondary); font-size: 12px; line-height: 18px; font-weight: 400; }
 .list { margin: 0; padding: 0; display: grid; gap: 2px; overflow-y: auto; list-style: none; }
 .list li { position: relative; min-height: 42px; padding: 0 42px 0 12px; display: flex; align-items: center; border-radius: 12px; background: transparent; transition: background-color .16s ease; }
 .list li:hover, .list li:focus-within, .list li[data-menu-open='true'], .list li[data-active='true'] { background: var(--backgroundSecondaryDefault); }

@@ -54,7 +54,7 @@
   &Divider {
     width: 1px;
     height: 20px;
-    background-color: var(--textBaseDefault);
+    background-color: var(--borderDefault);
   }
 }
 
@@ -70,7 +70,7 @@
   width: 1px;
   height: 20px;
   flex-shrink: 0;
-  background-color: var(--textBaseDefault);
+  background-color: var(--borderDefault);
 }
 
 @media (max-width: 599px) {

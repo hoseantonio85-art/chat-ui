@@ -196,6 +196,16 @@ export const Chat = React.memo(
 					</div>
 					</div>
 					<Row justify="end" gutter={16}>
+						{threadUi.enabled && <>
+							<Button
+								variant="ellipse"
+								icon={EIconName.message}
+								iconOnly
+								aria-label="Новый чат"
+								onClick={threadUi.onNew}
+							/>
+							<div className={classes.headerDivider} aria-hidden="true" />
+						</>}
 						{!!canCreateIncident && !hideCreatingForm && !isPhone && (
 							<>
 								<Button

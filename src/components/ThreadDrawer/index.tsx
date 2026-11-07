@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, EIconName, Icon, Popover, Row, Text, Title } from '@sber-orm/ui-kit';
 import { useThreadUi } from './context';
+import { groupThreadsForHistory } from './history';
 import { getDeletionCopy, type SettingsDeletionTarget } from './settings';
 import classes from './styles.module.scss';
 
@@ -181,13 +182,11 @@ type HistoryViewProps = {
 };
 
 function HistoryView({ ui, threads, menu, menuRef, renaming, draft, onClose, setDraft, setMenu, setRenaming, settingsEntryRef, onOpenSettings }: HistoryViewProps) {
+	const groups = groupThreadsForHistory(threads);
 	return <>
-		<header><div><strong>Диалоги</strong><span>История сохраняет ход работы агента</span></div></header>
+		<header><div><strong>Диалоги</strong></div></header>
 		<Button className={classes.newButton} icon={EIconName.message} variant="secondary" onClick={() => { ui.onNew(); onClose(); }}>Новый чат</Button>
-		<div className={classes.groups}>{[
-			{ title: 'Закреплённые', items: threads.filter(thread => thread.pinned) },
-			{ title: 'Недавние', items: threads.filter(thread => !thread.pinned) },
-		].filter(group => group.items.length > 0).map(group => <section key={group.title} aria-label={group.title}>
+		<div className={classes.groups}>{groups.map(group => <section key={group.title} aria-label={group.title}>
 			<h3 className={classes.groupTitle}>{group.title}</h3>
 			<ul className={classes.list}>{group.items.map(thread => <li key={thread.id} data-active={thread.id === ui.activeThreadId} data-menu-open={menu?.threadId === thread.id}>
 				{renaming === thread.id ? <form onSubmit={event => { event.preventDefault(); if (draft.trim()) ui.onRename(thread.id, draft.trim()); setRenaming(undefined); }}><input autoFocus value={draft} onChange={event => setDraft(event.target.value)} aria-label="Название диалога"/><Button size="S" icon={EIconName.check} iconOnly aria-label="Сохранить"/></form> : <button className={classes.thread} type="button" onClick={() => { ui.onSelect(thread.id); onClose(); }}><span className={classes.threadLabel}><span className={`${classes.threadTitle} ${thread.agentState === 'running' ? classes.threadRunning : ''}`}>{thread.title}</span>{thread.agentUnread && thread.agentState === 'ready' && <i className={classes.readySparkle} aria-label="Новый результат работы агента"/>}</span></button>}
