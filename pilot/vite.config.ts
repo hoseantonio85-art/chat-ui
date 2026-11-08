@@ -22,6 +22,15 @@ export default defineConfig({
   // The host tsconfig extends a private package; the standalone harness does not.
   esbuild: { tsconfigRaw: JSON.stringify({ compilerOptions: { jsx: 'react-jsx', useDefineForClassFields: true } }) },
   server: { fs: { allow: [path('..')] } },
-  build: { outDir: 'dist', emptyOutDir: true },
-  test: { include: ['../src/components/AgentActivity/*.test.ts', '../src/components/ThreadDrawer/*.test.ts', './*.model.test.ts'], environment: 'node' },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        pilot: path('./index.html'),
+        scenarioMap: path('./scenario-map/index.html'),
+      },
+    },
+  },
+  test: { include: ['../src/components/AgentActivity/*.test.ts', '../src/components/ThreadDrawer/*.test.ts', './*.model.test.ts', './scenario-map/*.test.ts'], environment: 'node' },
 });

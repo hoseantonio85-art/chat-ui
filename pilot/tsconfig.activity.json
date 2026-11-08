@@ -26,6 +26,8 @@
     "../src/components/ThreadDrawer/settings.ts",
     "../src/components/ThreadDrawer/settings.test.ts",
     "./VndBackground.model.ts",
-    "./VndBackground.model.test.ts"
+    "./VndBackground.model.test.ts",
+    "./scenario-map/**/*.ts",
+    "./scenario-map/**/*.tsx"
   ]
 }

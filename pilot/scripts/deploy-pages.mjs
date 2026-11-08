@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { cpSync, existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertDeploySourceBranch } from './deploy-pages.lib.mjs';
+import { assertDeploySourceBranch, assertPagesBuild } from './deploy-pages.lib.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '../..');
@@ -19,9 +19,7 @@ const git = (...args) => execFileSync('git', args, {
   stdio: ['ignore', 'pipe', 'inherit'],
 }).trim();
 
-if (!existsSync(join(distDir, 'index.html'))) {
-  throw new Error('pilot/dist is missing. Run npm run build:pages first.');
-}
+assertPagesBuild(distDir);
 if (git('status', '--porcelain')) {
   throw new Error('Source worktree is not clean. Commit source changes before publishing.');
 }
