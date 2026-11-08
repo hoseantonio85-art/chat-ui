@@ -4,6 +4,7 @@ import {
   getAdjacentStep,
   getInitialLocation,
   getScenarioStep,
+  toLivePreviewUrl,
   toSearch,
 } from './model';
 
@@ -40,6 +41,11 @@ describe('scenario map model', () => {
   it('serializes the selected scenario, step, and view', () => {
     expect(toSearch({ scenarioId: 'vnd', stepId: 'vnd.result', view: 'screens' }))
       .toBe('?scenario=vnd&step=vnd.result&view=screens');
+  });
+
+  it('creates a same-origin live preview URL for the 100% viewer', () => {
+    expect(toLivePreviewUrl('/chat-ui/', 'settings.confirm'))
+      .toBe('/chat-ui/?atlas=settings.confirm&embed=1');
   });
 
   it('moves through steps without wrapping at the boundaries', () => {

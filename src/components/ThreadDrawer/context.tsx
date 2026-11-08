@@ -12,11 +12,15 @@ export interface ChatThread {
 	jobState?: 'running' | 'ready' | 'saved';
 }
 
+export type ThreadDrawerInitialState = 'history' | 'settings' | 'memory-confirm';
+
 interface ThreadUiValue {
 	enabled: boolean;
 	threads: ChatThread[];
 	agentMemory: string[];
 	activeThreadId?: string;
+	initialDrawerState?: ThreadDrawerInitialState;
+	initialDrawerFocus?: 'memory-heading';
 	onSelect: (id: string) => void;
 	onNew: () => void;
 	onRename: (id: string, title: string) => void;

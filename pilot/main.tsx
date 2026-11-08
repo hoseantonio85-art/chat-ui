@@ -20,12 +20,13 @@ import chatClasses from '@/components/Chat/styles.module.scss';
 import '@/i18n';
 import './vendor/ui-kit/dist/index.css';
 import './styles.css';
-import {useVndBackground, type BackgroundThread} from './VndBackground';
+import {useVndBackground} from './VndBackground';
 import {canResolveVndAttachmentLookup} from './VndBackground.model';
 import {methodologistService} from './mocks/files';
+import {createAtlasPreview, type AtlasPreviewThread} from './atlasPreview';
 
 type VndStage = 'start' | 'chooseStandard' | 'reviewed' | 'complete';
-interface DemoThread extends BackgroundThread { scenario: ScenarioId; messages: IMessage[]; runs: Record<string, AgentRun>; vndStage?: VndStage; }
+type DemoThread = AtlasPreviewThread;
 const assistantSkills: AssistantSkill[] = [
   {id: 'methodologist', title: 'Методолог'}, {id: 'risk-review', title: 'Проверка рисков'}, {id: 'createIncident', title: 'Регистрация события'},
 ];
@@ -66,13 +67,30 @@ const initialThreads = () => [
   historicalThread('finance', 'Финансовые показатели', 'rich', 90 * 24 * 60),
 ];
 
+function createInitialAppState() {
+  const params = new URLSearchParams(window.location.search);
+  const baseThreads = initialThreads();
+  const preview = createAtlasPreview(params.get('atlas'), baseThreads, initialAgentMemory);
+  return {
+    threads: preview?.threads ?? baseThreads,
+    agentMemory: preview?.agentMemory ?? initialAgentMemory,
+    activeThreadId: preview?.activeThreadId ?? 'vnd',
+    scenario: preview?.scenario ?? 'vnd',
+    drawer: preview?.drawer,
+    drawerFocus: preview?.drawerFocus,
+    embedded: params.get('embed') === '1',
+  };
+}
+
 function App() {
-  const [threads, setThreads] = useState<DemoThread[]>(initialThreads); const threadsRef = useRef(threads);
-  const [agentMemory, setAgentMemory] = useState(initialAgentMemory);
-  const [activeThreadId, setActiveThreadId] = useState('vnd'); const activeIdRef = useRef(activeThreadId);
-  const [scenario, setScenario] = useState<ScenarioId>('vnd');
-  const [runs, setRunsState] = useState<Record<string, AgentRun>>({}); const runsRef = useRef(runs);
-  const vndStageRef = useRef<VndStage>('start');
+  const [initialState] = useState(createInitialAppState);
+  const [threads, setThreads] = useState<DemoThread[]>(initialState.threads); const threadsRef = useRef(threads);
+  const [agentMemory, setAgentMemory] = useState(initialState.agentMemory);
+  const [activeThreadId, setActiveThreadId] = useState(initialState.activeThreadId); const activeIdRef = useRef(activeThreadId);
+  const [scenario, setScenario] = useState<ScenarioId>(initialState.scenario);
+  const initialThread = initialState.threads.find(thread => thread.id === initialState.activeThreadId) ?? initialState.threads[0];
+  const [runs, setRunsState] = useState<Record<string, AgentRun>>(initialThread.runs); const runsRef = useRef(runs);
+  const vndStageRef = useRef<VndStage>(initialThread.vndStage || 'start');
   const [selectedSkillId, setSelectedSkillId] = useState<string>();
   const [playing, setPlaying] = useState(false); const [online, setOnline] = useState(true); const [actionUrl, setActionUrl] = useState('');
   const generations = useRef(new Map<string, number>()); const timeouts = useRef(new Map<string, Set<ReturnType<typeof setTimeout>>>());
@@ -344,13 +362,44 @@ function App() {
     else { events.forEach((event,index) => later(threadId, () => {run = appendEvent(run, {...event, at:Date.now()}); updateRun();}, (index + 1) * 700)); const chunks = answer.match(/.{1,36}(?:\s|$)|.{1,36}/gs) || [answer]; let text = ''; chunks.forEach((chunk,index) => later(threadId, () => {text += chunk; appendToThread(threadId, {...base,text,extras:{agentPending:'true'}});}, events.length * 700 + (index + 1) * 65)); later(threadId, finish, events.length * 700 + (chunks.length + 1) * 65); }
     chat$.openChat();
   }
-  useEffect(() => { const listener = (event: Event) => setActionUrl((event as CustomEvent<string>).detail); window.addEventListener('pilot:navigate',listener); const bootstrap = setTimeout(() => {loadThread(threadsRef.current[0]); if (window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen); chat$.openChat();}, 50); return () => {clearTimeout(bootstrap); clearAllTimers(); window.removeEventListener('pilot:navigate',listener);}; }, []);
+  useEffect(() => { const listener = (event: Event) => setActionUrl((event as CustomEvent<string>).detail); window.addEventListener('pilot:navigate',listener); const bootstrap = setTimeout(() => {const thread=threadsRef.current.find(item=>item.id===initialState.activeThreadId) || threadsRef.current[0]; loadThread(thread); if (initialState.embedded || window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen); chat$.openChat();}, 50); return () => {clearTimeout(bootstrap); clearAllTimers(); window.removeEventListener('pilot:navigate',listener);}; }, []);
+  useEffect(() => {
+    if (!initialState.embedded || window.parent === window) return;
+    const forwardEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) window.parent.postMessage({ type: 'atlas:close-live-preview' }, window.location.origin);
+    };
+    window.addEventListener('keydown', forwardEscape);
+    return () => window.removeEventListener('keydown', forwardEscape);
+  }, [initialState.embedded]);
+  useEffect(() => {
+    if (!initialState.embedded) return;
+    let cancelled = false;
+    let attempts = 0;
+    let readyTimer = 0;
+    const announceReady = () => {
+      if (cancelled) return;
+      const focusTarget = initialState.drawerFocus === 'memory-heading'
+        ? document.getElementById('agent-memory-title')
+        : undefined;
+      if (initialState.drawerFocus && !focusTarget && attempts < 20) {
+        attempts += 1;
+        readyTimer = window.setTimeout(announceReady, 50);
+        return;
+      }
+      focusTarget?.focus();
+      if (window.parent !== window) window.parent.postMessage({ type: 'atlas:live-preview-ready' }, window.location.origin);
+    };
+    readyTimer = window.setTimeout(announceReady, 150);
+    return () => { cancelled = true; window.clearTimeout(readyTimer); };
+  }, [initialState.drawerFocus, initialState.embedded]);
   useEffect(() => {setDemoSender(request => scenario.startsWith('vnd') ? sendVnd(request) : play(selectedSkillId === 'methodologist' ? 'subagent' : scenario, false, request.body, request.extras));}, [scenario, selectedSkillId]);
   const threadUi = {
     enabled:true,
     threads,
     agentMemory,
     activeThreadId,
+    initialDrawerState:initialState.drawer,
+    initialDrawerFocus:initialState.drawerFocus,
     onSelect:selectThread,
     onNew:newThread,
     onRename:(id:string,title:string) => updateThreads(items => items.map(item => item.id === id ? {...item,title,updatedAt:Date.now()} : item)),
@@ -362,9 +411,9 @@ function App() {
   };
   const selectedSkill = demoFlags.assistantSkills ? assistantSkills.find(item => item.id === selectedSkillId) : undefined;
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><AgentRunsContext.Provider value={runs}>
-    <style>{`.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
-    <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Демонстрационные данные'}</span></div><label className="scenario-picker"><span className="sr-only">Сценарий</span><select aria-label="Сценарий" value={scenario} onChange={event => runScenario(event.target.value as ScenarioId)}>{scenarios.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{scenario === 'vndBackground' ? 'Демо проверки' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>
-    <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div><div><small>Источники</small><strong>4</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main><ModalContainer/>{background.ui}
+    <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
+    {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Демонстрационные данные'}</span></div><label className="scenario-picker"><span className="sr-only">Сценарий</span><select aria-label="Сценарий" value={scenario} onChange={event => runScenario(event.target.value as ScenarioId)}>{scenarios.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{scenario === 'vndBackground' ? 'Демо проверки' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
+    {!initialState.embedded && <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div><div><small>Источники</small><strong>4</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main>}<ModalContainer/>{background.ui}
     {actionUrl && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Переход в НОРМ"><h2>Переход в форму НОРМ</h2><p>Продуктовый чат передал команду открытия формы. В демо она перехвачена локально.</p><code>{actionUrl}</code><Button onClick={() => {setActionUrl('');chat$.openChat();}}>Вернуться в чат</Button></div>}
   </AgentRunsContext.Provider></AssistantSkillsContext.Provider></ThreadUiContext.Provider></reatomContext.Provider>;
 }

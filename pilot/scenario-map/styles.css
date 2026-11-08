@@ -118,8 +118,10 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .modal-actions{flex:0 0 auto}
 .modal-actions button:first-child svg{transform:rotate(180deg)}
 .modal-actions button:last-child{margin-left:4px}
-.full-screen-stage{overflow:auto;padding:32px;background-color:#dfe4e8;background-image:radial-gradient(circle,#bec8d0 1px,transparent 1px);background-size:24px 24px}
-.full-screen-stage img{width:1416px;height:812px;max-width:none;display:block;margin:0 auto;border-radius:14px;box-shadow:0 20px 48px rgba(33,48,60,.2)}
+.full-screen-stage{position:relative;overflow:auto;padding:32px;background-color:#dfe4e8;background-image:radial-gradient(circle,#bec8d0 1px,transparent 1px);background-size:24px 24px}
+.full-screen-stage iframe{width:1416px;height:812px;max-width:none;display:block;margin:0 auto;border:0;border-radius:14px;background:#fff;box-shadow:0 20px 48px rgba(33,48,60,.2)}
+.live-loading{position:fixed;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);padding:12px 16px;border:1px solid var(--border);border-radius:12px;background:#fff;color:var(--muted);font-size:14px;box-shadow:0 8px 24px rgba(33,48,60,.12)}
+.frame-focus-return{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 @media(max-width:1100px){
   .app-shell{grid-template-columns:208px minmax(420px,1fr) 280px}
   .topbar{padding:0 16px}

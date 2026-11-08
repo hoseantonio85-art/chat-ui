@@ -54,7 +54,7 @@ export const Chat = React.memo(
 		const [canLoadHistory] = useAtom(canLoadHistoryAtom);
 		const [createIncidentAvailable] = useAtom(isCreateIncidentAvailable);
 		const threadUi = useThreadUi();
-		const [historyOpen, setHistoryOpen] = useState(false);
+		const [historyOpen, setHistoryOpen] = useState(Boolean(threadUi.initialDrawerState));
 		const historyIndicators = getHistoryIndicatorState(threadUi.threads);
 		const historyLabel = historyIndicators.running && historyIndicators.unreadReady
 			? 'История диалогов — агент работает, есть новый результат'

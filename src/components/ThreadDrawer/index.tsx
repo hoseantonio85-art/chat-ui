@@ -17,8 +17,10 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 	const memoryHeadingRef = useRef<HTMLHeadingElement>(null);
 	const popoverRef = useRef<HTMLDivElement>(null);
 	const popoverCancelRef = useRef<HTMLButtonElement>(null);
+	const previewMemoryDeleteRef = useRef<HTMLButtonElement>(null);
+	const previewDeletionOpenedRef = useRef(false);
 	const pendingFocusRef = useRef<FocusTarget>();
-	const [view, setView] = useState<DrawerView>('history');
+	const [view, setView] = useState<DrawerView>(ui.initialDrawerState === 'settings' || ui.initialDrawerState === 'memory-confirm' ? 'settings' : 'history');
 	const [deletion, setDeletion] = useState<ActiveDeletion>();
 	const [renaming, setRenaming] = useState<string>();
 	const [draft, setDraft] = useState('');
@@ -58,8 +60,20 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 		return () => document.removeEventListener('keydown', closeOnEscape);
 	}, [deletion, open, menu, onClose, view]);
 	useEffect(() => {
-		if (open && view === 'settings') settingsBackRef.current?.focus();
-	}, [open, view]);
+		if (!open || view !== 'settings') return;
+		if (ui.initialDrawerFocus !== 'memory-heading') {
+			settingsBackRef.current?.focus();
+			return;
+		}
+		let secondFrame = 0;
+		const firstFrame = requestAnimationFrame(() => {
+			secondFrame = requestAnimationFrame(() => memoryHeadingRef.current?.focus());
+		});
+		return () => {
+			cancelAnimationFrame(firstFrame);
+			if (secondFrame) cancelAnimationFrame(secondFrame);
+		};
+	}, [open, ui.initialDrawerFocus, view]);
 	useEffect(() => {
 		const target = pendingFocusRef.current;
 		if (!target) return;
@@ -89,6 +103,14 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 			document.removeEventListener('keydown', escape);
 		};
 	}, [deletion]);
+	useEffect(() => {
+		if (!open || view !== 'settings' || ui.initialDrawerState !== 'memory-confirm' || previewDeletionOpenedRef.current) return;
+		const anchor = previewMemoryDeleteRef.current;
+		const fact = ui.agentMemory[0];
+		if (!anchor || !fact) return;
+		previewDeletionOpenedRef.current = true;
+		setDeletion({ target: { kind: 'memory-fact', fact }, anchor });
+	}, [open, ui.agentMemory, ui.initialDrawerState, view]);
 	useEffect(() => {
 		if (!menu) return;
 		const outside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node) && !menu.anchor.contains(event.target as Node)) setMenu(undefined); };
@@ -138,7 +160,7 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 					<section className={classes.settingsSection} aria-labelledby="agent-memory-title">
 						<div className={classes.sectionHeading}><div><h2 ref={memoryHeadingRef} tabIndex={-1} id="agent-memory-title">Память агента</h2><span>{ui.agentMemory.length ? `Сохранено: ${ui.agentMemory.length}` : 'Память пуста'}</span></div></div>
 						<p className={classes.sectionNote}>Факты о вас и предпочтениях, которые агент использует во всех чатах.</p>
-						{ui.agentMemory.length ? <ul className={classes.memoryList}>{ui.agentMemory.map((fact, index) => <li key={`${index}-${fact}`}><span>{fact}</span><Tooltip content="Удалить из памяти" placement="left" showOnChildFocus><Button variant="ellipse" size="XS" icon={EIconName.trash} iconOnly aria-label={`Удалить из памяти: ${fact}`} onClick={event => setDeletion({ target: { kind: 'memory-fact', fact }, anchor: event.currentTarget })}/></Tooltip></li>)}</ul> : <div className={classes.emptyMemory}>Пока ничего. Агент запомнит только то, что вы сообщите о себе и предпочитаемом формате работы.</div>}
+						{ui.agentMemory.length ? <ul className={classes.memoryList}>{ui.agentMemory.map((fact, index) => <li key={`${index}-${fact}`}><span>{fact}</span><Tooltip content="Удалить из памяти" placement="left" showOnChildFocus><Button ref={index === 0 ? previewMemoryDeleteRef : undefined} variant="ellipse" size="XS" icon={EIconName.trash} iconOnly aria-label={`Удалить из памяти: ${fact}`} onClick={event => setDeletion({ target: { kind: 'memory-fact', fact }, anchor: event.currentTarget })}/></Tooltip></li>)}</ul> : <div className={classes.emptyMemory}>Пока ничего. Агент запомнит только то, что вы сообщите о себе и предпочитаемом формате работы.</div>}
 						<Button variant="danger" size="S" fullWidth disabled={!ui.agentMemory.length} onClick={event => setDeletion({ target: { kind: 'memory-all' }, anchor: event.currentTarget })}>Очистить память</Button>
 					</section>
 				</div>

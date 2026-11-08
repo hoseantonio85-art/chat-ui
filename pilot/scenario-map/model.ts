@@ -140,6 +140,11 @@ export const toSearch = ({ scenarioId, stepId, view }: MapLocation): string => {
   return `?${params.toString()}`;
 };
 
+export const toLivePreviewUrl = (baseUrl: string, stepId: string): string => {
+  const params = new URLSearchParams({ atlas: stepId, embed: '1' });
+  return `${baseUrl}?${params.toString()}`;
+};
+
 export function getAdjacentStep(scenarioId: ScenarioId, stepId: string, direction: -1 | 1): ScenarioStep | undefined {
   const scenario = getScenario(scenarioId);
   if (!scenario) return undefined;

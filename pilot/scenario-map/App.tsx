@@ -6,6 +6,7 @@ import {
   getScenario,
   getScenarioStep,
   scenarios,
+  toLivePreviewUrl,
   toSearch,
   type MapLocation,
   type MapView,
@@ -88,14 +89,24 @@ export function App() {
   const [location, setLocation] = useState<MapLocation>(() => getInitialLocation(window.location.search));
   const [transform, setTransform] = useState<Transform>({ x: 32, y: 32, zoom: .72 });
   const [fullScreenStep, setFullScreenStep] = useState<ScenarioStep>();
+  const [liveReadyStepId, setLiveReadyStepId] = useState<string>();
   const [dragging, setDragging] = useState(false);
   const appShellRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const liveFrameRef = useRef<HTMLIFrameElement>(null);
   const dragRef = useRef<{ x: number; y: number; originX: number; originY: number }>();
+  const modalPreviousRef = useRef<HTMLButtonElement>(null);
+  const modalNextRef = useRef<HTMLButtonElement>(null);
   const modalCloseRef = useRef<HTMLButtonElement>(null);
   const screenTriggerRef = useRef<HTMLElement>();
   const restoreScreenFocusRef = useRef(false);
+
+  const focusFirstModalControl = () => {
+    const control = [modalPreviousRef.current, modalNextRef.current, modalCloseRef.current]
+      .find(item => item && !item.disabled);
+    control?.focus();
+  };
 
   const scenario = getScenario(location.scenarioId) ?? scenarios[0];
   const selectedStep = getScenarioStep(scenario.id, location.stepId) ?? scenario.steps[0];
@@ -146,7 +157,7 @@ export function App() {
 
   useEffect(() => {
     if (fullScreenStep) {
-      modalCloseRef.current?.focus();
+      focusFirstModalControl();
     } else if (restoreScreenFocusRef.current) {
       restoreScreenFocusRef.current = false;
       window.setTimeout(() => screenTriggerRef.current?.focus(), 0);
@@ -156,11 +167,13 @@ export function App() {
   const openFullScreen = (step: ScenarioStep, trigger?: HTMLElement) => {
     screenTriggerRef.current = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : undefined);
     updateLocation({ stepId: step.id });
+    setLiveReadyStepId(undefined);
     setFullScreenStep(step);
   };
 
   const closeFullScreen = () => {
     restoreScreenFocusRef.current = true;
+    setLiveReadyStepId(undefined);
     setFullScreenStep(undefined);
   };
 
@@ -169,6 +182,7 @@ export function App() {
     const step = getAdjacentStep(scenario.id, fullScreenStep.id, direction);
     if (!step) return;
     updateLocation({ stepId: step.id });
+    setLiveReadyStepId(undefined);
     setFullScreenStep(step);
   };
 
@@ -187,13 +201,24 @@ export function App() {
           return;
         }
         if (event.key === 'Tab') {
-          const controls = Array.from(modalRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+          const controls = Array.from(modalRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), iframe') ?? []);
           if (!controls.length) return;
-          const current = controls.indexOf(document.activeElement as HTMLButtonElement);
+          const current = controls.indexOf(document.activeElement as HTMLElement);
           const next = event.shiftKey
             ? controls[(current <= 0 ? controls.length : current) - 1]
             : controls[(current + 1) % controls.length];
           event.preventDefault();
+          if (next.tagName === 'IFRAME') {
+            const frame = next as HTMLIFrameElement;
+            const frameControls = Array.from(frame.contentDocument?.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])') ?? [])
+              .filter(item => item.tabIndex >= 0 && item.getClientRects().length > 0);
+            const frameTarget = event.shiftKey ? frameControls.at(-1) : frameControls[0];
+            if (frameTarget) {
+              frame.focus();
+              frameTarget.focus();
+              return;
+            }
+          }
           next.focus();
         }
         return;
@@ -210,6 +235,19 @@ export function App() {
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [fullScreenStep, scenario.id, selectedStep.id, updateLocation]);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== liveFrameRef.current?.contentWindow) return;
+      if (event.data?.type === 'atlas:close-live-preview') closeFullScreen();
+      if (event.data?.type === 'atlas:live-preview-ready' && fullScreenStep) {
+        setLiveReadyStepId(fullScreenStep.id);
+        focusFirstModalControl();
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [fullScreenStep]);
 
   const progress = useMemo(() => scenario.steps.findIndex(step => step.id === selectedStep.id) + 1, [scenario, selectedStep]);
 
@@ -384,17 +422,21 @@ export function App() {
     </div>
 
       {fullScreenStep && (
-        <div ref={modalRef} className="screen-modal" role="dialog" aria-modal="true" aria-label={`${fullScreenStep.title}, масштаб 100%`}>
+        <div ref={modalRef} className="screen-modal" role="dialog" aria-modal="true" aria-label={`${fullScreenStep.title}, живой HTML в масштабе 100%`}>
           <header>
-            <div><span>{fullScreenStep.number} · 100%</span><strong>{fullScreenStep.title}</strong></div>
+            <div><span>{fullScreenStep.number} · LIVE · 100%</span><strong>{fullScreenStep.title}</strong></div>
             <div className="modal-actions">
-              <button onClick={() => moveFullScreen(-1)} disabled={scenario.steps[0].id === fullScreenStep.id} aria-label="Предыдущий экран"><Icon name="arrow" /></button>
+              <button ref={modalPreviousRef} onClick={() => moveFullScreen(-1)} disabled={scenario.steps[0].id === fullScreenStep.id} aria-label="Предыдущий экран"><Icon name="arrow" /></button>
               <span>{scenario.steps.findIndex(step => step.id === fullScreenStep.id) + 1} / {scenario.steps.length}</span>
-              <button onClick={() => moveFullScreen(1)} disabled={scenario.steps.at(-1)?.id === fullScreenStep.id} aria-label="Следующий экран"><Icon name="arrow" /></button>
+              <button ref={modalNextRef} onClick={() => moveFullScreen(1)} disabled={scenario.steps.at(-1)?.id === fullScreenStep.id} aria-label="Следующий экран"><Icon name="arrow" /></button>
               <button ref={modalCloseRef} onClick={closeFullScreen} aria-label="Закрыть просмотр"><Icon name="close" /></button>
             </div>
           </header>
-          <div className="full-screen-stage"><img src={`${SCREEN_BASE}${fullScreenStep.screen}`} alt={fullScreenStep.screenAlt} /></div>
+          <div className="full-screen-stage">
+            {liveReadyStepId !== fullScreenStep.id && <div className="live-loading" role="status">Загружаем живой экран…</div>}
+            <iframe ref={liveFrameRef} key={fullScreenStep.id} src={toLivePreviewUrl(import.meta.env.BASE_URL, fullScreenStep.id)} title={`Живой экран: ${fullScreenStep.title}`} width="1416" height="812" sandbox="allow-scripts allow-same-origin allow-forms" />
+            <span className="frame-focus-return" tabIndex={0} onFocus={focusFirstModalControl} />
+          </div>
         </div>
       )}
     </>
