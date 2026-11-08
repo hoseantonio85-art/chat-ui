@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+export interface TFileAttach { filename: string; fileId?: string; size?: number; extension?: string; }
 export const ClickStreamProvider = ({children}: {children: ReactNode; [key: string]: unknown}) => children;
 export const Portal = ({visible, children}: {visible: boolean; children: ReactNode; id?: string}) => visible ? createPortal(children, document.body) : null;
 const trackEvent = () => {};

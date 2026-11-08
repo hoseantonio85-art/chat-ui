@@ -13,7 +13,7 @@ describe('scenario map model', () => {
     const ids = scenarios.flatMap(scenario => scenario.steps.map(step => step.id));
 
     expect(new Set(ids).size).toBe(ids.length);
-    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 4]);
+    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 4, 5]);
     expect(scenarios.every(scenario => scenario.steps.every(step => step.screen.endsWith('.png')))).toBe(true);
   });
 
@@ -57,5 +57,14 @@ describe('scenario map model', () => {
   it('returns only a step that belongs to the selected scenario', () => {
     expect(getScenarioStep('settings', 'settings.confirm')?.title).toContain('Подтверждение');
     expect(getScenarioStep('settings', 'vnd.result')).toBeUndefined();
+  });
+
+  it('restores a CSI review step as an independent scenario', () => {
+    expect(getInitialLocation('?scenario=csi&step=csi.review&view=screens')).toEqual({
+      scenarioId: 'csi',
+      stepId: 'csi.review',
+      view: 'screens',
+    });
+    expect(getScenarioStep('csi', 'csi.review')?.summary).toContain('исходные ответы');
   });
 });

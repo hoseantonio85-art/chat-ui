@@ -3,6 +3,11 @@ import { join } from 'node:path';
 
 export const DEPLOY_SOURCE_BRANCH = 'universal-agent-ui-pilot';
 export const PAGES_SCREEN_ASSETS = [
+  'csi-01-prompt.png',
+  'csi-02-rating.png',
+  'csi-03-review.png',
+  'csi-04-edited.png',
+  'csi-05-submitted.png',
   'settings-01-history.png',
   'settings-02-overview.png',
   'settings-03-confirm.png',
@@ -31,6 +36,6 @@ export function assertPagesBuild(distDir) {
   const screensDir = join(distDir, 'scenario-map', 'screens');
   const screens = existsSync(screensDir) ? new Set(readdirSync(screensDir)) : new Set();
   if (!PAGES_SCREEN_ASSETS.every(file => screens.has(file))) {
-    throw new Error('Expected all 10 scenario map screenshots in dist/scenario-map/screens.');
+    throw new Error(`Expected all ${PAGES_SCREEN_ASSETS.length} scenario map screenshots in dist/scenario-map/screens.`);
   }
 }

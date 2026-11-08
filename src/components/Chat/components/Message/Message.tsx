@@ -29,6 +29,7 @@ import { Graphs } from '@/components/UniversalChart/components/Graphs';
 import { IChartData } from '@/components/UniversalChart/types';
 import { ERoles } from '../../types';
 import { Table } from '../Table';
+import { useMessageAddon } from '../../MessageAddonContext';
 import classes from './styles.module.scss';
 import type { IMessageProps } from './types';
 
@@ -43,6 +44,8 @@ export const Message = React.memo((props: IMessageProps) => {
 	} = props;
 	const { reaction, role, skill, text } = message;
 	const agentRun = useAgentRun(id as string);
+	const renderMessageAddon = useMessageAddon();
+	const messageAddon = renderMessageAddon?.(message as IMessage);
 	const isAgentPending = message.extras?.agentPending === 'true';
 	const hasAgentTrace = !!agentRun?.events.some(event => event.kind !== 'finish');
 
@@ -145,7 +148,7 @@ export const Message = React.memo((props: IMessageProps) => {
 			onMouseOver={onMouseOver}
 		>
 			{(hasAgentTrace || isAgentPending) && <AgentActivity run={hasAgentTrace ? agentRun : undefined} />}
-			{(loader || text || fileIds.length > 0 || !!graphsData) && <div
+			{(loader || text || fileIds.length > 0 || !!graphsData || !!messageAddon) && <div
 				className={cn(classes.message, {
 					[classes.messageBot]: role === ERoles.bot || loader,
 					[classes.messageLoader]: loader,
@@ -169,6 +172,7 @@ export const Message = React.memo((props: IMessageProps) => {
 						/>
 					)}
 				</Title>
+				{messageAddon && <div className={classes.messageAddon}>{messageAddon}</div>}
 				{fileIds.length > 0 &&
 					files.length === 0 &&
 					Config.filesUploadEnabled && (

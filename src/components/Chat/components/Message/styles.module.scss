@@ -92,6 +92,11 @@
     align-items: end;
     gap: 8px;
   }
+
+  &Addon {
+    width: min(620px, 100%);
+    margin-top: 12px;
+  }
 }
 
 .attributes {

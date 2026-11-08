@@ -7,6 +7,7 @@
     "paths": {
       "@/*": ["../src/*"],
       "@sber-orm/ui-kit": ["vendor/ui-kit/dist/index.d.ts"],
+      "@sber-orm/components": ["mocks/components.tsx"],
       "react": ["node_modules/@types/react"],
       "react/*": ["node_modules/@types/react/*"],
       "vitest": ["node_modules/vitest"]
@@ -27,6 +28,10 @@
     "../src/components/ThreadDrawer/settings.test.ts",
     "./VndBackground.model.ts",
     "./VndBackground.model.test.ts",
+    "./Feedback.model.ts",
+    "./Feedback.model.test.ts",
+    "./FeedbackCard.tsx",
+    "../src/components/Chat/MessageAddonContext.tsx",
     "./scenario-map/**/*.ts",
     "./scenario-map/**/*.tsx"
   ]

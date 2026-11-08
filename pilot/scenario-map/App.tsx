@@ -311,7 +311,7 @@ export function App() {
       </header>
 
       <nav className="scenario-rail" aria-label="Сценарии MVP">
-        <div className="rail-title"><span>Сценарии</span><small>2 из 2</small></div>
+        <div className="rail-title"><span>Сценарии</span><small>{scenarios.length} из {scenarios.length}</small></div>
         {scenarios.map((item, index) => (
           <button
             key={item.id}
@@ -321,7 +321,7 @@ export function App() {
             onClick={() => updateLocation({ scenarioId: item.id, stepId: item.steps[0].id })}
           >
             <span className={`scenario-index ${item.accent}`}>0{index + 1}</span>
-            <span><strong>{item.id === 'vnd' ? 'Проверка ВНД' : 'Настройки'}</strong><small>{item.steps.length} состояний</small></span>
+            <span><strong>{item.id === 'vnd' ? 'Проверка ВНД' : item.id === 'settings' ? 'Настройки' : 'CSI'}</strong><small>{item.steps.length} состояний</small></span>
           </button>
         ))}
         <div className="rail-note">

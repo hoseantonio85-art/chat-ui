@@ -82,6 +82,26 @@ describe('atlas live preview states', () => {
       .toEqual(second?.threads.map(thread => [thread.id, thread.updatedAt]));
   });
 
+  it('builds deterministic CSI prompt, review, and submitted states', () => {
+    const prompt = createAtlasPreview('csi.prompt', baseThreads(), memory);
+    const review = createAtlasPreview('csi.review', baseThreads(), memory);
+    const submitted = createAtlasPreview('csi.submitted', baseThreads(), memory);
+    const reviewThread = review?.threads.find(thread => thread.id === 'vnd');
+
+    expect(prompt?.scenario).toBe('csiProactive');
+    expect(prompt?.threads.find(thread => thread.id === 'vnd')?.csiDraft?.stage).toBe('rating');
+    expect(reviewThread?.csiDraft).toMatchObject({ stage: 'confirm', status: 'draft' });
+    expect(reviewThread?.csiDraft?.rawMessages.map(message => message.text)).toEqual([
+      '4 из 5',
+      'Не сразу понял, где смотреть результат проверки.',
+    ]);
+    expect(submitted?.threads.find(thread => thread.id === 'vnd')?.csiDraft).toMatchObject({
+      stage: 'submitted',
+      status: 'submitted',
+      delivery: 'mock',
+    });
+  });
+
   it('rejects unknown steps instead of inventing a live state', () => {
     expect(createAtlasPreview('missing.step', baseThreads(), memory)).toBeUndefined();
   });
