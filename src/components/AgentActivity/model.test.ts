@@ -87,6 +87,24 @@ describe('UI run protocol', () => {
     expect(traceSteps(run)[1].detail).toMatchObject({event: delta, text: 'Проверяю профиль. Сверяю данные.'});
     expect(traceSteps(run, 'expert')[0].detail?.text).toBe('Работа эксперта.');
   });
+  it('shows one row per call and keeps service steps and nested expert work accessible', () => {
+    const run = [
+      event('profile', 'toolCall', {callId: 'profile'}),
+      event('risks', 'toolCall', {callId: 'risks'}),
+      event('profile-result', 'toolResult', {callId: 'profile'}),
+      event('unlabeled', 'message', {text: 'Промежуточная реплика'}),
+      event('risks-error', 'error', {callId: 'risks', text: 'Источник не ответил'}),
+      event('expert', 'delegation', {callId: 'expert'}),
+      event('expert-note', 'message', {parentCallId: 'expert', text: 'Проверяю критерии'}),
+      event('handback', 'handback', {callId: 'expert', parentCallId: 'expert'}),
+      event('service-step', 'message', {label: 'Сверяю документ с требованиями'}),
+    ].reduce(appendEvent, createRun('run', 'request', 0));
+
+    expect(traceSteps(run).map(step => [step.event.id, step.outcome?.id])).toEqual([
+      ['profile', 'profile-result'], ['risks', 'risks-error'], ['expert', 'handback'], ['service-step', undefined],
+    ]);
+    expect(traceSteps(run, 'expert').map(step => step.event.id)).toEqual(['expert-note']);
+  });
   it('summarizes backend text steps without inventing source-call counts', () => {
     let run = createRun('run', 'request', 0);
     run = appendEvent(run, event('step', 'message', {label: 'Посмотрел профиль компании'}));

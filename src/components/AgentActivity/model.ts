@@ -49,39 +49,70 @@ export function activityLabel(run?: AgentRun): string {
   return calls.length ? 'Собираю источники' : 'Думаю';
 }
 
+export const formatDuration = (ms: number) => `${Math.max(0, Math.floor(ms / 1000))} с`;
+
 export function callDuration(run: AgentRun, call: AgentEvent, now: number): string {
   const end = callOutcome(run, call)?.at ?? run.finishedAt ??
     (run.status === 'running' ? now : run.events.at(-1)?.at ?? call.at);
-  return `${Math.max(0, Math.floor((end - call.at) / 1000))} с`;
+  return formatDuration(end - call.at);
+}
+
+const sourceNames: Record<string, string> = {
+  get_company_profile: 'Профайлер',
+  profiler_search: 'Профайлер',
+  ask_methodologist: 'Методолог',
+  ask_analyst: 'Аналитик',
+  get_company_fin_indicators: 'Аналитик',
+  get_company_laws: 'Законы',
+  get_company_risks: 'Реестр рисков',
+  get_incident_form: 'Регистрация события',
+  create_incident: 'Регистрация события',
+};
+
+export function callTitle(event: AgentEvent): string {
+  return (event.tool && sourceNames[event.tool]) || event.source || event.label ||
+    (event.kind === 'delegation' ? 'Профильный эксперт' : 'Источник');
 }
 
 export function traceSteps(run: AgentRun, parentCallId?: string) {
   const events = run.events.filter(event => event.parentCallId === parentCallId && event.kind !== 'finish');
-  const stepIds = new Set(events.filter(event => event.kind !== 'thinking').map(event => event.id));
+  const outcomes = new Map<string, AgentEvent>();
+  const foldedIds = new Map<string, string>();
+  for (const event of events) {
+    const outcome = callOutcome(run, event);
+    if (!outcome) continue;
+    outcomes.set(event.id, outcome);
+    foldedIds.set(outcome.id, event.id);
+  }
+  const visible = events.filter(event => event.kind !== 'thinking' && event.kind !== 'toolResult' &&
+    event.kind !== 'handback' && !foldedIds.has(event.id) && (event.kind !== 'message' || !!event.label || !!parentCallId));
+  const stepIds = new Set(visible.map(event => event.id));
   const details = new Map<string | undefined, { event: AgentEvent; lastId: string; text: string }>();
   for (const event of events) {
     // Only explicitly public fragments can enter the trace. Older thinking events contain raw text.
     const delta = event.kind === 'thinking' ? event.progressDelta : undefined;
     if (!delta?.text) continue;
-    const detail = details.get(delta.stepId);
+    const stepId = delta.stepId ? foldedIds.get(delta.stepId) ?? delta.stepId : undefined;
+    const detail = details.get(stepId);
     if (detail) {
       detail.text += delta.text;
       detail.lastId = event.id;
-    } else details.set(delta.stepId, { event, lastId: event.id, text: delta.text });
+    } else details.set(stepId, { event, lastId: event.id, text: delta.text });
   }
 
-  const steps = events.filter(event => event.kind !== 'thinking').map(event => ({
+  const steps = visible.map(event => ({
     event,
     detail: details.get(event.id),
+    outcome: outcomes.get(event.id),
   }));
   for (const [stepId, detail] of details) {
-    if (!stepId || !stepIds.has(stepId)) steps.push({ event: detail.event, detail });
+    if (!stepId || !stepIds.has(stepId)) steps.push({ event: detail.event, detail, outcome: undefined });
   }
   return steps;
 }
 
 export function hasTrace(run?: AgentRun): boolean {
-  return !!run?.events.some(event => event.kind === 'thinking' ? !!event.progressDelta?.text : event.kind !== 'finish');
+  return !!run && traceSteps(run).length > 0;
 }
 
 export function createRun(runId: string, requestId: string, startedAt: number): AgentRun {

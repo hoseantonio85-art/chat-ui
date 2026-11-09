@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useId, useState } from 'react';
 import { EIconName, Icon } from '@sber-orm/ui-kit';
-import { type AgentEvent, type AgentRun, callDuration, openCalls, runSummary, sourcesForRun, traceSteps } from './model';
+import { type AgentEvent, type AgentRun, callDuration, callTitle, formatDuration, openCalls, runSummary, sourcesForRun, traceSteps } from './model';
 import classes from './styles.module.scss';
 const names: Record<AgentEvent['kind'], string> = {
-  thinking: 'Обдумывание', message: 'Промежуточная реплика', plan: 'План · write_todos', toolCall: 'Вызов источника', toolResult: 'Результат', delegation: 'Делегирование', handback: 'Возврат эксперта', error: 'Ошибка источника', empty: 'Ничего не найдено', finish: 'Завершено',
+  thinking: 'Думаю', message: 'Промежуточная реплика', plan: 'План', toolCall: 'Вызов источника', toolResult: 'Результат', delegation: 'Делегирование', handback: 'Возврат эксперта', error: 'Ошибка источника', empty: 'Ничего не найдено', finish: 'Завершено',
 };
 const statusLabels = { running: 'Выполняется', success: 'Завершён', empty: 'Нет данных', error: 'Недоступен' };
 const marks = { pending: 'Ожидает', in_progress: 'В работе', completed: 'Готово' };
@@ -11,7 +11,7 @@ const iconByKind: Record<AgentEvent['kind'], EIconName> = {
   thinking: EIconName.clock, message: EIconName.fill, plan: EIconName.taskList, toolCall: EIconName.taskSearch, toolResult: EIconName.success, delegation: EIconName.users, handback: EIconName.userSwap, error: EIconName.errorRounded, empty: EIconName.warningRounded, finish: EIconName.check,
 };
 
-function StepDetail({ title, text, header }: { title: string; text: string; header: ReactNode }) {
+function StepDetail({ title, children, header }: { title: string; children: ReactNode; header: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
   return <>
@@ -19,36 +19,44 @@ function StepDetail({ title, text, header }: { title: string; text: string; head
       aria-controls={detailId} aria-label={`${title} · подробности`} onClick={() => setExpanded(value => !value)}>
       {header}<Icon className={classes.chevron} name={expanded ? EIconName.chevronFillUp : EIconName.chevronFillDown} width={16} height={16}/>
     </button>
-    <p id={detailId} hidden={!expanded}>{text}</p>
+    <div id={detailId} hidden={!expanded} className={classes.stepDetails}>{children}</div>
   </>;
 }
 
 function TraceSteps({ run, activeIds, now, parent }: { run: AgentRun; activeIds: ReadonlySet<string>; now: number; parent?: string }) {
   return <ol className={classes.trace}>
-    {traceSteps(run, parent).map(({ event, detail }) => {
+    {traceSteps(run, parent).map(({ event, detail, outcome }) => {
       const pendingDetail = event.kind === 'thinking';
-      const text = pendingDetail || event.kind === 'toolResult' ? undefined : event.text;
+      const isCall = event.kind === 'toolCall' || event.kind === 'delegation';
+      const text = pendingDetail || isCall ? undefined : event.text;
       const lines = text?.split('\n').map(line => line.trim()).filter(Boolean) || [];
-      const bulletItems = event.kind !== 'toolResult' && lines.length > 1 && lines.every(line => /^[✓→•]\s+/.test(line))
+      const bulletItems = lines.length > 1 && lines.every(line => /^[✓→•]\s+/.test(line))
         ? lines.map(line => line.replace(/^[✓→•]\s+/, ''))
         : null;
-      const title = pendingDetail
-        ? detail?.event.progressDelta?.stepId ? 'Подготовка шага' : 'Подготовка ответа'
-        : event.label || ((event.kind === 'toolCall' || event.kind === 'delegation') && event.source) || names[event.kind];
+      const warning = outcome?.kind === 'error' || outcome?.kind === 'empty' ? outcome : undefined;
+      const suffix = warning?.kind === 'error' ? ' — недоступен' : warning ? ' — нет данных' : '';
+      const title = isCall ? `${callTitle(event)}${suffix}`
+        : pendingDetail && run.status !== 'running' ? 'Итоговое рассуждение'
+        : event.label || names[event.kind];
       const active = activeIds.has(event.id) || (pendingDetail && !!detail && activeIds.has(detail.lastId));
-      const duration = event.callId && (event.kind === 'toolCall' || event.kind === 'delegation') ? callDuration(run, event, now) : undefined;
-      const header = <><Icon className={classes.marker} name={iconByKind[event.kind]} width={16} height={16}/><strong>{title}</strong></>;
-      return <li key={detail?.event.id ?? event.id} className={classes.step} data-kind={event.kind} data-active={active} tabIndex={detail ? undefined : 0}>
-      <div className={classes.stepHeading}>
-        {detail ? <StepDetail title={title} text={detail.text} header={header}/> : <div className={classes.stepHeader}>{header}</div>}
-        {duration && <small className={classes.duration} aria-label={`Длительность: ${duration}`}>{duration}</small>}
-        {active && duration && <small className={classes.callState}>В работе</small>}
-      </div>
-      {!pendingDetail && (event.source || event.tool) && <div className={classes.meta}>{event.source}{event.source && event.tool ? ' · ' : ''}<code>{event.tool}</code></div>}
+      const duration = isCall && event.callId ? callDuration(run, event, now) : undefined;
+      const expertCallId = event.kind === 'delegation' ? event.callId : undefined;
+      const hasNested = expertCallId && traceSteps(run, expertCallId).length > 0;
+      const outcomeText = warning?.text || (outcome?.kind === 'handback' ? outcome.text : undefined);
+      const expandable = !!(detail || hasNested || outcomeText);
+      const displayKind = warning?.kind ?? event.kind;
+      const header = <><Icon className={classes.marker} name={iconByKind[displayKind]} width={16} height={16}/><strong>{title}</strong>
+        {duration && <small className={classes.duration}>{duration}</small>}
+      </>;
+      return <li key={detail?.event.id ?? event.id} className={classes.step} data-kind={displayKind} data-active={active} tabIndex={expandable ? undefined : 0}>
+      {expandable ? <StepDetail title={title} header={header}>
+          {detail && <p>{detail.text}</p>}
+          {hasNested && <TraceSteps run={run} activeIds={activeIds} now={now} parent={expertCallId}/>}
+          {outcomeText && <p>{outcomeText}</p>}
+      </StepDetail> : <div className={classes.stepHeader}>{header}</div>}
       {bulletItems ? <ul className={classes.backendPlan}>{bulletItems.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul>
         : text && <p>{text}</p>}
       {!pendingDetail && event.todos && <ul className={classes.plan}>{event.todos.map((todo, index) => <li key={`${index}-${todo.content}`} data-status={todo.status}><span>{todo.content}</span><small>{marks[todo.status]}</small></li>)}</ul>}
-      {event.kind === 'delegation' && event.callId && <TraceSteps run={run} activeIds={activeIds} now={now} parent={event.callId}/>}
     </li>})}
   </ol>;
 }
@@ -67,14 +75,21 @@ export function AgentTrace({ run }: { run: AgentRun }) {
   }, [ticking]);
   const activeIds = new Set(calls.map(call => call.id));
   if (run.status === 'running' && !ticking) {
-    const latest = run.events.slice().reverse().find(event => event.kind !== 'thinking' || event.progressDelta?.text);
-    if (latest && (latest.kind === 'plan' || latest.kind === 'message' || latest.kind === 'thinking')) activeIds.add(latest.id);
+    const latest = traceSteps(run).at(-1);
+    if (latest) activeIds.add(latest.event.id);
   }
+  const status = run.status === 'running' ? 'Выполняется сейчас' : run.status === 'failed' ? 'Прогон прерван'
+    : run.finishedAt === undefined ? 'Ответ готов' : `Ответ готов за ${formatDuration(run.finishedAt - run.startedAt)}`;
   return <div className={classes.traceIslands}>
     <div className={classes.traceContent}>
-    <div className={classes.traceTitle}>Ход работы <span>{run.status === 'running' ? 'Выполняется сейчас' : runSummary(run)}</span></div>
+    <div className={classes.traceTitle}>Ход работы
+      {sources.length > 0 ? <details className={classes.sourceSummary}>
+        <summary aria-label={`${status} · Источники`}>{status}</summary>
+        {run.status !== 'running' && <span>{runSummary(run)}</span>}
+        <ul>{sources.map(source => <li key={source.name} data-status={source.status}><span>{source.name}</span><small>{statusLabels[source.status]} · {source.calls} обр.</small></li>)}</ul>
+      </details> : <span>{status}</span>}
+    </div>
     <TraceSteps key={run.runId} run={run} activeIds={activeIds} now={now}/>
     </div>
-    {!!sources.length && <div className={`${classes.traceContent} ${classes.sourceSummary}`}><strong>Источники</strong><ul>{sources.map(source => <li key={source.name} data-status={source.status}><span>{source.name}</span><small>{statusLabels[source.status]} · {source.calls} обр.</small></li>)}</ul></div>}
   </div>;
 }
