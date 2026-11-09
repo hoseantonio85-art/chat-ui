@@ -1,11 +1,10 @@
 import { type ReactNode, useEffect, useId, useState } from 'react';
 import { EIconName, Icon } from '@sber-orm/ui-kit';
-import { type AgentEvent, type AgentRun, callDuration, callTitle, formatDuration, openCalls, runSummary, sourcesForRun, traceSteps } from './model';
+import { type AgentEvent, type AgentRun, callDuration, callTitle, openCalls, runSummary, traceSteps } from './model';
 import classes from './styles.module.scss';
 const names: Record<AgentEvent['kind'], string> = {
   thinking: 'Думаю', message: 'Промежуточная реплика', plan: 'План', toolCall: 'Вызов источника', toolResult: 'Результат', delegation: 'Делегирование', handback: 'Возврат эксперта', error: 'Ошибка источника', empty: 'Ничего не найдено', finish: 'Завершено',
 };
-const statusLabels = { running: 'Выполняется', success: 'Завершён', empty: 'Нет данных', error: 'Недоступен' };
 const marks = { pending: 'Ожидает', in_progress: 'В работе', completed: 'Готово' };
 const iconByKind: Record<AgentEvent['kind'], EIconName> = {
   thinking: EIconName.clock, message: EIconName.fill, plan: EIconName.taskList, toolCall: EIconName.taskSearch, toolResult: EIconName.success, delegation: EIconName.users, handback: EIconName.userSwap, error: EIconName.errorRounded, empty: EIconName.warningRounded, finish: EIconName.check,
@@ -63,7 +62,6 @@ function TraceSteps({ run, activeIds, now, parent }: { run: AgentRun; activeIds:
 
 /** Presentation-only trace, reusable inside an inline disclosure or drawer. */
 export function AgentTrace({ run }: { run: AgentRun }) {
-  const sources = sourcesForRun(run);
   const calls = openCalls(run);
   const ticking = calls.length > 0;
   const [now, setNow] = useState(Date.now);
@@ -78,17 +76,9 @@ export function AgentTrace({ run }: { run: AgentRun }) {
     const latest = traceSteps(run).at(-1);
     if (latest) activeIds.add(latest.event.id);
   }
-  const status = run.status === 'running' ? 'Выполняется сейчас' : run.status === 'failed' ? 'Прогон прерван'
-    : run.finishedAt === undefined ? 'Ответ готов' : `Ответ готов за ${formatDuration(run.finishedAt - run.startedAt)}`;
   return <div className={classes.traceIslands}>
     <div className={classes.traceContent}>
-    <div className={classes.traceTitle}>Ход работы
-      {sources.length > 0 ? <details className={classes.sourceSummary}>
-        <summary aria-label={`${status} · Источники`}>{status}</summary>
-        {run.status !== 'running' && <span>{runSummary(run)}</span>}
-        <ul>{sources.map(source => <li key={source.name} data-status={source.status}><span>{source.name}</span><small>{statusLabels[source.status]} · {source.calls} обр.</small></li>)}</ul>
-      </details> : <span>{status}</span>}
-    </div>
+    <div className={classes.traceTitle}>Ход работы <span>{runSummary(run)}</span></div>
     <TraceSteps key={run.runId} run={run} activeIds={activeIds} now={now}/>
     </div>
   </div>;

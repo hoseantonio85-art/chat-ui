@@ -11,7 +11,7 @@
 .expanded { --trace-island-gap: 6px; margin-top: 8px; padding: var(--trace-island-gap); border-radius: 24px; background: linear-gradient(90deg, #ecfdf3, #eefcff); }
 .traceIslands { display: grid; gap: var(--trace-island-gap, 6px); min-width: 0; }
 .traceContent { padding: 18px 20px; border-radius: 19px; background: rgba(255, 255, 255, .76); }
-.traceTitle { font-weight: 600; margin-bottom: 16px; > span, summary { display: block; font-size: 12px; font-weight: 400; color: var(--textBaseSecondary); } }
+.traceTitle { font-weight: 600; margin-bottom: 16px; > span { display: block; font-size: 12px; font-weight: 400; color: var(--textBaseSecondary); } }
 .trace { list-style: none; padding: 0 0 0 14px; margin: 0; border-left: 1px solid var(--borderDefault); .trace { margin: 12px 0 0 4px; } }
 .step { margin: 0 0 16px; padding-left: 10px; min-width: 0; overflow-wrap: anywhere; &:last-child { margin-bottom: 0; } p { margin: 6px 0; } &[data-kind='error'] .marker { color: var(--textTechDanger); } &[data-kind='empty'] .marker { color: var(--backgroundTechWarning); } &[data-kind='delegation'] .marker { color: var(--iconBrandDefault); } }
 .stepHeader { display: flex; align-items: center; gap: 8px; strong { font-size: 14px; } }
@@ -21,13 +21,6 @@
 .duration { color: var(--textBaseSecondary); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .marker { color: var(--iconBrandDefault); flex-shrink: 0; }
 .plan { padding: 0; list-style: none; li { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 8px; margin: 6px 0; } small { color: var(--textBaseSecondary); font-size: inherit; } }
-.sourceSummary { font-size: 13px; font-weight: 400;
-  > summary { display: list-item; width: fit-content; cursor: pointer; }
-  ul { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 6px; }
-  li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; overflow-wrap: anywhere; }
-  li[data-status='error'] { color: var(--textTechDanger); }
-  small { color: var(--textBaseSecondary); font-size: inherit; }
-}
 
 .trace { border: 0; padding-left: 0; }
 .trace .trace { margin: 14px 0 0; }
