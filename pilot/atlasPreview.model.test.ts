@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAtlasPreview, type AtlasPreviewThread } from './atlasPreview';
+import { traceSteps } from '../src/components/AgentActivity/model';
 import { scenarios as mapScenarios } from './scenario-map/model';
 
 const baseThreads = (): AtlasPreviewThread[] => [
@@ -38,6 +39,12 @@ describe('atlas live preview states', () => {
     expect(vnd?.pinned).toBe(false);
     expect(Object.keys(vnd?.runs ?? {})).toEqual(['atlas-vnd-running']);
     expect(vnd?.messages.at(-1)?.extras?.agentPending).toBe('true');
+    const run = vnd!.runs['atlas-vnd-running'];
+    expect(traceSteps(run)).toMatchObject([{
+      event: {kind: 'message', label: 'Проверяю ВНД по групповому стандарту'},
+      detail: {text: expect.stringContaining('в фоне')},
+    }]);
+    expect(run.events.some(event => event.todos?.length)).toBe(false);
   });
 
   it('keeps a completed VND result unread while another thread is active', () => {

@@ -75,18 +75,14 @@ export function useVndBackground<T extends BackgroundThread>(options: {
       timeCreated: new Date(startedAt).toISOString(),
     };
     let run = createRun(pendingId, `vnd-request-${crypto.randomUUID()}`, startedAt);
-    run = appendExplanation(run, `${pendingId}-plan`, vndBackgroundExplanation, startedAt);
+    const comparisonStep = `${pendingId}-compare`;
+    run = appendExplanation(run, comparisonStep, vndBackgroundExplanation, startedAt);
     run = appendEvent(run, {
-      id: `${pendingId}-plan`,
+      id: comparisonStep,
       runId: pendingId,
       at: startedAt,
-      kind: 'plan',
+      kind: 'message',
       label: 'Проверяю ВНД по групповому стандарту',
-      tool: 'write_todos',
-      todos: [
-        { content: 'Изучить документ', status: 'in_progress' },
-        { content: 'Сверить с групповым стандартом', status: 'pending' },
-      ],
     });
 
     const isActive = latest.current.activeId.current === id;
@@ -117,13 +113,8 @@ export function useVndBackground<T extends BackgroundThread>(options: {
         id: `${pendingId}-complete`,
         runId: pendingId,
         at: completedAt,
-        kind: 'plan',
+        kind: 'message',
         label: 'Готовлю итог проверки',
-        tool: 'write_todos',
-        todos: [
-          { content: 'Изучить документ', status: 'completed' },
-          { content: 'Сверить с групповым стандартом', status: 'completed' },
-        ],
       });
       run = appendEvent(run, { id: `${pendingId}-finish`, runId: pendingId, at: Date.now(), kind: 'finish' });
       latest.current.publishRun(id, run);
