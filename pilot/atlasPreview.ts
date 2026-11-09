@@ -204,8 +204,8 @@ function createCsiPreview(stepId: Extract<AtlasStepId, `csi.${string}`>, baseThr
       messages.push({
         id:'atlas-csi-result', role:ERoles.bot,
         text:draft.status === 'submitted'
-          ? 'Спасибо, записал оценку в демо. **Команде она пока не отправлена.**'
-          : 'Не удалось сохранить оценку даже в демо. Не буду говорить, что она передана.',
+          ? 'Спасибо, оценка и комментарий сохранены.'
+          : 'Не удалось сохранить оценку. Попробуйте ещё раз позже.',
         timeCreated:at(24),
       });
     }
@@ -230,7 +230,7 @@ function createDirectCsiPreview(stepId: Extract<AtlasStepId, `csi-direct.${strin
     draft = selectCsiRating(draft, 4, 'atlas-csi-direct-value', at(24));
     messages.push({ id:'atlas-csi-direct-value', role:ERoles.user, text:'4 из 5', timeCreated:at(24) });
     draft = saveFeedbackMock(skipCsiComment(draft));
-    messages.push({ id:'atlas-csi-direct-result', role:ERoles.bot, text:'Спасибо, записал оценку в демо. **Команде она пока не отправлена.**', timeCreated:at(25) });
+    messages.push({ id:'atlas-csi-direct-result', role:ERoles.bot, text:'Спасибо, оценка сохранена.', timeCreated:at(25) });
   }
   return finishFeedbackPreview(stepId, unknown ? 'csiDirectUnknown' : 'csiDirect', 'Оценка проверки ВНД', messages, draft, baseThreads, initialMemory);
 }
@@ -259,10 +259,10 @@ function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${strin
   if (!needsClarification || stepId === 'feedback.clarified' || stepId === 'feedback.idea-clarified') {
     draft = saveFeedbackMock(draft);
     const success = draft.status === 'submitted';
-    const text = !success ? 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.'
-      : kind === 'idea' ? 'Хорошая мысль. Записал предложение в демо. **Команде пока не отправлено.**'
-        : kind === 'praise' ? 'Рад, что проверка пригодилась. Отзыв записан в демо, но **команде пока не отправлен.**'
-          : 'Понял: результат проверки было непросто найти. Отзыв записан в демо, но **команде пока не отправлен.**';
+    const text = !success ? 'Не удалось сохранить отзыв. Попробуйте ещё раз позже.'
+      : kind === 'idea' ? 'Хорошая мысль. Предложение сохранено и передано команде сервиса.'
+        : kind === 'praise' ? 'Рад, что проверка пригодилась. Спасибо за отзыв!'
+          : 'Понял: результат проверки было непросто найти. Отзыв сохранён и передан команде сервиса.';
     messages.push({ id:'atlas-feedback-result', role:ERoles.bot, text, timeCreated:at(23) });
   }
   const scenario = isIdea || isPraise ? (isPraise ? 'feedbackPraise' : needsClarification ? 'feedbackIdeaClarify' : 'feedbackIdea') : stepId === 'feedback.error' ? 'feedbackError' : needsClarification ? 'feedbackComplaintClarify' : 'feedbackComplaint';

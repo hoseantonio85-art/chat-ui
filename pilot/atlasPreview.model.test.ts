@@ -114,7 +114,7 @@ describe('atlas live preview states', () => {
       'Не сразу понял, где смотреть результат проверки.',
     ]);
     expect(savedThread?.messages.some(message => message.extras?.feedbackAddon === 'csi-review')).toBe(false);
-    expect(savedThread?.messages.at(-1)?.text).toContain('Команде она пока не отправлена');
+    expect(savedThread?.messages.at(-1)?.text).toContain('оценка и комментарий сохранены');
     expect(skipped?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.rawMessages.map(message => message.text)).toEqual(['3 из 5']);
     expect(failed?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ stage: 'error', status: 'error', mockSaveCount: 1 });
     expect(declined?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ stage: 'cancelled', status: 'cancelled', mockSaveCount: 0 });

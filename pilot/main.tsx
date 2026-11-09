@@ -27,6 +27,7 @@ import {methodologistService} from './mocks/files';
 import {createAtlasPreview, type AtlasPreviewThread} from './atlasPreview';
 import { MessageAddonContext } from '../src/components/Chat/MessageAddonContext';
 import { FeedbackCard, type FeedbackAddon } from './FeedbackCard';
+import { ScenarioPicker } from './ScenarioPicker';
 import {
   addCsiComment,
   addFeedbackClarification,
@@ -208,15 +209,15 @@ function App() {
   const updateFeedbackDraft = (draft: FeedbackDraft) => updateThreads(items => items.map(thread =>
     thread.id === activeIdRef.current ? {...thread, feedbackDraft:draft, updatedAt:Date.now()} : thread,
   ));
-  const appendMockResult = (draft: FeedbackDraft) => {
+  const appendFeedbackResult = (draft: FeedbackDraft) => {
     const success = draft.status === 'submitted';
     const text = success
       ? draft.kind === 'csi'
-        ? 'Спасибо, записал оценку в демо. **Команде она пока не отправлена.**'
-        : 'Спасибо, записал отзыв в демо. **Команде он пока не отправлен.**'
+        ? 'Спасибо, оценка сохранена.'
+        : 'Спасибо, отзыв сохранён и передан команде сервиса.'
       : draft.kind === 'csi'
-        ? 'Не удалось сохранить оценку даже в демо. Не буду говорить, что она передана.'
-        : 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.';
+        ? 'Не удалось сохранить оценку. Попробуйте ещё раз позже.'
+        : 'Не удалось сохранить отзыв. Попробуйте ещё раз позже.';
     appendExplainedReply(activeIdRef.current, {
       id:`feedback-result-${crypto.randomUUID()}`,
       role:ERoles.bot,
@@ -227,7 +228,7 @@ function App() {
   const completeCsi = (ready: CsiDraft) => {
     const saved = saveFeedbackMock(ready);
     updateFeedbackDraft(saved);
-    appendMockResult(saved);
+    appendFeedbackResult(saved);
   };
   const selectCsiValue = (value: number) => {
     const current = getActiveCsi();
@@ -303,8 +304,8 @@ function App() {
       messages.push({
         id:'csi-submitted-demo', role:ERoles.bot,
         text:draft.status === 'submitted'
-          ? 'Спасибо, записал оценку в демо. **Команде она пока не отправлена.**'
-          : 'Не удалось сохранить оценку даже в демо. Не буду говорить, что она передана.',
+          ? 'Спасибо, оценка и комментарий сохранены.'
+          : 'Не удалось сохранить оценку. Попробуйте ещё раз позже.',
         timeCreated:startedAt,
       });
     }
@@ -338,7 +339,7 @@ function App() {
         appendToThread(activeIdRef.current, {
           id:`csi-service-unsupported-${crypto.randomUUID()}`,
           role:ERoles.bot,
-          text:'Не смог определить сервис. В демо поддержана только «Проверка ВНД», поэтому оценку не записал.',
+          text:'Не удалось определить сервис. Уточните его название, например «Проверка ВНД».',
           timeCreated:new Date().toISOString(),
         });
         return;
@@ -348,7 +349,7 @@ function App() {
       appendExplainedReply(activeIdRef.current, {
         id:`csi-prompt-${crypto.randomUUID()}`,
         role:ERoles.bot,
-        text:'Спасибо, понял. В прототипе покажу путь для сервиса «Проверка ВНД».',
+        text:'Спасибо, понял. Оценим сервис «Проверка ВНД».',
         extras:feedbackExtras('csi-rating'),
         timeCreated:new Date().toISOString(),
       }, csiServiceResolved);
@@ -368,7 +369,7 @@ function App() {
       completeCsi(addCsiComment(current, body, messageId, now));
       return;
     }
-    appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:current.stage === 'submitted' ? 'Эта оценка уже записана в демо — второй записи не будет.' : current.stage === 'error' ? 'Сохранение в демо завершилось ошибкой. Успешная запись не создана.' : 'Оценка отменена. Если захотите, начните сценарий заново.', timeCreated:new Date().toISOString()});
+    appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:current.stage === 'submitted' ? 'Эта оценка уже сохранена.' : current.stage === 'error' ? 'Оценку сохранить не удалось. Попробуйте ещё раз позже.' : 'Оценка отменена. Если захотите, начните заново.', timeCreated:new Date().toISOString()});
   }
 
   function playFeedbackFlow(entry: Extract<ScenarioId, 'feedbackComplaint' | 'feedbackComplaintClarify' | 'feedbackHelp' | 'feedbackIdea' | 'feedbackIdeaClarify' | 'feedbackPraise' | 'feedbackError'>, sourceOverride?: string, preserveCurrent = false, instant = false) {
@@ -404,17 +405,17 @@ function App() {
           const clarification = 'В сервисе проверки ВНД.';
           messages.push({id:'feedback-clarification-demo', role:ERoles.user, text:clarification, timeCreated:now});
           draft = saveFeedbackMock(addFeedbackClarification(draft, clarification, 'feedback-clarification-demo', now, 'vnd-check', 'Проверка ВНД'));
-          messages.push({id:'feedback-result-demo', role:ERoles.bot, text:'Спасибо, что уточнили. Отзыв записан в демо, но **команде пока не отправлен.**', timeCreated:now});
+          messages.push({id:'feedback-result-demo', role:ERoles.bot, text:'Спасибо, что уточнили. Отзыв сохранён и передан команде сервиса.', timeCreated:now});
         }
       } else {
         draft = saveFeedbackMock(draft);
         const text = draft.status === 'error'
-          ? 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.'
+          ? 'Не удалось сохранить отзыв. Попробуйте ещё раз позже.'
           : entry === 'feedbackIdea'
-            ? 'Хорошая мысль. Записал предложение про фильтр в демо. **Команде пока не отправлено.**'
+            ? 'Хорошая мысль. Предложение про фильтр сохранено и передано команде сервиса.'
             : entry === 'feedbackPraise'
-              ? 'Рад, что проверка пригодилась. Спасибо! Отзыв записан в демо, но **команде пока не отправлен.**'
-              : 'Понял: результат проверки было непросто найти. Спасибо, что рассказали. Отзыв записан в демо, но **команде пока не отправлен.**';
+              ? 'Рад, что проверка пригодилась. Спасибо за отзыв!'
+              : 'Понял: результат проверки было непросто найти. Спасибо, что рассказали. Отзыв сохранён и передан команде сервиса.';
         messages.push({id:'feedback-result', role:ERoles.bot, text, timeCreated:now});
       }
     }
@@ -439,7 +440,7 @@ function App() {
     if (!current || current.kind === 'csi') return;
     const body = request.body.trim();
     if (current.stage !== 'clarification') {
-      appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:'Этот отзыв уже обработан в демо — второй записи не будет.', timeCreated:new Date().toISOString()});
+      appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:'Этот отзыв уже сохранён.', timeCreated:new Date().toISOString()});
       return;
     }
     const messageId = `feedback-clarification-${crypto.randomUUID()}`;
@@ -455,10 +456,10 @@ function App() {
       id:`feedback-clarified-${crypto.randomUUID()}`,
       role:ERoles.bot,
       text:saved.status === 'error'
-        ? 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.'
+        ? 'Не удалось сохранить отзыв. Попробуйте ещё раз позже.'
         : resolvedService
-          ? 'Понял, речь о проверке ВНД. Спасибо, что уточнили. Отзыв записан в демо, но **команде пока не отправлен.**'
-          : 'Не смог определить сервис. Сохранил исходное сообщение в общей демо-очереди, но **команде ничего не отправлено.**',
+          ? 'Понял, речь о проверке ВНД. Спасибо, что уточнили. Отзыв сохранён и передан команде сервиса.'
+          : 'Не удалось определить сервис. Отзыв сохранён в общей очереди обратной связи.',
       timeCreated:new Date().toISOString(),
     }, feedbackSaveExplanation(saved));
   }
@@ -471,7 +472,7 @@ function App() {
         id:`feedback-duplicate-${crypto.randomUUID()}`,
         role:ERoles.bot,
         text:existing.status === 'submitted'
-          ? 'Этот отзыв уже записан в демо — второй записи не будет.'
+          ? 'Этот отзыв уже сохранён.'
           : 'Предыдущая попытка завершилась ошибкой. Успешная запись не создана.',
         timeCreated:new Date().toISOString(),
       });
@@ -788,9 +789,9 @@ function App() {
   };
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><AgentRunsContext.Provider value={runs}>
     <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
-    {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario.startsWith('csi') ? 'CSI · разговорный демо-сценарий' : scenario.startsWith('feedback') ? 'Обратная связь · разговорный демо-сценарий' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Демонстрационные данные'}</span></div><label className="scenario-picker"><span className="sr-only">Сценарий</span><select aria-label="Сценарий" value={scenario} onChange={event => runScenario(event.target.value as ScenarioId)}>{scenarios.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') || scenario.startsWith('csi') || scenario.startsWith('feedback') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{scenario === 'vndBackground' ? 'Демо проверки' : scenario.startsWith('csi') ? 'Показать результат' : scenario.startsWith('feedback') ? 'Показать ветку' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
+    {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario.startsWith('csi') ? 'CSI · оценка сервиса' : scenario.startsWith('feedback') ? 'Обратная связь с командой сервиса' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Сценарии универсального агента'}</span></div><ScenarioPicker value={scenario} onChange={runScenario}/><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') || scenario.startsWith('csi') || scenario.startsWith('feedback') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{scenario === 'vndBackground' ? 'Показать проверку' : scenario.startsWith('csi') ? 'Показать результат' : scenario.startsWith('feedback') ? 'Показать ветку' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
     {!initialState.embedded && <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main>}<ModalContainer/>{background.ui}
-    {actionUrl && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Переход в НОРМ"><h2>Переход в форму НОРМ</h2><p>Продуктовый чат передал команду открытия формы. В демо она перехвачена локально.</p><code>{actionUrl}</code><Button onClick={() => {setActionUrl('');chat$.openChat();}}>Вернуться в чат</Button></div>}
+    {actionUrl && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Переход в НОРМ"><h2>Переход в форму НОРМ</h2><p>Форма регистрации события готова к открытию.</p><code>{actionUrl}</code><Button onClick={() => {setActionUrl('');chat$.openChat();}}>Вернуться в чат</Button></div>}
   </AgentRunsContext.Provider></MessageAddonContext.Provider></AssistantSkillsContext.Provider></ThreadUiContext.Provider></reatomContext.Provider>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

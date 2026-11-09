@@ -11,6 +11,23 @@ body { margin:0; color:var(--textBaseDefault); background:var(--backgroundSecond
 .demo-label strong { font-size:14px; }
 .demo-label span,.demo-state { color:var(--textBaseSecondary); }
 .scenario-picker select { border:1px solid var(--borderDefault); border-radius:8px; background:var(--backgroundBasicDefault); color:inherit; font:inherit; padding:9px 12px; max-width:100%; }
+.scenario-tree { position:relative; width:280px; max-width:100%; }
+.scenario-tree button { color:inherit; font:inherit; }
+.scenario-tree-trigger { width:100%; height:36px; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; border:1px solid var(--borderDefault); border-radius:8px; background:var(--backgroundBasicDefault); cursor:pointer; text-align:left; }
+.scenario-tree-trigger>span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.scenario-tree-chevron { width:8px; height:8px; flex:0 0 auto; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor; transform:rotate(45deg) translateY(-2px); transition:transform .15s ease; }
+.scenario-tree-trigger[aria-expanded="true"] .scenario-tree-chevron { transform:rotate(225deg) translate(-2px,-2px); }
+.scenario-tree-menu { position:absolute; top:calc(100% + 6px); left:0; z-index:1300; width:340px; max-width:calc(100vw - 24px); max-height:min(640px,calc(100vh - 88px)); overflow:auto; padding:8px; border:1px solid var(--borderDefault); border-radius:12px; background:var(--backgroundBasicDefault); box-shadow:0 12px 32px #24292e24; }
+.scenario-tree-group+.scenario-tree-group { margin-top:2px; }
+.scenario-tree-group-trigger,.scenario-tree-item { width:100%; min-height:36px; display:flex; align-items:center; border:0; border-radius:8px; background:transparent; cursor:pointer; text-align:left; }
+.scenario-tree-group-trigger { gap:10px; padding:8px 10px; font-weight:600!important; }
+.scenario-tree-group-trigger .scenario-tree-chevron { transform:rotate(-45deg); }
+.scenario-tree-group-trigger[aria-expanded="true"] .scenario-tree-chevron { transform:rotate(45deg) translate(-1px,-1px); }
+.scenario-tree-item { padding:8px 10px 8px 28px; }
+.scenario-tree-item-root { padding-left:10px; margin-top:2px; }
+.scenario-tree-group-trigger:hover,.scenario-tree-item:hover { background:var(--backgroundBasicHover); }
+.scenario-tree-group-trigger:focus-visible,.scenario-tree-item:focus-visible,.scenario-tree-trigger:focus-visible { outline:2px solid var(--borderFocus); outline-offset:2px; }
+.scenario-tree-item[aria-selected="true"] { background:var(--backgroundLightBrandLight); color:var(--textBrandDefault,var(--textBaseDefault)); font-weight:600; }
 .offline-toggle { display:flex; align-items:center; gap:4px; white-space:nowrap; }
 .demo-state { margin-left:auto; white-space:nowrap; }
 .product-backdrop { padding-top:64px; min-height:100vh; display:flex; overflow:hidden; }
@@ -33,4 +50,5 @@ body { margin:0; color:var(--textBaseDefault); background:var(--backgroundSecond
 .vnd-knowledge-file {display:grid;gap:10px;padding:20px;border:1px solid #dce7e3;border-radius:16px;margin:16px 0;}
 @media(max-width:599px){.vnd-save-actions{bottom:124px;flex-wrap:wrap;width:calc(100% - 48px)}.vnd-save-actions>span{width:100%}}
 @media (max-width:900px) { .demo-label span,.demo-state {display:none;} .demo-toolbar {gap:8px; padding:8px 12px;} }
-@media (max-width:599px) { .demo-toolbar {height:112px;flex-wrap:wrap;align-content:center;gap:6px;} .demo-label {margin-right:0;} .scenario-picker {width:calc(100% - 82px);} .scenario-picker select {width:100%;} .offline-toggle {margin-left:auto;} .product-backdrop {padding-top:112px;} .product-backdrop section {padding:20px;} .product-backdrop aside {display:none;} .backdrop-cards {display:none;} }
+@media (max-width:599px) { .demo-toolbar {height:112px;flex-wrap:wrap;align-content:center;gap:6px;} .demo-label {margin-right:0;} .scenario-tree,.scenario-picker {width:calc(100% - 82px);} .scenario-picker select {width:100%;} .scenario-tree-menu {left:auto;right:0;max-height:calc(100vh - 126px);} .offline-toggle {margin-left:auto;} .product-backdrop {padding-top:112px;} .product-backdrop section {padding:20px;} .product-backdrop aside {display:none;} .backdrop-cards {display:none;} }
+@media(prefers-reduced-motion:reduce){.scenario-tree-chevron{transition:none}}

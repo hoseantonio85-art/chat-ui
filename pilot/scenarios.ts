@@ -7,14 +7,14 @@ export const scenarios = [
   {id: 'csiProactive', title: 'CSI · после проверки ВНД', question: 'Оценить завершённую проверку ВНД.'},
   {id: 'csiDirect', title: 'CSI · пользователь, сервис известен', question: 'Хочу оценить сервис проверки ВНД.'},
   {id: 'csiDirectUnknown', title: 'CSI · сначала уточнить сервис', question: 'Хочу оценить сервис.'},
-  {id: 'csiError', title: 'CSI · ошибка демо-сохранения', question: 'Оценить проверку ВНД и показать ошибку сохранения.'},
+  {id: 'csiError', title: 'CSI · ошибка сохранения', question: 'Оценить проверку ВНД и показать ошибку сохранения.'},
   {id: 'feedbackComplaint', title: 'ОС · явная жалоба', question: 'Невозможно найти результат после проверки.'},
   {id: 'feedbackComplaintClarify', title: 'ОС · жалоба, сервис неизвестен', question: 'После возврата всё сбросилось.'},
   {id: 'feedbackHelp', title: 'ОС · запрос помощи, не жалоба', question: 'Помогите найти результат проверки.'},
   {id: 'feedbackIdea', title: 'ОС · идея', question: 'Добавьте фильтр по статусу проверки.'},
   {id: 'feedbackIdeaClarify', title: 'ОС · идея, сервис неизвестен', question: 'Добавьте быстрый фильтр.'},
   {id: 'feedbackPraise', title: 'ОС · благодарность', question: 'Проверка стала очень удобной.'},
-  {id: 'feedbackError', title: 'ОС · ошибка демо-сохранения', question: 'Фильтр сбрасывается после возврата назад.'},
+  {id: 'feedbackError', title: 'ОС · ошибка сохранения', question: 'Фильтр сбрасывается после возврата назад.'},
   {id: 'normal', title: 'Обычная проверка', question: 'Проверь операционные риски компании и подскажи, на что обратить внимание.'},
   {id: 'noReasoning', title: 'Модель без рассуждений', question: 'Проверь операционные риски компании и подскажи, на что обратить внимание.'},
   {id: 'parallel', title: 'Два источника сразу', question: 'Проверь профиль компании и реестр рисков, а затем уточни у методолога.'},
@@ -28,6 +28,16 @@ export const scenarios = [
   {id: 'backendCallback', title: 'Текущий контракт /ainvoke', question: 'Проверь профиль компании, спроси методолога и посмотри реестр рисков.'},
 ] as const;
 export type ScenarioId = typeof scenarios[number]['id'];
+
+export const scenarioGroups = [
+  {id:'vnd', title:'ВНД', scenarioIds:['vndBackground', 'vnd', 'vndWelcome']},
+  {id:'csi', title:'CSI', scenarioIds:['csiProactive', 'csiDirect', 'csiDirectUnknown', 'csiError']},
+  {id:'feedback', title:'Обратная связь', scenarioIds:['feedbackComplaint', 'feedbackComplaintClarify', 'feedbackHelp', 'feedbackIdea', 'feedbackIdeaClarify', 'feedbackPraise', 'feedbackError']},
+  {id:'agent', title:'Работа агента', scenarioIds:['normal', 'noReasoning', 'parallel', 'subagent', 'empty', 'error', 'backendCallback']},
+  {id:'answers', title:'Форматы ответа', scenarioIds:['rich', 'ordinary', 'finalOnly']},
+] as const satisfies ReadonlyArray<{id:string; title:string; scenarioIds:readonly ScenarioId[]}>;
+
+export const ungroupedScenarioIds = ['registration'] as const satisfies readonly ScenarioId[];
 export const usesReferenceFlow = (id: ScenarioId) => id === 'normal' || id === 'noReasoning' || id === 'parallel';
 
 export const vndStandardPrompt = `Документ загружен. С каким групповым документом его нужно сверить? Отправьте номер выбранного варианта.
@@ -57,7 +67,7 @@ export const vndCorrectedAnswer = `**Повторная проверка зав�
 
 Документ соответствует выбранному групповому стандарту.`;
 export const chart: IChartData = {
-  metadata: {title: 'Потери по месяцам · демонстрационные данные', view: 'barChart', categories: ['Январь', 'Февраль', 'Март', 'Апрель'], series: ['Прямые', 'Косвенные'], colors: {Прямые: '#a0d7f3', Косвенные: '#d5bbff'}, units: {y: 'тыс. ₽'}},
+  metadata: {title: 'Потери по месяцам', view: 'barChart', categories: ['Январь', 'Февраль', 'Март', 'Апрель'], series: ['Прямые', 'Косвенные'], colors: {Прямые: '#a0d7f3', Косвенные: '#d5bbff'}, units: {y: 'тыс. ₽'}},
   data: [410, 400, 210, 190].map((value, i) => ({category: ['Январь','Февраль','Март','Апрель'][i], values: {Прямые: value, Косвенные: [415,810,180,490][i]}})),
 };
 export function fixture(scenario: ScenarioId, runId: string, start: number) {
@@ -76,7 +86,7 @@ export function fixture(scenario: ScenarioId, runId: string, start: number) {
       'Спросил методолога',
       'Посмотрел реестр рисков — источник недоступен',
     );
-    return {events, backendSteps, answer: '**Демонстрационный итоговый ответ.** Его содержание в настоящем запросе генерирует модель; фиксированных текстов ответа в бэкенде нет.'};
+    return {events, backendSteps, answer: '**Проверка завершена.** Профиль компании и рекомендации методолога получены. Реестр рисков сейчас недоступен, поэтому его данные нужно перепроверить перед итоговой оценкой.'};
   }
   let at = start;
   const sourceDelays: Record<string, number> = {get_company_profile:3800, ask_methodologist:6200, get_company_risks:4600, get_company_laws:4100};
@@ -108,7 +118,7 @@ export function fixture(scenario: ScenarioId, runId: string, start: number) {
       : 'Пользователь спрашивает про операционные риски компании. Чтобы ответ был предметным, сначала нужно понять, чем компания занимается, где у неё площадки и какие процессы для неё ключевые. Начну с профиля.', profileStep);
     add('toolCall', {id:profileStep, callId:'profile', tool:'get_company_profile', source:'Данные компании', args:{company_id:'demo-company', sections:['activities', 'operations']}});
     if (scenario === 'parallel') requestRisks(50);
-    add('toolResult', {callId:'profile', tool:'get_company_profile', source:'Данные компании', result:{company:'Демо-компания', industry:'Производство', locations:3, key_process:'Поставки комплектующих'}}, usesReferenceFlow(scenario) ? undefined : 1400);
+    add('toolResult', {callId:'profile', tool:'get_company_profile', source:'Данные компании', result:{company:'Промтех', industry:'Производство', locations:3, key_process:'Поставки комплектующих'}}, usesReferenceFlow(scenario) ? undefined : 1400);
     if (scenario === 'parallel') finishRisks(1500);
 
     explain(scenario === 'subagent'
@@ -130,7 +140,7 @@ export function fixture(scenario: ScenarioId, runId: string, start: number) {
     }
     if (scenario === 'parallel') {
       explain('Все три источника ответили, картина сходится. Формирую ответ с конкретными шагами.');
-      return {events, backendSteps, answer: '**Проверка завершена.** Профиль и реестр запрошены одновременно; в демонстрационном реестре два операционных риска: сбой поставок и простой оборудования.\n\nПо методологии начните с концентрации поставщиков и контроля критичных запасов.'};
+      return {events, backendSteps, answer: '**Проверка завершена.** Профиль и реестр запрошены одновременно; в реестре найдено два операционных риска: сбой поставок и простой оборудования.\n\nПо методологии начните с концентрации поставщиков и контроля критичных запасов.'};
     }
 
     explain(scenario === 'subagent' ? 'Методолог предложил проверить концентрацию поставщиков и запас комплектующих. Уточню, зарегистрирован ли риск сбоя поставок.'
@@ -165,11 +175,11 @@ export function fixture(scenario: ScenarioId, runId: string, start: number) {
     : scenario === 'subagent' ? 'Риск сбоя поставок есть в реестре. Сопоставлю запись с рекомендациями методолога и выделю первые меры контроля.'
     : scenario === 'rich' ? 'Сравню месячные суммы и выделю пик. Для таблицы, графика и отчёта использую один набор данных.'
     : 'Данных достаточно: профиль, критерии и риски из реестра сходятся. Формирую ответ с конкретными шагами.');
-  const answer = scenario === 'rich' ? 'Вот потери по месяцам. Все значения демонстрационные, в тыс. ₽.\n\n| Месяц | Прямые потери | Косвенные потери |\n| --- | ---: | ---: |\n| Январь | 410 | 415 |\n| Февраль | 400 | 810 |\n| Март | 210 | 180 |\n| Апрель | 190 | 540 |\n\nСамые высокие совокупные потери — в феврале. Рекомендую проверить причины отклонения и действующие контроли.'
+  const answer = scenario === 'rich' ? 'Вот потери по месяцам, в тыс. ₽.\n\n| Месяц | Прямые потери | Косвенные потери |\n| --- | ---: | ---: |\n| Январь | 410 | 415 |\n| Февраль | 400 | 810 |\n| Март | 210 | 180 |\n| Апрель | 190 | 540 |\n\nСамые высокие совокупные потери — в феврале. Рекомендую проверить причины отклонения и действующие контроли.'
     : scenario === 'registration' ? '**Событие можно зарегистрировать в НОРМ.** Нажмите «Открыть форму» и укажите, что произошло, когда это случилось и какие последствия известны.'
     : scenario === 'error' ? '**Реестр рисков сейчас недоступен.** Проверка частичная: профиль компании и методология получены, данные реестра не подтверждены.\n\nПредварительно стоит проверить зависимость от ключевого поставщика и план восстановления. Повторите обращение к реестру перед итоговой оценкой.'
     : scenario === 'empty' ? '**В реестре нет записей по заданным условиям.** Это не подтверждает отсутствие рисков.\n\nПо профилю и методологии стоит уточнить границы нового процесса и проверить зависимость от поставщиков.'
     : scenario === 'subagent' ? '**Методолог завершил проверку.** Для оценки риска сбоя поставок нужны вероятность, влияние и действующие контроли.\n\n1. Проверьте концентрацию поставщиков.\n2. Уточните запас критичных комплектующих.\n3. Назначьте владельца резервного плана.\n\nРеестр содержит два релевантных риска. Подробности работы эксперта доступны выше.'
-    : '**Проверка завершена.** В демонстрационном реестре найдено два операционных риска: сбой поставок и простой оборудования.\n\nРекомендую начать с резервного поставщика и контроля критичных запасов. Оценку вероятности и влияния следует уточнить с владельцами процессов.';
+    : '**Проверка завершена.** В реестре найдено два операционных риска: сбой поставок и простой оборудования.\n\nРекомендую начать с резервного поставщика и контроля критичных запасов. Оценку вероятности и влияния следует уточнить с владельцами процессов.';
   return {events, backendSteps, answer};
 }
