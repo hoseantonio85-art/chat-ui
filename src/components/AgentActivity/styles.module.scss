@@ -11,21 +11,23 @@
 .expanded { --trace-island-gap: 6px; margin-top: 8px; padding: var(--trace-island-gap); border-radius: 24px; background: linear-gradient(90deg, #ecfdf3, #eefcff); }
 .traceIslands { display: grid; gap: var(--trace-island-gap, 6px); min-width: 0; }
 .traceContent { padding: 18px 20px; border-radius: 19px; background: rgba(255, 255, 255, .76); }
-.traceTitle { font-weight: 600; margin-bottom: 16px; span { display: block; font-size: 12px; font-weight: 400; color: var(--textBaseSecondary); } }
+.traceTitle { font-weight: 600; margin-bottom: 16px; > span, summary { display: block; font-size: 12px; font-weight: 400; color: var(--textBaseSecondary); } }
 .trace { list-style: none; padding: 0 0 0 14px; margin: 0; border-left: 1px solid var(--borderDefault); .trace { margin: 12px 0 0 4px; } }
 .step { margin: 0 0 16px; padding-left: 10px; min-width: 0; overflow-wrap: anywhere; &:last-child { margin-bottom: 0; } p { margin: 6px 0; } &[data-kind='error'] .marker { color: var(--textTechDanger); } &[data-kind='empty'] .marker { color: var(--backgroundTechWarning); } &[data-kind='delegation'] .marker { color: var(--iconBrandDefault); } }
 .stepHeader { display: flex; align-items: center; gap: 8px; strong { font-size: 14px; } }
-.stepHeading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; }
-.stepHeading p { flex-basis: 100%; order: 1; }
-.detailToggle { min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+.detailToggle { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; gap: 4px;
   &:focus-visible { outline: 1px solid var(--borderFocus); outline-offset: 3px; border-radius: 6px; }
 }
-.duration, .callState { color: var(--textBaseSecondary); font-size: 12px; white-space: nowrap; }
-.duration { font-variant-numeric: tabular-nums; }
+.duration { color: var(--textBaseSecondary); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .marker { color: var(--iconBrandDefault); flex-shrink: 0; }
-.meta { color: var(--textBaseSecondary); font-size: 12px; margin: 4px 0; code { color: var(--textBaseDefault); } }
 .plan { padding: 0; list-style: none; li { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 8px; margin: 6px 0; } small { color: var(--textBaseSecondary); font-size: inherit; } }
-.sourceSummary { > strong { font-size: 14px; } ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; } li { display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 8px; } li[data-status='error'] { color: var(--textTechDanger); } small { color: var(--textBaseSecondary); font-size: inherit; } }
+.sourceSummary { font-size: 13px; font-weight: 400;
+  > summary { display: list-item; width: fit-content; cursor: pointer; }
+  ul { list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 6px; }
+  li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+  li[data-status='error'] { color: var(--textTechDanger); }
+  small { color: var(--textBaseSecondary); font-size: inherit; }
+}
 
 .trace { border: 0; padding-left: 0; }
 .trace .trace { margin: 14px 0 0; }
@@ -35,17 +37,16 @@
 .step::after { content: ''; position: absolute; left: 5px; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: #c6c9cd; }
 .stepHeader { min-height: 20px; }
 .stepHeader strong { font-size: 14px; font-weight: 400; color: var(--textBaseDefault); }
-.step p, .meta { color: var(--textBaseSecondary); font-size: 14px; line-height: 20px; }
+.step p { color: var(--textBaseSecondary); font-size: 13px; line-height: 18px; }
 .step p { white-space: pre-line; }
 .marker { position: absolute; left: 0; top: 2px; opacity: 0; color: var(--textBaseSecondary) !important; }
-.step:hover > .stepHeading .marker, .step:focus-within > .stepHeading .marker { opacity: 1; }
+.step:hover > .stepHeader .marker, .step:focus-within > .stepHeader .marker { opacity: 1; }
 .step:hover::after, .step:focus-within::after { opacity: 0; }
 .step:focus-visible { outline: 1px solid var(--borderFocus); outline-offset: 3px; border-radius: 6px; }
-.plan li { grid-template-columns: 1fr auto; font-size: 14px; color: var(--textBaseSecondary); }
-.backendPlan { list-style: none; display: grid; gap: 5px; margin: 6px 0 0; padding: 0; color: var(--textBaseSecondary); font-size: 14px; line-height: 20px; }
+.plan li { grid-template-columns: 1fr auto; font-size: 13px; color: var(--textBaseSecondary); }
+.backendPlan { list-style: none; display: grid; gap: 5px; margin: 6px 0 0; padding: 0; color: var(--textBaseSecondary); font-size: 13px; line-height: 18px; }
 .backendPlan li { position: relative; padding-left: 14px; }
 .backendPlan li::before { content: ''; position: absolute; left: 2px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .5; }
-.sourceSummary li { grid-template-columns: 1fr auto; }
-.step[data-active='true'] > .stepHeading strong, .activity[data-status='running'] .live > span { background: linear-gradient(100deg,#333 30%,#aaa 48%,#333 66%); background-size: 240% 100%; background-clip: text; -webkit-background-clip: text; color: transparent; animation: activityShimmer 2.8s linear infinite; }
+.step[data-active='true'] > .stepHeader strong, .activity[data-status='running'] .live > span { background: linear-gradient(100deg,#333 30%,#aaa 48%,#333 66%); background-size: 240% 100%; background-clip: text; -webkit-background-clip: text; color: transparent; animation: activityShimmer 2.8s linear infinite; }
 @keyframes activityShimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
-@media (prefers-reduced-motion: reduce) { .step[data-active='true'] > .stepHeading strong, .activity[data-status='running'] .live > span { animation: none; background: none; color: var(--textBaseDefault); } }
+@media (prefers-reduced-motion: reduce) { .step[data-active='true'] > .stepHeader strong, .activity[data-status='running'] .live > span { animation: none; background: none; color: var(--textBaseDefault); } }

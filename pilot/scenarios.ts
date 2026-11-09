@@ -80,38 +80,46 @@ export function fixture(scenario: ScenarioId, runId: string, start: number) {
     at += delay;
     events.push({id: `${runId}-${events.length}`, runId, at, kind, ...data});
   };
-  add('plan', {tool: 'write_todos', todos: [{content:'Проверить данные компании', status:'in_progress'}, {content:'Свериться с методологией и реестром', status:'pending'}, {content:'Подготовить ответ', status:'pending'}]});
+  const explain = (text: string, stepId?: string) => {
+    const fragments = text.match(/\S+(?:\s+\S+)?\s*/g) ?? [];
+    fragments.forEach((fragment, index) => add('thinking', {progressDelta: {stepId, text: fragment}}, index ? 300 : 700));
+  };
   const profileStep = `${runId}-profile`;
-  add('thinking', {progressDelta: {stepId: profileStep, text: 'Проверяю профиль компании.'}}, 400);
-  add('thinking', {progressDelta: {stepId: profileStep, text: ' Он поможет определить, какие процессы учесть при проверке рисков.'}}, 900);
+  explain(scenario === 'normal'
+    ? 'Профиль покажет, какие процессы учесть при оценке рисков. Одновременно уточню у методолога критерии оценки.'
+    : 'Начну с профиля компании. Он покажет, какие процессы учесть при оценке рисков.', profileStep);
   add('toolCall', {id:profileStep, callId:'profile', tool:'get_company_profile', source:'Данные компании', args:{company_id:'demo-company', sections:['activities', 'operations']}});
   const finishProfile = (delay = 1400) => add('toolResult', {callId:'profile', tool:'get_company_profile', source:'Данные компании', result:{company:'Демо-компания', industry:'Производство', locations:3, key_process:'Поставки комплектующих'}}, delay);
   if (scenario !== 'normal') finishProfile();
+  const methodStep = `${runId}-method`;
   if (scenario === 'subagent') {
-    add('delegation', {callId:'expert', tool:'task', label:'Подключаю методолога…', source:'Методолог', args:{subagent_type:'methodologist', description:'Оценить риск сбоя поставок по методологии'}});
+    explain('Ключевой процесс компании — поставки комплектующих. Поручу методологу проверить, как оценить риск сбоя поставок.', methodStep);
+    add('delegation', {id:methodStep, callId:'expert', tool:'task', label:'Подключаю методолога…', source:'Методолог', args:{subagent_type:'methodologist', description:'Оценить риск сбоя поставок по методологии'}});
     add('message', {parentCallId:'expert', text:'Проверю критерии оценки и необходимые меры контроля.'});
     add('toolCall', {parentCallId:'expert', callId:'method', tool:'ask_methodologist', source:'Методолог', args:{query:'Критерии риска сбоя поставок', company_id:'demo-company'}});
     add('toolResult', {parentCallId:'expert', callId:'method', tool:'ask_methodologist', source:'Методолог', result:{criteria:['Вероятность', 'Влияние', 'Действующие контроли'], recommendations:['Резервный поставщик', 'Контроль критичных запасов']}});
     add('handback', {parentCallId:'expert', callId:'expert', text:'Методолог завершил проверку и вернул рекомендации супервизору.', result:{assessment:'Оценить концентрацию поставщиков', controls:2}});
   } else {
-    add('toolCall', {callId:'method', tool:'ask_methodologist', source:'Методолог', args:{query:'Оценка операционных рисков компании'}});
+    if (scenario !== 'normal') explain('Уточню, какие критерии применять при оценке рисков компании.', methodStep);
+    add('toolCall', {id:methodStep, callId:'method', tool:'ask_methodologist', source:'Методолог', args:{query:'Оценка операционных рисков компании'}});
     if (scenario === 'normal') finishProfile(1100);
     add('toolResult', {callId:'method', tool:'ask_methodologist', source:'Методолог', result:{criteria:['Вероятность', 'Влияние'], controls:['Резервный поставщик', 'Мониторинг сроков']}}, 1400);
   }
-  add('message', {text:'Профиль и методология проверены. Уточняю сведения в реестре рисков.'});
-  add('toolCall', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', args:{company_id:'demo-company', risk_type:'operational', limit:10}});
+  const risksStep = `${runId}-risks`;
+  explain('Профиль и критерии получены. Теперь сверю их с рисками, уже зарегистрированными в реестре.', risksStep);
+  add('toolCall', {id:risksStep, callId:'risks', tool:'get_company_risks', source:'Реестр рисков', args:{company_id:'demo-company', risk_type:'operational', limit:10}});
   if (scenario === 'error') add('error', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', text:'Источник не ответил. Продолжу по доступным данным; сведения реестра не подтверждены.', result:{code:'SOURCE_TIMEOUT', retryable:true}});
   else if (scenario === 'empty') add('empty', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', text:'По заданным условиям записей нет. Это не означает отсутствие риска.', result:{items:[], total:0}});
   else add('toolResult', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', result:{items:[{name:'Сбой поставок', level:'Высокий'}, {name:'Простой оборудования', level:'Средний'}], total:2}});
   if (scenario === 'rich') {
-    add('toolCall', {callId:'finance', tool:'get_company_fin_indicators', source:'Финансовые показатели', args:{company_id:'demo-company', period:'2025-Q1-Q2'}});
+    const financeStep = `${runId}-finance`;
+    explain('Для таблицы и графика запрошу у аналитика данные о потерях по месяцам.', financeStep);
+    add('toolCall', {id:financeStep, callId:'finance', tool:'get_company_fin_indicators', source:'Финансовые показатели', args:{company_id:'demo-company', period:'2025-Q1-Q2'}});
     add('toolResult', {callId:'finance', tool:'get_company_fin_indicators', source:'Финансовые показатели', result:chart.data});
   }
-  add('plan', {tool:'write_todos', todos:[{content:'Проверить данные компании',status:'completed'},{content:scenario === 'error' ? 'Зафиксировать недоступность реестра' : 'Зафиксировать результаты источников',status:'completed'},{content:'Подготовить ответ',status:'completed'}]});
-  if (scenario === 'normal') {
-    add('thinking', {progressDelta: {text: 'Собираю выводы по проверенным данным.'}}, 350);
-    add('thinking', {progressDelta: {text: ' Добавляю меры контроля для найденных рисков.'}}, 700);
-  }
+  explain(scenario === 'error' ? 'Собираю выводы по доступным источникам. Отмечу, что сведения реестра не подтверждены.'
+    : scenario === 'empty' ? 'Учитываю, что в реестре нет записей по заданным условиям.'
+    : 'Собираю выводы и добавляю меры контроля для найденных рисков.');
   const answer = scenario === 'rich' ? 'Вот потери по месяцам. Все значения демонстрационные, в тыс. ₽.\n\n| Месяц | Прямые потери | Косвенные потери |\n| --- | ---: | ---: |\n| Январь | 410 | 415 |\n| Февраль | 400 | 810 |\n| Март | 210 | 180 |\n| Апрель | 190 | 490 |\n\nСамые высокие совокупные потери — в феврале. Рекомендую проверить причины отклонения и действующие контроли.'
     : scenario === 'registration' ? '**Событие можно зарегистрировать в НОРМ.** Я подготовил контекст по компании и помогу перенести его в форму. Кнопка «Открыть форму» доступна только в этом диалоге.'
     : scenario === 'ordinary' ? '**Операционный риск** — вероятность потерь из-за ошибок процессов, людей, систем или внешних событий. Для первичной оценки определите причину, последствия, вероятность и действующие меры контроля.'
