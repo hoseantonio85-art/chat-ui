@@ -14,7 +14,8 @@ import { completeThreadActivity, markThreadActivityRead, startThreadActivity } f
 import { clearMemoryFacts, forgetMemoryFact, resetThreads } from '../src/components/ThreadDrawer/settings';
 import { chat$, EChatState } from './mocks/auth';
 import { resetPending, setDemoOnline, setDemoSender } from './mocks/useChat';
-import { chart, fixture, scenarios, type ScenarioId, vndCorrectedAnswer, vndResultAnswer, vndStandardPrompt } from './scenarios';
+import { chart, fixture, scenarios, type ScenarioId, usesReferenceFlow, vndCorrectedAnswer, vndResultAnswer, vndStandardPrompt } from './scenarios';
+import { appendExplanation, csiComment, csiServiceResolved, explainedReply, feedbackRuns, feedbackSaveExplanation } from './scenarioExplanations';
 import modalClasses from '@/components/ModalContainer/styles.module.scss';
 import chatClasses from '@/components/Chat/styles.module.scss';
 import '@/i18n';
@@ -66,7 +67,7 @@ function historicalThread(id: string, title: string, scenario: ScenarioId, minut
   const {events, answer} = fixture(scenario, responseId, startedAt);
   let run = createRun(responseId, requestId, startedAt);
   events.forEach(event => { run = appendEvent(run, event); });
-  if (events.length) run = appendEvent(run, {id: `${responseId}-finish`, runId: responseId, at: events.at(-1)!.at, kind: 'finish'});
+  if (events.length) run = appendEvent(run, {id: `${responseId}-finish`, runId: responseId, at: events.at(-1)!.at + (usesReferenceFlow(scenario) ? 1500 : 0), kind: 'finish'});
   return {id, title, scenario, pinned, initialSkill, updatedAt: startedAt, runs: events.length ? {[responseId]: run} : {}, messages: [
     {id: requestId, role: ERoles.user, text: scenarios.find(item => item.id === scenario)!.question, timeCreated: new Date(startedAt).toISOString()},
     {id: responseId, requestId, role: ERoles.bot, text: answer, timeCreated: new Date(startedAt + 1).toISOString(), extras: scenario === 'rich' ? {fileIds:'["demo-report"]', chart} as IMessage['extras'] : undefined},
@@ -164,6 +165,10 @@ function App() {
       return {...thread, messages, updatedAt:Date.now()};
     }));
   };
+  const appendExplainedReply = (threadId: string, message: IMessage, explanation: Parameters<typeof explainedReply>[1]) => {
+    publishRun(threadId, explainedReply(message, explanation));
+    appendToThread(threadId, message);
+  };
   const loadThread = (thread: DemoThread) => {
     resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); thread.messages.forEach(message => addMessageAction(ctx, message));
     canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false); contextChatAtom(ctx, thread.initialSkill === 'createIncident' ? {intent:'createIncident', company_id:'demo-company'} : {company_id:'demo-company'});
@@ -212,12 +217,12 @@ function App() {
       : draft.kind === 'csi'
         ? 'Не удалось сохранить оценку даже в демо. Не буду говорить, что она передана.'
         : 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.';
-    appendToThread(activeIdRef.current, {
+    appendExplainedReply(activeIdRef.current, {
       id:`feedback-result-${crypto.randomUUID()}`,
       role:ERoles.bot,
       text,
       timeCreated:new Date().toISOString(),
-    });
+    }, feedbackSaveExplanation(draft));
   };
   const completeCsi = (ready: CsiDraft) => {
     const saved = saveFeedbackMock(ready);
@@ -232,13 +237,13 @@ function App() {
     const next = selectCsiRating(current, value, messageId, now);
     updateFeedbackDraft(next);
     appendToThread(activeIdRef.current, {id:messageId, role:ERoles.user, text:`${value} из 5`, timeCreated:now});
-    appendToThread(activeIdRef.current, {
+    appendExplainedReply(activeIdRef.current, {
       id:`csi-comment-prompt-${crypto.randomUUID()}`,
       role:ERoles.bot,
       text:getCsiCommentPrompt(value),
       extras:feedbackExtras('csi-comment-actions'),
       timeCreated:new Date().toISOString(),
-    });
+    }, csiComment);
   };
   const skipCsiText = () => {
     const current = getActiveCsi();
@@ -303,6 +308,8 @@ function App() {
         timeCreated:startedAt,
       });
     }
+    const nextRuns = {...(preserveCurrent ? runsRef.current : {}), ...feedbackRuns(entry, messages, draft)};
+    setRuns(nextRuns);
     messages.forEach(message => preserveCurrent ? appendToThread(threadId, message) : addMessageAction(ctx, message));
     updateThreads(items => items.map(thread => thread.id === threadId ? {
       ...thread,
@@ -310,11 +317,11 @@ function App() {
       scenario:entry,
       feedbackDraft:draft,
       ...(preserveCurrent ? {} : {messages:messages.map(message => ({...message}))}),
-      runs:{},
+      runs:nextRuns,
       updatedAt:Date.now(),
       pinned:false,
     } : thread));
-    setRuns({}); setPlaying(false); setActionUrl(''); setScenario(entry); chat$.openChat();
+    setPlaying(false); setActionUrl(''); setScenario(entry); chat$.openChat();
   }
 
   function sendCsi(request: {body: string}) {
@@ -338,13 +345,13 @@ function App() {
       }
       const resolved = setFeedbackService(current, 'vnd-check', 'Проверка ВНД');
       updateFeedbackDraft(resolved);
-      appendToThread(activeIdRef.current, {
+      appendExplainedReply(activeIdRef.current, {
         id:`csi-prompt-${crypto.randomUUID()}`,
         role:ERoles.bot,
         text:'Спасибо, понял. В прототипе покажу путь для сервиса «Проверка ВНД».',
         extras:feedbackExtras('csi-rating'),
         timeCreated:new Date().toISOString(),
-      });
+      }, csiServiceResolved);
       return;
     }
     if (current.stage === 'rating') {
@@ -411,6 +418,8 @@ function App() {
         messages.push({id:'feedback-result', role:ERoles.bot, text, timeCreated:now});
       }
     }
+    const nextRuns = {...(preserveCurrent ? runsRef.current : {}), ...feedbackRuns(entry, messages, draft)};
+    setRuns(nextRuns);
     messages.forEach(message => preserveCurrent ? appendToThread(threadId, message) : addMessageAction(ctx, message));
     updateThreads(items => items.map(thread => thread.id === threadId ? {
       ...thread,
@@ -418,11 +427,11 @@ function App() {
       scenario:entry,
       feedbackDraft:draft,
       ...(preserveCurrent ? {} : {messages:messages.map(message => ({...message}))}),
-      runs:{},
+      runs:nextRuns,
       updatedAt:Date.now(),
       pinned:false,
     } : thread));
-    setRuns({}); setPlaying(false); setActionUrl(''); setScenario(entry); chat$.openChat();
+    setPlaying(false); setActionUrl(''); setScenario(entry); chat$.openChat();
   }
 
   function sendFeedbackClarification(request: {body: string}) {
@@ -442,7 +451,7 @@ function App() {
       : addUnresolvedFeedbackClarification(current, body, messageId, now);
     const saved = saveFeedbackMock(ready);
     updateFeedbackDraft(saved);
-    appendToThread(activeIdRef.current, {
+    appendExplainedReply(activeIdRef.current, {
       id:`feedback-clarified-${crypto.randomUUID()}`,
       role:ERoles.bot,
       text:saved.status === 'error'
@@ -451,7 +460,7 @@ function App() {
           ? 'Понял, речь о проверке ВНД. Спасибо, что уточнили. Отзыв записан в демо, но **команде пока не отправлен.**'
           : 'Не смог определить сервис. Сохранил исходное сообщение в общей демо-очереди, но **команде ничего не отправлено.**',
       timeCreated:new Date().toISOString(),
-    });
+    }, feedbackSaveExplanation(saved));
   }
 
   function sendGeneral(request: {body: string; extras?: Record<string, string>}) {
@@ -496,7 +505,12 @@ function App() {
     const updateRun = () => publishRun(threadId, run);
     const finish = () => {
       const completedTodos = plan.map(item => ({...item,status:'completed' as const}));
-      run = appendEvent(run, {id:`${responseId}-complete`, runId:responseId, at:Date.now(), kind:'plan', tool:'write_todos', todos:completedTodos});
+      const completedAt = Date.now();
+      const completeStep = `${responseId}-complete`;
+      run = appendExplanation(run, completeStep, corrected
+        ? 'Сверка подтвердила, что замечания из предыдущего отчёта устранены. Подготовлю итог по каждому пункту.'
+        : 'Сведу найденные расхождения в таблицу. Для каждого отмечу, что изменить в документе.', completedAt);
+      run = appendEvent(run, {id:completeStep, runId:responseId, at:completedAt, kind:'plan', label:'Готовлю итог проверки', tool:'write_todos', todos:completedTodos});
       run = appendEvent(run, {id:`${responseId}-finish`, runId:responseId, at:Date.now() + 1, kind:'finish'});
       updateRun();
       appendToThread(threadId, {...base, text:corrected ? vndCorrectedAnswer : vndResultAnswer});
@@ -507,8 +521,9 @@ function App() {
     const compareStep = `${responseId}-compare`;
     const accept = () => {
       run = appendEvent(run, {id:`${responseId}-accepted`, runId:responseId, at:Date.now(), kind:'message', label:'Документ принят в работу'});
-      run = appendEvent(run, {id:`${responseId}-compare-note`, runId:responseId, at:Date.now(), kind:'thinking',
-        progressDelta:{stepId:compareStep, text:corrected ? 'Проверяю пункты, отмеченные в предыдущем отчёте.' : 'Проверяю, какие требования выбранного стандарта применимы к документу.'}});
+      run = appendExplanation(run, compareStep, corrected
+        ? 'Пользователь приложил исправленный ВНД. Проверю порог регистрации потерь, сроки расследования и ответственность коллегиального органа по предыдущим замечаниям.'
+        : 'Пользователь выбрал стандарт для сверки. Проверю порог регистрации потерь, сроки расследования и распределение ответственности в документе.', Date.now());
       updateRun();
     };
     const compare = () => {
@@ -658,9 +673,19 @@ function App() {
       const completedAt = Math.max(Date.now(), run.events.at(-1)?.at ?? startedAt);
       // The current backend sends service texts only after /ainvoke completes.
       // Put those exact texts into the activity trace in one update, not chat bubbles.
+      const callbackExplanations = [
+        'В плане указаны этапы, которые агент вернул вместе с ответом. Покажу состояние каждого.',
+        'Профиль помог определить, какие процессы компании учитывать при оценке.',
+        'Профильному помощнику поручили отдельную часть проверки.',
+        'Критерии оценки сверили с методологом.',
+        'Реестр не ответил. В итогах нужно отметить, что сведения из него не подтверждены.',
+      ];
       backendSteps.forEach((serviceText, index) => {
         const [label, ...lines] = serviceText.split('\n');
-        run = appendEvent(run, {id:`${responseId}-backend-${index}`, runId:responseId, at:completedAt + index, kind:'message', label, text:lines.join('\n') || undefined});
+        const stepId = `${responseId}-backend-${index}`;
+        const explanation = callbackExplanations[index];
+        if (explanation) run = appendExplanation(run, stepId, explanation, completedAt + index);
+        run = appendEvent(run, {id:stepId, runId:responseId, at:completedAt + index, kind:'message', label, text:lines.join('\n') || undefined});
       });
       if (events.length || backendSteps.length) {
         run = appendEvent(run, {id:`${responseId}-finish`, runId:responseId, at:completedAt + backendSteps.length, kind:'finish'});
@@ -682,7 +707,7 @@ function App() {
           updateRun();
         }, event.at - startedAt);
       }
-      const answerDelay = events.at(-1)!.at - startedAt;
+      const answerDelay = events.at(-1)!.at - startedAt + (usesReferenceFlow(id) ? 700 : 0);
       const chunks = answer.match(/.{1,36}(?:\s|$)|.{1,36}/gs) || [answer];
       let text = '';
       chunks.forEach((chunk, index) => later(threadId, () => {
@@ -771,7 +796,7 @@ function App() {
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><AgentRunsContext.Provider value={runs}>
     <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
     {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario.startsWith('csi') ? 'CSI · разговорный демо-сценарий' : scenario.startsWith('feedback') ? 'Обратная связь · разговорный демо-сценарий' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Демонстрационные данные'}</span></div><label className="scenario-picker"><span className="sr-only">Сценарий</span><select aria-label="Сценарий" value={scenario} onChange={event => runScenario(event.target.value as ScenarioId)}>{scenarios.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') || scenario.startsWith('csi') || scenario.startsWith('feedback') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{scenario === 'vndBackground' ? 'Демо проверки' : scenario.startsWith('csi') ? 'Показать результат' : scenario.startsWith('feedback') ? 'Показать ветку' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
-    {!initialState.embedded && <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div><div><small>Источники</small><strong>4</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main>}<ModalContainer/>{background.ui}
+    {!initialState.embedded && <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main>}<ModalContainer/>{background.ui}
     {actionUrl && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Переход в НОРМ"><h2>Переход в форму НОРМ</h2><p>Продуктовый чат передал команду открытия формы. В демо она перехвачена локально.</p><code>{actionUrl}</code><Button onClick={() => {setActionUrl('');chat$.openChat();}}>Вернуться в чат</Button></div>}
   </AgentRunsContext.Provider></MessageAddonContext.Provider></AssistantSkillsContext.Provider></ThreadUiContext.Provider></reatomContext.Provider>;
 }

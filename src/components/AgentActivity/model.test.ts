@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activityLabel, appendEvent, callDuration, createRun, hasTrace, openCalls, runSummary, sourcesForRun, traceSteps, type AgentEvent } from './model';
+import { activityLabel, appendEvent, callDuration, createRun, hasTrace, openCalls, runSummary, traceSteps, type AgentEvent } from './model';
 const event = (id: string, kind: AgentEvent['kind'], extra: Partial<AgentEvent> = {}): AgentEvent => ({ id, kind, runId: 'run', at: 1000, ...extra });
 describe('UI run protocol', () => {
   it('isolates runs and deduplicates reconnect replay', () => {
@@ -19,15 +19,14 @@ describe('UI run protocol', () => {
     let run = createRun('run', 'request', 0);
     for (const e of [event('a', 'toolCall', {callId: '1', source: 'Реестр'}), event('b', 'error', {callId: '1'}), event('c', 'toolCall', {callId: '2', source: 'Реестр'}), event('d', 'toolResult', {callId: '2'})]) run = appendEvent(run, e);
     expect(run.status).toBe('running');
-    expect(sourcesForRun(run)).toEqual([{name: 'Реестр', status: 'error', calls: 2}]);
-    expect(runSummary(run)).toContain('с замечаниями: 1');
+    expect(traceSteps(run).map(step => step.outcome?.kind)).toEqual(['error', 'toolResult']);
+    expect(runSummary(run)).toBe('Выполняется сейчас');
   });
-  it('distinguishes empty from error and counts only successfully checked sources', () => {
+  it('shows an empty result on its call and summarizes only the elapsed time', () => {
     let run = createRun('run', 'request', 0);
     for (const e of [event('a', 'toolCall', {callId: '1', source: 'Компания', tool: 'get_company_profile'}), event('b', 'empty', {callId: '1'}), event('c', 'finish', {at: 12000})]) run = appendEvent(run, e);
-    expect(sourcesForRun(run)[0].status).toBe('empty');
-    expect(runSummary(run)).toContain('0/1');
-    expect(runSummary(run)).not.toMatch(/\d+ с(?:\s|$)/);
+    expect(traceSteps(run)[0].outcome?.kind).toBe('empty');
+    expect(runSummary(run)).toBe('Ответ готов за 12 с');
     expect(appendEvent(run, event('late', 'toolCall'))).toBe(run);
   });
   it('terminates on fatal error without claiming a completed answer', () => {
@@ -50,7 +49,7 @@ describe('UI run protocol', () => {
     const second = event('second', 'toolCall', {callId: 'risks', at: 1600});
     const expert = event('expert', 'delegation', {callId: 'expert', at: 1800});
     let run = [first, second, expert].reduce(appendEvent, createRun('run', 'request', 0));
-    expect(activityLabel(run)).toBe('Делегирую');
+    expect(activityLabel(run)).toBe('Делегирую: эксперт');
     expect(openCalls(run)).toEqual([first, second, expert]);
     expect(callDuration(run, second, 3700)).toBe('2 с');
 
@@ -109,6 +108,6 @@ describe('UI run protocol', () => {
     let run = createRun('run', 'request', 0);
     run = appendEvent(run, event('step', 'message', {label: 'Посмотрел профиль компании'}));
     run = appendEvent(run, event('finish', 'finish', {at: 2000}));
-    expect(runSummary(run)).toBe('Ответ готов');
+    expect(runSummary(run)).toBe('Ответ готов за 2 с');
   });
 });

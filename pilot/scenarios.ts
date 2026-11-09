@@ -16,6 +16,7 @@ export const scenarios = [
   {id: 'feedbackPraise', title: 'ОС · благодарность', question: 'Проверка стала очень удобной.'},
   {id: 'feedbackError', title: 'ОС · ошибка демо-сохранения', question: 'Фильтр сбрасывается после возврата назад.'},
   {id: 'normal', title: 'Обычная проверка', question: 'Проверь операционные риски компании и подскажи, на что обратить внимание.'},
+  {id: 'noReasoning', title: 'Модель без рассуждений', question: 'Проверь операционные риски компании и подскажи, на что обратить внимание.'},
   {id: 'parallel', title: 'Два источника сразу', question: 'Проверь профиль компании и реестр рисков, а затем уточни у методолога.'},
   {id: 'subagent', title: 'Работа с экспертом', question: 'Подключи методолога и проверь, как оценить риск сбоя поставок.'},
   {id: 'empty', title: 'Источник без данных', question: 'Есть ли в реестре риски для нового направления компании?'},
@@ -27,6 +28,7 @@ export const scenarios = [
   {id: 'backendCallback', title: 'Текущий контракт /ainvoke', question: 'Проверь профиль компании, спроси методолога и посмотри реестр рисков.'},
 ] as const;
 export type ScenarioId = typeof scenarios[number]['id'];
+export const usesReferenceFlow = (id: ScenarioId) => id === 'normal' || id === 'noReasoning' || id === 'parallel';
 
 export const vndStandardPrompt = `Документ загружен. С каким групповым документом его нужно сверить? Отправьте номер выбранного варианта.
 
@@ -77,53 +79,69 @@ export function fixture(scenario: ScenarioId, runId: string, start: number) {
     return {events, backendSteps, answer: '**Демонстрационный итоговый ответ.** Его содержание в настоящем запросе генерирует модель; фиксированных текстов ответа в бэкенде нет.'};
   }
   let at = start;
-  const add = (kind: AgentEvent['kind'], data: Partial<AgentEvent> = {}, delay = 700) => {
-    at += delay;
+  const sourceDelays: Record<string, number> = {get_company_profile:3800, ask_methodologist:6200, get_company_risks:4600, get_company_laws:4100};
+  const add = (kind: AgentEvent['kind'], data: Partial<AgentEvent> = {}, delay?: number) => {
+    at += delay ?? (usesReferenceFlow(scenario) && kind === 'toolResult' ? sourceDelays[data.tool ?? ''] ?? 4000 : 700);
     events.push({id: `${runId}-${events.length}`, runId, at, kind, ...data});
   };
   const explain = (text: string, stepId?: string) => {
+    if (scenario === 'noReasoning') return;
     const fragments = text.match(/\S+(?:\s+\S+)?\s*/g) ?? [];
     fragments.forEach((fragment, index) => add('thinking', {progressDelta: {stepId, text: fragment}}, index ? 300 : 700));
   };
+  if (scenario === 'ordinary') {
+    explain('Пользователь просит краткое определение. Объясню, откуда возникает операционный риск, и приведу простой пример.');
+    return {events, backendSteps, answer: '**Операционный риск** — вероятность потерь из-за ошибок в процессах, действий сотрудников, сбоев систем или внешних событий. Например, сбой платёжной системы может задержать перевод и привести к потерям.'};
+  }
   const profileStep = `${runId}-profile`;
   const methodStep = `${runId}-method`;
   const risksStep = `${runId}-risks`;
   const requestRisks = (delay?: number) => add('toolCall', {id:risksStep, callId:'risks', tool:'get_company_risks', source:'Реестр рисков', args:{company_id:'demo-company', risk_type:'operational', limit:10}}, delay);
   const finishRisks = (delay?: number) => add('toolResult', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', result:{items:[{name:'Сбой поставок', level:'Высокий'}, {name:'Простой оборудования', level:'Средний'}], total:2}}, delay);
-  // The demo explanations below come from the shared flows in AnkumaGithub/chat-ui design-fixes.
-  explain(scenario === 'parallel'
-    ? 'Чтобы оценить риски, нужно понимать, чем живёт компания, и что по ней уже зарегистрировано. Профиль и реестр друг от друга не зависят, поэтому запрошу оба источника сразу, чтобы не ждать дважды.'
-    : 'Человек спрашивает про операционные риски компании. Чтобы ответ был предметным, сначала нужно понять, чем компания занимается, где у неё площадки и какие процессы для неё ключевые. Начну с профиля.', profileStep);
-  add('toolCall', {id:profileStep, callId:'profile', tool:'get_company_profile', source:'Данные компании', args:{company_id:'demo-company', sections:['activities', 'operations']}});
-  if (scenario === 'parallel') requestRisks(50);
-  add('toolResult', {callId:'profile', tool:'get_company_profile', source:'Данные компании', result:{company:'Демо-компания', industry:'Производство', locations:3, key_process:'Поставки комплектующих'}}, scenario === 'parallel' ? 3800 : 1400);
-  if (scenario === 'parallel') finishRisks(1500);
+  // Keep the wording and timing of the three reference scenarios in sync with design-fixes.
+  if (scenario !== 'rich' && scenario !== 'registration') {
+    explain(scenario === 'parallel'
+      ? 'Чтобы оценить риски, нужно понимать, чем живёт компания, и что по ней уже зарегистрировано. Профиль и реестр друг от друга не зависят, поэтому запрошу оба источника сразу, чтобы не ждать дважды.'
+      : scenario === 'subagent' ? 'Пользователь просит оценить риск сбоя поставок. Уточню, от каких поставок зависит работа компании.'
+      : scenario === 'empty' ? 'Пользователь спрашивает о новом направлении. Уточню профиль компании, чтобы проверить реестр в контексте её деятельности.'
+      : scenario === 'error' ? 'Пользователь просит продолжить проверку при сбое. Начну с профиля компании и соберу данные, которые доступны.'
+      : 'Пользователь спрашивает про операционные риски компании. Чтобы ответ был предметным, сначала нужно понять, чем компания занимается, где у неё площадки и какие процессы для неё ключевые. Начну с профиля.', profileStep);
+    add('toolCall', {id:profileStep, callId:'profile', tool:'get_company_profile', source:'Данные компании', args:{company_id:'demo-company', sections:['activities', 'operations']}});
+    if (scenario === 'parallel') requestRisks(50);
+    add('toolResult', {callId:'profile', tool:'get_company_profile', source:'Данные компании', result:{company:'Демо-компания', industry:'Производство', locations:3, key_process:'Поставки комплектующих'}}, usesReferenceFlow(scenario) ? undefined : 1400);
+    if (scenario === 'parallel') finishRisks(1500);
 
-  explain(scenario === 'subagent'
-    ? 'Профиль показывает, что ключевой процесс — поставки комплектующих, а площадок три. Человек прямо просит методолога: как оценивать риск сбоя поставок, лучше узнать у него, а не додумывать самому.'
-    : scenario === 'parallel'
-      ? 'Профиль и реестр получены: ключевой процесс — поставки комплектующих, в реестре два операционных риска. Осталось понять, как их правильно оценить, — это вопрос к методологу.'
-      : 'Профиль показывает, что ключевой процесс — поставки комплектующих, а площадок три. Чтобы оценивать риски не на глаз, нужны критерии из методологии: вероятность, влияние и действующие контроли.', methodStep);
-  if (scenario === 'subagent') {
-    add('delegation', {id:methodStep, callId:'expert', tool:'task', label:'Подключаю методолога…', source:'Методолог', args:{subagent_type:'methodologist', description:'Оценить риск сбоя поставок по методологии'}});
-    add('message', {parentCallId:'expert', text:'Проверю критерии оценки и необходимые меры контроля.'});
-    add('toolCall', {parentCallId:'expert', callId:'method', tool:'ask_methodologist', source:'Методолог', args:{query:'Критерии риска сбоя поставок', company_id:'demo-company'}});
-    add('toolResult', {parentCallId:'expert', callId:'method', tool:'ask_methodologist', source:'Методолог', result:{criteria:['Вероятность', 'Влияние', 'Действующие контроли'], recommendations:['Резервный поставщик', 'Контроль критичных запасов']}});
-    add('handback', {parentCallId:'expert', callId:'expert', text:'Методолог завершил проверку и вернул рекомендации супервизору.', result:{assessment:'Оценить концентрацию поставщиков', controls:2}});
-  } else {
-    add('toolCall', {id:methodStep, callId:'method', tool:'ask_methodologist', source:'Методолог', args:{query:'Оценка операционных рисков компании'}});
-    add('toolResult', {callId:'method', tool:'ask_methodologist', source:'Методолог', result:{criteria:['Вероятность', 'Влияние'], controls:['Резервный поставщик', 'Мониторинг сроков']}}, 1400);
-  }
-  if (scenario === 'parallel') {
-    explain('Все три источника ответили, картина сходится. Формирую ответ с конкретными шагами.');
-    return {events, backendSteps, answer: '**Проверка завершена.** Профиль и реестр запрошены одновременно; в демонстрационном реестре два операционных риска: сбой поставок и простой оборудования.\n\nПо методологии начните с концентрации поставщиков и контроля критичных запасов.'};
-  }
+    explain(scenario === 'subagent'
+      ? 'Поставки комплектующих — ключевой процесс. Попрошу методолога подобрать критерии оценки сбоя и меры, снижающие зависимость от поставщика.'
+      : scenario === 'parallel'
+        ? 'Профиль и реестр получены: ключевой процесс — поставки комплектующих, в реестре два операционных риска. Осталось понять, как их правильно оценить, — это вопрос к методологу.'
+        : scenario === 'empty' ? 'Даже если записей нет, направление можно оценить. Уточню у методолога, какие критерии применить.'
+        : scenario === 'error' ? 'Профиль доступен. Уточню критерии оценки у методолога, чтобы дать предварительную рекомендацию и при неполных данных.'
+        : 'Профиль показывает, что ключевой процесс — поставки комплектующих, а площадок три. Чтобы оценивать риски не на глаз, нужны критерии из методологии: вероятность, влияние и действующие контроли.', methodStep);
+    if (scenario === 'subagent') {
+      add('delegation', {id:methodStep, callId:'expert', tool:'task', label:'Подключаю методолога…', source:'Методолог', args:{subagent_type:'methodologist', description:'Оценить риск сбоя поставок по методологии'}});
+      add('message', {parentCallId:'expert', text:'Проверю критерии оценки и необходимые меры контроля.'});
+      add('toolCall', {parentCallId:'expert', callId:'method', tool:'ask_methodologist', source:'Методолог', args:{query:'Критерии риска сбоя поставок', company_id:'demo-company'}});
+      add('toolResult', {parentCallId:'expert', callId:'method', tool:'ask_methodologist', source:'Методолог', result:{criteria:['Вероятность', 'Влияние', 'Действующие контроли'], recommendations:['Резервный поставщик', 'Контроль критичных запасов']}});
+      add('handback', {parentCallId:'expert', callId:'expert', text:'Методолог завершил проверку и вернул рекомендации супервизору.', result:{assessment:'Оценить концентрацию поставщиков', controls:2}});
+    } else {
+      add('toolCall', {id:methodStep, callId:'method', tool:'ask_methodologist', source:'Методолог', args:{query:'Оценка операционных рисков компании'}});
+      add('toolResult', {callId:'method', tool:'ask_methodologist', source:'Методолог', result:{criteria:['Вероятность', 'Влияние'], controls:['Резервный поставщик', 'Мониторинг сроков']}}, usesReferenceFlow(scenario) ? undefined : 1400);
+    }
+    if (scenario === 'parallel') {
+      explain('Все три источника ответили, картина сходится. Формирую ответ с конкретными шагами.');
+      return {events, backendSteps, answer: '**Проверка завершена.** Профиль и реестр запрошены одновременно; в демонстрационном реестре два операционных риска: сбой поставок и простой оборудования.\n\nПо методологии начните с концентрации поставщиков и контроля критичных запасов.'};
+    }
 
-  explain('Критерии оценки есть. Теперь важно не изобретать риски заново, а посмотреть, что по компании уже зарегистрировано в реестре, и сравнить это с тем, что видно по профилю.', risksStep);
-  requestRisks();
-  if (scenario === 'error') add('error', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', text:'Источник не ответил. Продолжу по доступным данным; сведения реестра не подтверждены.', result:{code:'SOURCE_TIMEOUT', retryable:true}});
-  else if (scenario === 'empty') add('empty', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', text:'По заданным условиям записей нет. Это не означает отсутствие риска.', result:{items:[], total:0}});
-  else finishRisks();
+    explain(scenario === 'subagent' ? 'Методолог предложил проверить концентрацию поставщиков и запас комплектующих. Уточню, зарегистрирован ли риск сбоя поставок.'
+      : scenario === 'empty' ? 'Проверю записи по новому направлению. Отсутствие записей не подтверждает отсутствие рисков.'
+      : scenario === 'error' ? 'Проверю зарегистрированные риски. Если реестр не ответит, укажу, какие сведения остались неподтверждёнными.'
+      : 'Критерии оценки есть. Теперь важно не изобретать риски заново, а посмотреть, что по компании уже зарегистрировано в реестре, и сравнить это с тем, что видно по профилю.', risksStep);
+    requestRisks();
+    if (scenario === 'error') add('error', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', text:'Источник не ответил. Продолжу по доступным данным; сведения реестра не подтверждены.', result:{code:'SOURCE_TIMEOUT', retryable:true}});
+    else if (scenario === 'empty') add('empty', {callId:'risks', tool:'get_company_risks', source:'Реестр рисков', text:'По заданным условиям записей нет. Это не означает отсутствие риска.', result:{items:[], total:0}});
+    else finishRisks();
+  }
   if (scenario === 'normal') {
     const lawsStep = `${runId}-laws`;
     explain('В реестре два риска: сбой поставок и простой оборудования. Прежде чем советовать меры, проверю, какие требования законов к управлению операционным риском касаются компании.', lawsStep);
@@ -132,24 +150,25 @@ export function fixture(scenario: ScenarioId, runId: string, start: number) {
   }
   if (scenario === 'registration') {
     const formStep = `${runId}-form`;
-    explain('Контекст по компании собран: профиль, критерии и связанные риски из реестра. Теперь подготовлю форму регистрации, чтобы человеку осталось только проверить поля.', formStep);
+    explain('Пользователь хочет зарегистрировать событие, но ещё не описал его. Подготовлю форму, где можно указать дату, обстоятельства и последствия.', formStep);
     add('toolCall', {id:formStep, callId:'form', tool:'get_incident_form', source:'Регистрация события', args:{company_id:'demo-company'}});
     add('toolResult', {callId:'form', tool:'get_incident_form', source:'Регистрация события', result:{fields:['Описание', 'Дата', 'Потери']}});
   }
   if (scenario === 'rich') {
     const financeStep = `${runId}-finance`;
-    explain('Для таблицы и графика нужны данные о потерях по месяцам, а в реестре только перечень рисков без сумм. Цифры по потерям есть у аналитика — спрошу у него.', financeStep);
-    add('toolCall', {id:financeStep, callId:'finance', tool:'get_company_fin_indicators', source:'Финансовые показатели', args:{company_id:'demo-company', period:'2025-Q1-Q2'}});
+    explain('Пользователь просит сравнить потери по месяцам. Запрошу у аналитика прямые и косвенные потери за один период.', financeStep);
+    add('toolCall', {id:financeStep, callId:'finance', tool:'get_company_fin_indicators', source:'Финансовые показатели', args:{company_id:'demo-company', period:'2025-01/2025-04'}});
     add('toolResult', {callId:'finance', tool:'get_company_fin_indicators', source:'Финансовые показатели', result:chart.data});
   }
-  explain(scenario === 'error' ? 'Реестр рисков так и не ответил. Ждать дальше смысла нет: соберу ответ по профилю и методологии и честно отмечу, что данные реестра не подтверждены.'
-    : scenario === 'empty' ? 'Записей в реестре по этим условиям нет. Это не значит, что рисков нет, — направление новое и могло ещё не попасть в реестр. Учту это в ответе.'
+  if (scenario !== 'registration') explain(scenario === 'error' ? 'Реестр не ответил. Отделю предварительные рекомендации по профилю и методологии от сведений, которые нужно перепроверить.'
+    : scenario === 'empty' ? 'Записей по направлению нет. Объясню, какие процессы и меры контроля можно оценить до появления данных.'
+    : scenario === 'subagent' ? 'Риск сбоя поставок есть в реестре. Сопоставлю запись с рекомендациями методолога и выделю первые меры контроля.'
+    : scenario === 'rich' ? 'Сравню месячные суммы и выделю пик. Для таблицы, графика и отчёта использую один набор данных.'
     : 'Данных достаточно: профиль, критерии и риски из реестра сходятся. Формирую ответ с конкретными шагами.');
-  const answer = scenario === 'rich' ? 'Вот потери по месяцам. Все значения демонстрационные, в тыс. ₽.\n\n| Месяц | Прямые потери | Косвенные потери |\n| --- | ---: | ---: |\n| Январь | 410 | 415 |\n| Февраль | 400 | 810 |\n| Март | 210 | 180 |\n| Апрель | 190 | 490 |\n\nСамые высокие совокупные потери — в феврале. Рекомендую проверить причины отклонения и действующие контроли.'
-    : scenario === 'registration' ? '**Событие можно зарегистрировать в НОРМ.** Я подготовил контекст по компании и помогу перенести его в форму. Кнопка «Открыть форму» доступна только в этом диалоге.'
-    : scenario === 'ordinary' ? '**Операционный риск** — вероятность потерь из-за ошибок процессов, людей, систем или внешних событий. Для первичной оценки определите причину, последствия, вероятность и действующие меры контроля.'
+  const answer = scenario === 'rich' ? 'Вот потери по месяцам. Все значения демонстрационные, в тыс. ₽.\n\n| Месяц | Прямые потери | Косвенные потери |\n| --- | ---: | ---: |\n| Январь | 410 | 415 |\n| Февраль | 400 | 810 |\n| Март | 210 | 180 |\n| Апрель | 190 | 540 |\n\nСамые высокие совокупные потери — в феврале. Рекомендую проверить причины отклонения и действующие контроли.'
+    : scenario === 'registration' ? '**Событие можно зарегистрировать в НОРМ.** Нажмите «Открыть форму» и укажите, что произошло, когда это случилось и какие последствия известны.'
     : scenario === 'error' ? '**Реестр рисков сейчас недоступен.** Проверка частичная: профиль компании и методология получены, данные реестра не подтверждены.\n\nПредварительно стоит проверить зависимость от ключевого поставщика и план восстановления. Повторите обращение к реестру перед итоговой оценкой.'
-    : scenario === 'empty' ? '**В реестре нет записей по заданным условиям.** Это не подтверждает отсутствие рисков.\n\nПо профилю и методологии стоит уточнить границы нового процесса и проверить зависимость от поставщиков. При необходимости откройте форму регистрации события в НОРМ.'
+    : scenario === 'empty' ? '**В реестре нет записей по заданным условиям.** Это не подтверждает отсутствие рисков.\n\nПо профилю и методологии стоит уточнить границы нового процесса и проверить зависимость от поставщиков.'
     : scenario === 'subagent' ? '**Методолог завершил проверку.** Для оценки риска сбоя поставок нужны вероятность, влияние и действующие контроли.\n\n1. Проверьте концентрацию поставщиков.\n2. Уточните запас критичных комплектующих.\n3. Назначьте владельца резервного плана.\n\nРеестр содержит два релевантных риска. Подробности работы эксперта доступны выше.'
     : '**Проверка завершена.** В демонстрационном реестре найдено два операционных риска: сбой поставок и простой оборудования.\n\nРекомендую начать с резервного поставщика и контроля критичных запасов. Оценку вероятности и влияния следует уточнить с владельцами процессов.';
   return {events, backendSteps, answer};

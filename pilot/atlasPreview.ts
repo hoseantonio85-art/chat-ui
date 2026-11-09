@@ -1,6 +1,7 @@
 import type { IMessage } from '@/types';
 import { ERoles } from '@/types';
 import { appendEvent, createRun, type AgentRun } from '../src/components/AgentActivity/model';
+import { appendExplanation, explainedReply, feedbackRuns, vndBackgroundExplanation } from './scenarioExplanations';
 import type { BackgroundThread } from './VndBackground';
 import { type ScenarioId, vndStandardPrompt } from './scenarios';
 import {
@@ -134,7 +135,8 @@ const savedMessage: IMessage = {
 };
 
 function createRunningRun(): AgentRun {
-  const run = createRun('atlas-vnd-running', 'atlas-vnd-request', previewTime + 4_000);
+  const run = appendExplanation(createRun('atlas-vnd-running', 'atlas-vnd-request', previewTime + 4_000),
+    'atlas-vnd-running-plan', vndBackgroundExplanation, previewTime + 4_000);
   return appendEvent(run, {
     id: 'atlas-vnd-running-plan',
     runId: 'atlas-vnd-running',
@@ -151,7 +153,7 @@ function createRunningRun(): AgentRun {
 
 function finishFeedbackPreview(
   stepId: AtlasStepId,
-  scenario: ScenarioId,
+  scenario: Parameters<typeof feedbackRuns>[0],
   title: string,
   messages: IMessage[],
   feedbackDraft: FeedbackDraft | undefined,
@@ -168,7 +170,7 @@ function finishFeedbackPreview(
     pinned: false,
     updatedAt: previewTime,
     messages,
-    runs: {},
+    runs: feedbackRuns(scenario, messages, feedbackDraft),
     feedbackDraft,
     vndStage: 'complete' as const,
     jobState: 'saved' as const,
@@ -267,7 +269,7 @@ function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${strin
           : 'Понял: результат проверки было непросто найти. Отзыв записан в демо, но **команде пока не отправлен.**';
     messages.push({ id:'atlas-feedback-result', role:ERoles.bot, text, timeCreated:at(23) });
   }
-  const scenario: ScenarioId = isIdea || isPraise ? (isPraise ? 'feedbackPraise' : needsClarification ? 'feedbackIdeaClarify' : 'feedbackIdea') : stepId === 'feedback.error' ? 'feedbackError' : needsClarification ? 'feedbackComplaintClarify' : 'feedbackComplaint';
+  const scenario = isIdea || isPraise ? (isPraise ? 'feedbackPraise' : needsClarification ? 'feedbackIdeaClarify' : 'feedbackIdea') : stepId === 'feedback.error' ? 'feedbackError' : needsClarification ? 'feedbackComplaintClarify' : 'feedbackComplaint';
   return finishFeedbackPreview(stepId, scenario, 'Обратная связь о проверке', messages, draft, baseThreads, initialMemory);
 }
 
@@ -317,6 +319,10 @@ export function createAtlasPreview(
         ? [requestMessage, standardMessage, choiceMessage, resultMessage]
         : [requestMessage, standardMessage, choiceMessage, pendingMessage];
   const runningRun = running ? createRunningRun() : undefined;
+  const completedRun = ready || saved || settingsStep ? explainedReply(resultMessage, [
+    'Готовлю итог проверки', 'В документе не найдено отклонений от выбранного стандарта. Предложу сохранить актуальную версию ВНД.',
+  ]) : undefined;
+  const reviewRun = runningRun ?? completedRun;
   const normalizedThreads = baseThreads.map((thread, index) => ({
     ...thread,
     updatedAt: previewTime - (stableThreadOffsets[thread.id] ?? (index + 1) * 24 * 60 * 60_000),
@@ -328,7 +334,7 @@ export function createAtlasPreview(
     pinned: false,
     updatedAt: previewTime,
     messages: vndMessages,
-    runs: runningRun ? { [runningRun.runId]: runningRun } : {},
+    runs: reviewRun ? { [reviewRun.runId]: reviewRun } : {},
     vndStage: stepId === 'vnd.start' ? 'start' as const : 'complete' as const,
     documentIds: stepId === 'vnd.start' ? undefined : '["vnd-draft"]',
     documentName: stepId === 'vnd.start' ? undefined : 'Регламент управления операционными рисками.docx',

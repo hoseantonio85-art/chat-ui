@@ -44,8 +44,13 @@ export function activityLabel(run?: AgentRun): string {
   if (!run) return 'Думаю';
   if (run.status === 'failed') return 'Не удалось завершить ответ';
   if (run.status === 'done') return 'Ответ готов';
-  const calls = openCalls(run);
-  if (calls.some(call => call.kind === 'delegation')) return 'Делегирую';
+  const calls = openCalls(run).filter(call => !call.parentCallId);
+  const experts = calls.flatMap(call => {
+    const name = callTitle(call);
+    if (expertNames.has(name)) return [name.toLowerCase()];
+    return call.kind === 'delegation' ? ['эксперт'] : [];
+  });
+  if (experts.length) return `Делегирую: ${[...new Set(experts)].join(', ')}`;
   return calls.length ? 'Собираю источники' : 'Думаю';
 }
 
@@ -68,6 +73,7 @@ const sourceNames: Record<string, string> = {
   get_incident_form: 'Регистрация события',
   create_incident: 'Регистрация события',
 };
+const expertNames = new Set(['Профайлер', 'Методолог', 'Аналитик']);
 
 export function callTitle(event: AgentEvent): string {
   return (event.tool && sourceNames[event.tool]) || event.source || event.label ||
@@ -128,31 +134,8 @@ export function appendEvent(run: AgentRun, event: AgentEvent): AgentRun {
   }
   return { ...run, events };
 }
-export type SourceState = { name: string; status: 'running' | 'success' | 'empty' | 'error'; calls: number };
-export function sourcesForRun(run: AgentRun): SourceState[] {
-  const calls = new Map<string, { name: string; status: SourceState['status'] }>();
-  for (const event of run.events) {
-    if (!event.callId) continue;
-    if (event.kind === 'toolCall' && event.source) calls.set(event.callId, {name: event.source, status: 'running'});
-    const call = calls.get(event.callId);
-    if (call && ['toolResult', 'empty', 'error'].includes(event.kind)) {
-      call.status = event.kind === 'toolResult' ? 'success' : event.kind as 'empty' | 'error';
-    }
-  }
-  const sources = new Map<string, SourceState>();
-  // Any unavailable/empty call remains visible even when another call succeeded.
-  const priority = {success: 0, empty: 1, running: 2, error: 3};
-  for (const call of calls.values()) {
-    const previous = sources.get(call.name);
-    sources.set(call.name, {name: call.name, calls: (previous?.calls || 0) + 1,
-      status: previous && priority[previous.status] > priority[call.status] ? previous.status : call.status});
-  }
-  return [...sources.values()];
-}
 export function runSummary(run: AgentRun): string {
-  const sources = sourcesForRun(run);
-  const successful = sources.filter(source => source.status === 'success').length;
-  const incomplete = sources.length - successful;
-  const experts = run.events.filter(event => event.kind === 'delegation').length;
-  return `${run.status === 'failed' ? 'Прогон прерван' : 'Ответ готов'}${sources.length ? ` · источников: ${successful}/${sources.length}` : ''}${incomplete ? ` · с замечаниями: ${incomplete}` : ''}${experts ? ` · экспертов: ${experts}` : ''}`;
+  if (run.status === 'running') return 'Выполняется сейчас';
+  const status = run.status === 'failed' ? 'Прогон прерван' : 'Ответ готов';
+  return run.finishedAt === undefined ? status : `${status} за ${formatDuration(run.finishedAt - run.startedAt)}`;
 }

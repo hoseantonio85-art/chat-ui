@@ -4,6 +4,7 @@ import { chat$ } from './mocks/auth';
 import { ERoles, type IMessage } from '@/types';
 import type { ChatThread } from '../src/components/ThreadDrawer/context';
 import { appendEvent, createRun, type AgentRun } from '../src/components/AgentActivity/model';
+import { appendExplanation, vndBackgroundExplanation } from './scenarioExplanations';
 import {
   applyVndBackgroundEvent,
   parseVndSaveIntent,
@@ -74,6 +75,7 @@ export function useVndBackground<T extends BackgroundThread>(options: {
       timeCreated: new Date(startedAt).toISOString(),
     };
     let run = createRun(pendingId, `vnd-request-${crypto.randomUUID()}`, startedAt);
+    run = appendExplanation(run, `${pendingId}-plan`, vndBackgroundExplanation, startedAt);
     run = appendEvent(run, {
       id: `${pendingId}-plan`,
       runId: pendingId,
@@ -109,11 +111,14 @@ export function useVndBackground<T extends BackgroundThread>(options: {
       const visible = latest.current.activeId.current === id
         && chat$.value.isPortalOpen
         && document.visibilityState === 'visible';
+      const completedAt = Date.now();
+      run = appendExplanation(run, `${pendingId}-complete`, 'Проверка завершилась без отклонений. Предложу сохранить актуальную версию ВНД в базу знаний.', completedAt);
       run = appendEvent(run, {
         id: `${pendingId}-complete`,
         runId: pendingId,
-        at: Date.now(),
+        at: completedAt,
         kind: 'plan',
+        label: 'Готовлю итог проверки',
         tool: 'write_todos',
         todos: [
           { content: 'Изучить документ', status: 'completed' },
