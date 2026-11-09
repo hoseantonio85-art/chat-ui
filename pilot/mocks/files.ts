@@ -1,5 +1,5 @@
 const files = new Map<string, {fileName: string; size: number; extension: string; source?: File}>([
-  ['demo-report', {fileName: 'Обзор рисков — демо.txt', size: 1240, extension: '.txt'}],
+  ['demo-report', {fileName: 'Обзор рисков.txt', size: 1240, extension: '.txt'}],
   ['demo-input', {fileName: 'Данные компании.xlsx', size: 24380, extension: '.xlsx'}],
   ['vnd-draft', {fileName: 'Регламент управления операционными рисками.docx', size: 248320, extension: '.docx'}],
   ['vnd-corrected', {fileName: 'Регламент управления операционными рисками — исправленный.docx', size: 251904, extension: '.docx'}],

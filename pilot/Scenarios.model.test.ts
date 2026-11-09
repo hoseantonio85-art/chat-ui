@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fixture } from './scenarios';
+import { fixture, scenarioGroups, scenarios, ungroupedScenarioIds } from './scenarios';
 
 describe('pilot explanations', () => {
   it('answers a definition without pretending to research a company', () => {
@@ -15,5 +15,11 @@ describe('pilot explanations', () => {
     expect(events.filter(event => event.kind === 'thinking')).toEqual([]);
     expect(events.filter(event => event.kind === 'toolCall').map(event => event.callId)).toEqual(['profile', 'method', 'risks']);
     expect(events.find(event => event.kind === 'toolResult')?.at).toBe(4500);
+  });
+
+  it('places every scenario in the tree exactly once', () => {
+    const treeIds = [...scenarioGroups.flatMap(group => group.scenarioIds), ...ungroupedScenarioIds];
+    expect(new Set(treeIds).size).toBe(treeIds.length);
+    expect(new Set(treeIds)).toEqual(new Set(scenarios.map(scenario => scenario.id)));
   });
 });

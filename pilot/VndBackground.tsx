@@ -229,7 +229,7 @@ export function useVndBackground<T extends BackgroundThread>(options: {
           <strong>{file.name}</strong>
           <span>Актуальная версия · DOCX</span>
         </div>)}
-        <p>Демонстрационное сохранение в прототипе.</p>
+        <p>Здесь хранятся актуальные версии сохранённых документов.</p>
         <Button variant="secondary" onClick={() => setKnowledge(false)}>Вернуться в чат</Button>
       </div>}
     </>,

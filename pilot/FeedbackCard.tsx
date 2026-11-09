@@ -23,7 +23,7 @@ function RatingCard({ draft, onRate, onCancel }: Pick<FeedbackCardProps, 'draft'
   const selected = draft.rating.value;
   return <section className="feedback-card feedback-rating-card" aria-labelledby="csi-question">
     <div className="feedback-card-heading">
-      <span className="feedback-demo-badge">CSI · демо</span>
+      <span className="feedback-demo-badge">CSI</span>
       <span>Можно пропустить</span>
     </div>
     <fieldset>
@@ -48,7 +48,6 @@ function RatingCard({ draft, onRate, onCancel }: Pick<FeedbackCardProps, 'draft'
       </div>
     </fieldset>
     <div className="feedback-rating-actions"><Button size="S" variant="secondary" disabled={draft.stage !== 'rating'} onClick={onCancel}>Не сейчас</Button></div>
-    <small>Вопрос и шкала фиксированы. Сохранение в этом прототипе — только демонстрационное.</small>
   </section>;
 }
 
