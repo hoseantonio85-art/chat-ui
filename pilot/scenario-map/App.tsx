@@ -15,14 +15,18 @@ import {
 } from './model';
 
 const STORY_POSITIONS = [
-  { x: 470, y: 70 }, { x: 840, y: 70 }, { x: 1210, y: 70 },
-  { x: 1210, y: 470 }, { x: 840, y: 470 }, { x: 470, y: 470 },
+  { x: 470, y: 70 }, { x: 840, y: 70 }, { x: 1210, y: 70 }, { x: 1580, y: 70 },
+  { x: 1580, y: 470 }, { x: 1210, y: 470 }, { x: 840, y: 470 }, { x: 470, y: 470 },
 ];
 const SCREEN_POSITIONS = [
-  { x: 420, y: 60 }, { x: 1000, y: 60 }, { x: 1580, y: 60 },
-  { x: 1580, y: 600 }, { x: 1000, y: 600 }, { x: 420, y: 600 },
+  { x: 420, y: 60 }, { x: 1000, y: 60 }, { x: 1580, y: 60 }, { x: 2160, y: 60 },
+  { x: 2160, y: 600 }, { x: 1580, y: 600 }, { x: 1000, y: 600 }, { x: 420, y: 600 },
 ];
 const SCREEN_BASE = `${import.meta.env.BASE_URL}scenario-map/`;
+const SCENARIO_LABELS: Record<ScenarioId, string> = {
+  vnd:'Проверка ВНД', settings:'Настройки', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
+  'feedback-complaint':'Жалоба / помощь', 'feedback-positive':'Идея / похвала',
+};
 
 interface Transform {
   x: number;
@@ -321,7 +325,7 @@ export function App() {
             onClick={() => updateLocation({ scenarioId: item.id, stepId: item.steps[0].id })}
           >
             <span className={`scenario-index ${item.accent}`}>0{index + 1}</span>
-            <span><strong>{item.id === 'vnd' ? 'Проверка ВНД' : item.id === 'settings' ? 'Настройки' : 'CSI'}</strong><small>{item.steps.length} состояний</small></span>
+            <span><strong>{SCENARIO_LABELS[item.id]}</strong><small>{item.steps.length} состояний</small></span>
           </button>
         ))}
         <div className="rail-note">

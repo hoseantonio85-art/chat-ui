@@ -31,6 +31,9 @@
     "./Feedback.model.ts",
     "./Feedback.model.test.ts",
     "./FeedbackCard.tsx",
+    "./atlasPreview.ts",
+    "./atlasPreview.model.test.ts",
+    "./scenarios.ts",
     "../src/components/Chat/MessageAddonContext.tsx",
     "./scenario-map/**/*.ts",
     "./scenario-map/**/*.tsx"

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAtlasPreview, type AtlasPreviewThread } from './atlasPreview';
+import { scenarios as mapScenarios } from './scenario-map/model';
 
 const baseThreads = (): AtlasPreviewThread[] => [
   {
@@ -82,27 +83,84 @@ describe('atlas live preview states', () => {
       .toEqual(second?.threads.map(thread => [thread.id, thread.updatedAt]));
   });
 
-  it('builds deterministic CSI prompt, review, and submitted states', () => {
+  it('builds conversational CSI branches without a review or consent state', () => {
     const prompt = createAtlasPreview('csi.prompt', baseThreads(), memory);
-    const review = createAtlasPreview('csi.review', baseThreads(), memory);
-    const submitted = createAtlasPreview('csi.submitted', baseThreads(), memory);
-    const reviewThread = review?.threads.find(thread => thread.id === 'vnd');
+    const low = createAtlasPreview('csi.low', baseThreads(), memory);
+    const neutral = createAtlasPreview('csi.neutral', baseThreads(), memory);
+    const high = createAtlasPreview('csi.high', baseThreads(), memory);
+    const saved = createAtlasPreview('csi.saved', baseThreads(), memory);
+    const skipped = createAtlasPreview('csi.skipped', baseThreads(), memory);
+    const failed = createAtlasPreview('csi.error', baseThreads(), memory);
+    const declined = createAtlasPreview('csi.declined', baseThreads(), memory);
 
     expect(prompt?.scenario).toBe('csiProactive');
-    expect(prompt?.threads.find(thread => thread.id === 'vnd')?.csiDraft?.stage).toBe('rating');
-    expect(reviewThread?.csiDraft).toMatchObject({ stage: 'confirm', status: 'draft' });
-    expect(reviewThread?.csiDraft?.rawMessages.map(message => message.text)).toEqual([
-      '4 из 5',
+    expect(prompt?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.stage).toBe('rating');
+    expect(low?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.rating?.value).toBe(1);
+    expect(low?.threads.find(thread => thread.id === 'vnd')?.messages.at(-1)?.text).toContain('что помешало');
+    expect(neutral?.threads.find(thread => thread.id === 'vnd')?.messages.at(-1)?.text).toContain('Что стоит улучшить');
+    expect(high?.threads.find(thread => thread.id === 'vnd')?.messages.at(-1)?.text).toContain('Что понравилось');
+
+    const savedThread = saved?.threads.find(thread => thread.id === 'vnd');
+    expect(savedThread?.feedbackDraft).toMatchObject({ stage: 'submitted', status: 'submitted', mockSaveCount: 1 });
+    expect(savedThread?.feedbackDraft?.rawMessages.map(message => message.text)).toEqual([
+      '5 из 5',
       'Не сразу понял, где смотреть результат проверки.',
     ]);
-    expect(submitted?.threads.find(thread => thread.id === 'vnd')?.csiDraft).toMatchObject({
-      stage: 'submitted',
-      status: 'submitted',
-      delivery: 'mock',
-    });
+    expect(savedThread?.messages.some(message => message.extras?.feedbackAddon === 'csi-review')).toBe(false);
+    expect(savedThread?.messages.at(-1)?.text).toContain('Команде она пока не отправлена');
+    expect(skipped?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.rawMessages.map(message => message.text)).toEqual(['3 из 5']);
+    expect(failed?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ stage: 'error', status: 'error', mockSaveCount: 1 });
+    expect(declined?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ stage: 'cancelled', status: 'cancelled', mockSaveCount: 0 });
+  });
+
+  it('builds direct CSI with known and unknown services', () => {
+    const known = createAtlasPreview('csi-direct.known', baseThreads(), memory);
+    const service = createAtlasPreview('csi-direct.service', baseThreads(), memory);
+    const rating = createAtlasPreview('csi-direct.rating', baseThreads(), memory);
+    const saved = createAtlasPreview('csi-direct.saved', baseThreads(), memory);
+
+    expect(known?.scenario).toBe('csiDirect');
+    expect(service?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ stage: 'service', serviceId: null });
+    expect(rating?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ stage: 'rating', serviceId: 'vnd-check' });
+    expect(saved?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ stage: 'submitted', status: 'submitted' });
+  });
+
+  it('builds complaint, help, clarification, idea and praise branches', () => {
+    const complaint = createAtlasPreview('feedback.complaint', baseThreads(), memory);
+    const help = createAtlasPreview('feedback.help', baseThreads(), memory);
+    const clarify = createAtlasPreview('feedback.clarify', baseThreads(), memory);
+    const clarified = createAtlasPreview('feedback.clarified', baseThreads(), memory);
+    const idea = createAtlasPreview('feedback.idea', baseThreads(), memory);
+    const ideaClarify = createAtlasPreview('feedback.idea-clarify', baseThreads(), memory);
+    const praise = createAtlasPreview('feedback.praise', baseThreads(), memory);
+    const error = createAtlasPreview('feedback.error', baseThreads(), memory);
+
+    expect(complaint?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ kind: 'complaint', status: 'submitted' });
+    expect(help?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toBeUndefined();
+    expect(help?.threads.find(thread => thread.id === 'vnd')?.messages.at(-1)?.text).toContain('не записывал это как жалобу');
+    expect(clarify?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ kind: 'complaint', stage: 'clarification', clarificationCount: 0 });
+    expect(clarified?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.rawMessages.map(message => message.text)).toEqual([
+      'После возврата всё сбросилось.',
+      'В сервисе проверки ВНД.',
+    ]);
+    expect(idea?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ kind: 'idea', status: 'submitted' });
+    expect(ideaClarify?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ kind: 'idea', stage: 'clarification' });
+    expect(praise?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ kind: 'praise', status: 'submitted' });
+    expect(error?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft).toMatchObject({ status: 'error', mockSaveCount: 1 });
+  });
+
+  it('redirects legacy CSI review links to the conversational saved state', () => {
+    expect(createAtlasPreview('csi.review', baseThreads(), memory)?.stepId).toBe('csi.saved');
+    expect(createAtlasPreview('csi.edited', baseThreads(), memory)?.stepId).toBe('csi.saved');
   });
 
   it('rejects unknown steps instead of inventing a live state', () => {
     expect(createAtlasPreview('missing.step', baseThreads(), memory)).toBeUndefined();
+  });
+
+  it('provides a deterministic live state for every map step', () => {
+    for (const step of mapScenarios.flatMap(scenario => scenario.steps)) {
+      expect(createAtlasPreview(step.id, baseThreads(), memory), step.id).toBeDefined();
+    }
   });
 });

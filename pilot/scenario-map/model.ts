@@ -1,4 +1,4 @@
-export type ScenarioId = 'vnd' | 'settings' | 'csi';
+export type ScenarioId = 'vnd' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
 export type MapView = 'story' | 'screens';
 export type StepKind = 'entry' | 'action' | 'system' | 'state' | 'result';
 
@@ -120,47 +120,48 @@ export const scenarios: Scenario[] = [
     ],
   },
   {
-    id: 'csi',
-    eyebrow: 'CSI · после значимого сценария',
-    title: 'Оценка завершённой проверки ВНД',
-    description: 'Стандартизированный вопрос, прозрачное подтверждение данных и демонстрационный результат.',
-    accent: 'mint',
+    id: 'csi', eyebrow: 'CSI · после значимого сценария', title: 'Разговорная оценка проверки ВНД',
+    description: 'Фиксированный вопрос 1–5, контекстная реакция и завершение без формы подтверждения.', accent: 'mint',
     steps: [
-      {
-        id: 'csi.prompt', number: '01', title: 'Ненавязчивое приглашение', actor: 'Агент', kind: 'entry',
-        summary: 'После завершения проверки агент предлагает один короткий вопрос, который можно пропустить.',
-        detail: 'CSI продолжает рабочий сценарий в том же чате. Отдельный виджет не перекрывает интерфейс, а приглашение не появляется после каждого ответа.',
-        screen: 'screens/csi-01-prompt.png', screenAlt: 'Чат с завершённой проверкой ВНД и компактной оценкой от одной до пяти звёзд',
-        tags: ['CSI', 'проактивно'],
-      },
-      {
-        id: 'csi.rating', number: '02', title: 'Формальная оценка', actor: 'Пользователь', kind: 'action',
-        summary: 'Пользователь ставит 4 из 5 и при желании добавляет свободный комментарий.',
-        detail: 'Вопрос и шкала имеют стабильный questionId. Комментарий необязателен, потому что формальная оценка и качественная обратная связь не смешиваются.',
-        screen: 'screens/csi-02-rating.png', screenAlt: 'Выбранная оценка четыре звезды и предложение добавить необязательный комментарий',
-        tags: ['1–5', 'комментарий'],
-      },
-      {
-        id: 'csi.review', number: '03', title: 'Проверка состава данных', actor: 'Система', kind: 'state',
-        summary: 'Карточка показывает исходные ответы отдельно от изменяемой интерпретации AI.',
-        detail: 'Дословные ответы сохраняют порядок и идентификаторы. Весь чат, вложения и другие диалоги не включаются по умолчанию.',
-        screen: 'screens/csi-03-review.png', screenAlt: 'Карточка подтверждения с исходными цитатами, интерпретацией AI и составом передаваемых данных',
-        tags: ['первоисточник', 'согласие'],
-      },
-      {
-        id: 'csi.edited', number: '04', title: 'Интерпретация исправлена', actor: 'Пользователь', kind: 'action',
-        summary: 'Пользователь уточняет AI-сводку, не изменяя исходные цитаты.',
-        detail: 'Согласие относится к явно показанному составу данных. Кнопка подтверждения недоступна, пока согласие не отмечено.',
-        screen: 'screens/csi-04-edited.png', screenAlt: 'Отредактированная AI-интерпретация рядом с неизменными исходными ответами',
-        tags: ['редактирование', 'контроль'],
-      },
-      {
-        id: 'csi.submitted', number: '05', title: 'Демонстрационный результат', actor: 'Агент', kind: 'result',
-        summary: 'Оценка появляется в демо-списке с фильтром по сервису и раскрытием первоисточника.',
-        detail: 'Реальной отправки нет. Прототип не обещает обработку и явно отделяет будущие API, права доступа, хранение и методику CSI.',
-        screen: 'screens/csi-05-submitted.png', screenAlt: 'Демонстрационный список оценок CSI с фильтром по сервису и исходными ответами',
-        tags: ['mock', 'список'],
-      },
+      { id:'csi.prompt', number:'01', title:'Короткое приглашение', actor:'Агент', kind:'entry', summary:'После сохранения ВНД агент задаёт один необязательный вопрос.', detail:'Вопрос и шкала CSI неизменны. Пользователь может отказаться без повторного приглашения.', screen:'screens/csi-01-prompt.png', screenAlt:'Короткое приглашение оценить проверку ВНД', tags:['CSI','проактивно'] },
+      { id:'csi.low', number:'02', title:'Оценка 1–2', actor:'Агент', kind:'state', summary:'Низкая оценка сохранена, агент спокойно спрашивает, что помешало.', detail:'Комментарий необязателен и не влияет на сохранность выбранного балла.', screen:'screens/csi-02-low.png', screenAlt:'Низкая оценка и вопрос о проблеме', tags:['1–2','эмпатия'] },
+      { id:'csi.neutral', number:'03', title:'Оценка 3', actor:'Агент', kind:'state', summary:'Нейтральная оценка сохранена, агент спрашивает, что улучшить.', detail:'Реакция не подталкивает пользователя повысить оценку.', screen:'screens/csi-03-neutral.png', screenAlt:'Оценка три и нейтральный уточняющий вопрос', tags:['3','уточнение'] },
+      { id:'csi.high', number:'04', title:'Оценка 4–5', actor:'Агент', kind:'state', summary:'Высокая оценка сохранена, можно назвать удачный или неудобный момент.', detail:'Комментарий остаётся свободным и необязательным.', screen:'screens/csi-04-high.png', screenAlt:'Высокая оценка и предложение добавить комментарий', tags:['4–5','комментарий'] },
+      { id:'csi.skipped', number:'05', title:'Без комментария', actor:'Пользователь', kind:'result', summary:'Пользователь пропускает комментарий, одна оценка сохраняется в демо.', detail:'Нет повторного опроса, review-экрана, согласия или второй записи.', screen:'screens/csi-05-skipped.png', screenAlt:'Подтверждение демонстрационного сохранения оценки без комментария', tags:['пропуск','mock'] },
+      { id:'csi.saved', number:'06', title:'Комментарий добавлен', actor:'Агент', kind:'result', summary:'Дословный комментарий присоединён к той же оценке без отдельного подтверждения.', detail:'Агент честно сообщает: запись только в демо, команде ничего не отправлено.', screen:'screens/csi-06-saved.png', screenAlt:'Разговорное завершение CSI с комментарием', tags:['первоисточник','mock'] },
+      { id:'csi.error', number:'07', title:'Ошибка сохранения', actor:'Система', kind:'result', summary:'Демо-сохранение не удалось, успех не показывается.', detail:'Повторное действие не создаёт дубликат записи.', screen:'screens/csi-07-error.png', screenAlt:'Честное сообщение об ошибке демонстрационного сохранения', tags:['ошибка','без дублей'] },
+      { id:'csi.declined', number:'08', title:'Не сейчас', actor:'Пользователь', kind:'result', summary:'Приглашение отклонено без давления и сохранения.', detail:'Разговор возвращается к рабочей задаче.', screen:'screens/csi-08-declined.png', screenAlt:'Отказ от CSI и возврат к работе', tags:['отказ','ненавязчиво'] },
+    ],
+  },
+  {
+    id:'csi-direct', eyebrow:'CSI · по инициативе пользователя', title:'Самостоятельная оценка сервиса',
+    description:'Короткий путь с известным сервисом или одним уточнением.', accent:'blue',
+    steps:[
+      { id:'csi-direct.known', number:'01', title:'Сервис известен', actor:'Пользователь', kind:'entry', summary:'Пользователь просит оценить проверку ВНД и сразу видит CSI-вопрос.', detail:'Добровольное обращение не превращается в длинную анкету.', screen:'screens/csi-direct-01-known.png', screenAlt:'Самостоятельный CSI для известного сервиса', tags:['direct','известный сервис'] },
+      { id:'csi-direct.service', number:'02', title:'Какой сервис?', actor:'Агент', kind:'action', summary:'Если контекста нет, агент задаёт одно короткое уточнение.', detail:'Без ответа формальная оценка не создаётся.', screen:'screens/csi-direct-02-service.png', screenAlt:'Уточнение сервиса перед CSI', tags:['уточнение','один вопрос'] },
+      { id:'csi-direct.rating', number:'03', title:'Сервис уточнён', actor:'Пользователь', kind:'state', summary:'После явного ответа показывается тот же фиксированный CSI-вопрос.', detail:'В демо поддержан сервис «Проверка ВНД», без имитации полноценного NLU.', screen:'screens/csi-direct-03-rating.png', screenAlt:'CSI после уточнения сервиса', tags:['questionId','1–5'] },
+      { id:'csi-direct.saved', number:'04', title:'Оценка записана', actor:'Агент', kind:'result', summary:'Бал и сервис сохранены один раз в демо.', detail:'Команде ничего не отправлено, review и чекбокс отсутствуют.', screen:'screens/csi-direct-04-saved.png', screenAlt:'Завершение самостоятельного CSI', tags:['mock','без формы'] },
+    ],
+  },
+  {
+    id:'feedback-complaint', eyebrow:'Обратная связь · проблема', title:'Жалоба или запрос помощи',
+    description:'Дословная жалоба сохраняется отдельно, просьба помочь остаётся рабочей задачей.', accent:'mint',
+    steps:[
+      { id:'feedback.complaint', number:'01', title:'Явная жалоба', actor:'Пользователь', kind:'entry', summary:'Конкретная проблема записывается в демо без CSI и анкеты.', detail:'Сохраняются точные слова и минимум контекста.', screen:'screens/feedback-complaint-01-complaint.png', screenAlt:'Принятая жалоба о результате проверки', tags:['жалоба','raw'] },
+      { id:'feedback.help', number:'02', title:'Просьба помочь', actor:'Агент', kind:'result', summary:'Агент помогает найти результат и не записывает просьбу как жалобу.', detail:'При сомнении сообщение не уходит за пределы чата.', screen:'screens/feedback-complaint-02-help.png', screenAlt:'Рабочая помощь без создания жалобы', tags:['помощь','не жалоба'] },
+      { id:'feedback.clarify', number:'03', title:'Сервис неясен', actor:'Агент', kind:'action', summary:'Агент задаёт не более одного вопроса о сервисе.', detail:'Исходная жалоба уже сохранена в состоянии и не теряется при молчании.', screen:'screens/feedback-complaint-03-clarify.png', screenAlt:'Одно уточнение сервиса для жалобы', tags:['уточнение','общая очередь'] },
+      { id:'feedback.clarified', number:'04', title:'Уточнение добавлено', actor:'Пользователь', kind:'result', summary:'Точный ответ присоединяется к исходной жалобе.', detail:'Создаётся одна mock-запись без пересказа на подтверждение.', screen:'screens/feedback-complaint-04-clarified.png', screenAlt:'Жалоба после одного уточнения', tags:['маршрутизация','mock'] },
+      { id:'feedback.error', number:'05', title:'Ошибка сохранения', actor:'Система', kind:'result', summary:'При сбое агент не утверждает, что отзыв передан.', detail:'Повторная отправка не создаёт ложный успех или дубликат.', screen:'screens/feedback-complaint-05-error.png', screenAlt:'Ошибка демонстрационного сохранения жалобы', tags:['ошибка','честность'] },
+    ],
+  },
+  {
+    id:'feedback-positive', eyebrow:'Обратная связь · идея и похвала', title:'Свободная положительная обратная связь',
+    description:'Идея или благодарность принимается без автоматического CSI.', accent:'blue',
+    steps:[
+      { id:'feedback.idea', number:'01', title:'Идея принята', actor:'Пользователь', kind:'entry', summary:'Конкретное предложение записывается дословно.', detail:'Агент не обещает реализацию и не просит звёзды.', screen:'screens/feedback-positive-01-idea.png', screenAlt:'Принятая идея об улучшении сервиса', tags:['идея','без CSI'] },
+      { id:'feedback.idea-clarify', number:'02', title:'Контекст идеи неясен', actor:'Агент', kind:'action', summary:'Один ненавязчивый вопрос помогает определить сервис.', detail:'Уточнение необязательно, исходная идея не переписывается.', screen:'screens/feedback-positive-02-idea-clarify.png', screenAlt:'Уточнение сервиса для идеи', tags:['идея','уточнение'] },
+      { id:'feedback.idea-clarified', number:'03', title:'Идея уточнена', actor:'Агент', kind:'result', summary:'Ответ добавлен к той же записи, завершение остаётся коротким.', detail:'Запись остаётся демонстрационной и не выдаётся за реальную отправку.', screen:'screens/feedback-positive-03-idea-clarified.png', screenAlt:'Идея после одного уточнения', tags:['одна запись','mock'] },
+      { id:'feedback.praise', number:'04', title:'Благодарность принята', actor:'Агент', kind:'result', summary:'Похвала принимается без автоматического запроса CSI.', detail:'Короткий живой ответ не обещает внешнюю передачу.', screen:'screens/feedback-positive-04-praise.png', screenAlt:'Ответ на благодарность без CSI', tags:['похвала','коротко'] },
     ],
   },
 ];
@@ -168,8 +169,15 @@ export const scenarios: Scenario[] = [
 export const getScenario = (scenarioId: string | null): Scenario | undefined =>
   scenarios.find(scenario => scenario.id === scenarioId);
 
+const legacyStepRedirects: Record<string, string> = {
+  'csi.rating': 'csi.high',
+  'csi.review': 'csi.saved',
+  'csi.edited': 'csi.saved',
+  'csi.submitted': 'csi.saved',
+};
+
 export const getScenarioStep = (scenarioId: string, stepId: string | null): ScenarioStep | undefined =>
-  getScenario(scenarioId)?.steps.find(step => step.id === stepId);
+  getScenario(scenarioId)?.steps.find(step => step.id === (stepId ? legacyStepRedirects[stepId] ?? stepId : stepId));
 
 export function getInitialLocation(search: string): MapLocation {
   const params = new URLSearchParams(search);

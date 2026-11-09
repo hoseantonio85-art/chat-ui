@@ -11,9 +11,11 @@ import {
 describe('scenario map model', () => {
   it('keeps stable unique ids and a real screen for every step', () => {
     const ids = scenarios.flatMap(scenario => scenario.steps.map(step => step.id));
+    const screens = scenarios.flatMap(scenario => scenario.steps.map(step => step.screen));
 
     expect(new Set(ids).size).toBe(ids.length);
-    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 4, 5]);
+    expect(new Set(screens).size).toBe(screens.length);
+    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 4, 8, 4, 5, 4]);
     expect(scenarios.every(scenario => scenario.steps.every(step => step.screen.endsWith('.png')))).toBe(true);
   });
 
@@ -59,12 +61,18 @@ describe('scenario map model', () => {
     expect(getScenarioStep('settings', 'vnd.result')).toBeUndefined();
   });
 
-  it('restores a CSI review step as an independent scenario', () => {
+  it('redirects legacy CSI review links to the new conversational saved state', () => {
     expect(getInitialLocation('?scenario=csi&step=csi.review&view=screens')).toEqual({
       scenarioId: 'csi',
-      stepId: 'csi.review',
+      stepId: 'csi.saved',
       view: 'screens',
     });
-    expect(getScenarioStep('csi', 'csi.review')?.summary).toContain('исходные ответы');
+    expect(getScenarioStep('csi', 'csi.saved')?.summary).toContain('без отдельного подтверждения');
+  });
+
+  it('restores every TO-BE feedback route as a separate scenario', () => {
+    expect(getInitialLocation('?scenario=csi-direct&step=csi-direct.service&view=story').scenarioId).toBe('csi-direct');
+    expect(getInitialLocation('?scenario=feedback-complaint&step=feedback.help&view=screens').stepId).toBe('feedback.help');
+    expect(getInitialLocation('?scenario=feedback-positive&step=feedback.praise&view=story').stepId).toBe('feedback.praise');
   });
 });

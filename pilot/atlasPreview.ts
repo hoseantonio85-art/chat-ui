@@ -5,11 +5,16 @@ import type { BackgroundThread } from './VndBackground';
 import { type ScenarioId, vndStandardPrompt } from './scenarios';
 import {
   addCsiComment,
+  addFeedbackClarification,
+  cancelCsi,
   createCsiDraft,
+  createQualitativeFeedback,
+  getCsiCommentPrompt,
+  saveFeedbackMock,
   selectCsiRating,
-  submitCsi,
-  updateCsiInterpretation,
-  type CsiDraft,
+  setFeedbackService,
+  skipCsiComment,
+  type FeedbackDraft,
 } from './Feedback.model';
 
 export type AtlasDrawerState = 'history' | 'settings' | 'memory-confirm';
@@ -25,10 +30,26 @@ export type AtlasStepId =
   | 'settings.confirm'
   | 'settings.updated'
   | 'csi.prompt'
-  | 'csi.rating'
-  | 'csi.review'
-  | 'csi.edited'
-  | 'csi.submitted';
+  | 'csi.low'
+  | 'csi.neutral'
+  | 'csi.high'
+  | 'csi.skipped'
+  | 'csi.saved'
+  | 'csi.error'
+  | 'csi.declined'
+  | 'csi-direct.known'
+  | 'csi-direct.service'
+  | 'csi-direct.rating'
+  | 'csi-direct.saved'
+  | 'feedback.complaint'
+  | 'feedback.help'
+  | 'feedback.clarify'
+  | 'feedback.clarified'
+  | 'feedback.error'
+  | 'feedback.idea'
+  | 'feedback.idea-clarify'
+  | 'feedback.idea-clarified'
+  | 'feedback.praise';
 
 type VndStage = 'start' | 'chooseStandard' | 'reviewed' | 'complete';
 
@@ -37,7 +58,7 @@ export interface AtlasPreviewThread extends BackgroundThread {
   messages: IMessage[];
   runs: Record<string, AgentRun>;
   vndStage?: VndStage;
-  csiDraft?: CsiDraft;
+  feedbackDraft?: FeedbackDraft;
 }
 
 export interface AtlasPreview {
@@ -128,110 +149,161 @@ function createRunningRun(): AgentRun {
   return { ...run, currentActivity: 'Проверяю ВНД по групповому стандарту…' };
 }
 
-function createCsiPreview(
-  stepId: Extract<AtlasStepId, `csi.${string}`>,
+function finishFeedbackPreview(
+  stepId: AtlasStepId,
+  scenario: ScenarioId,
+  title: string,
+  messages: IMessage[],
+  feedbackDraft: FeedbackDraft | undefined,
   baseThreads: AtlasPreviewThread[],
   initialMemory: string[],
 ): AtlasPreview {
-  let draft = createCsiDraft('proactive', at(20));
-  const messages: IMessage[] = [
-    {
-      id: 'atlas-csi-context',
-      role: ERoles.bot,
-      text: 'Сохранил «Регламент управления операционными рисками.docx» в базу знаний, в папку «Операционные риски».',
-      timeCreated: at(19),
-    },
-    {
-      id: 'atlas-csi-prompt',
-      role: ERoles.bot,
-      text: 'Проверка завершена. Можно один короткий вопрос об этом сценарии?',
-      extras: { type: 'system', feedbackAddon: 'csi-rating' },
-      timeCreated: at(20),
-    },
-  ];
-  if (stepId !== 'csi.prompt') {
-    draft = selectCsiRating(draft, 4, 'atlas-csi-rating', at(21));
-    messages.push(
-      { id: 'atlas-csi-rating', role: ERoles.user, text: '4 из 5', timeCreated: at(21) },
-      {
-        id: 'atlas-csi-comment-prompt',
-        role: ERoles.bot,
-        text: 'Спасибо. Если хотите, коротко напишите, что повлияло на оценку. Комментарий необязателен.',
-        extras: { type: 'system', feedbackAddon: 'csi-comment-actions' },
-        timeCreated: at(22),
-      },
-    );
-  }
-  if (stepId === 'csi.review' || stepId === 'csi.edited' || stepId === 'csi.submitted') {
-    draft = addCsiComment(draft, 'Не сразу понял, где смотреть результат проверки.', 'atlas-csi-comment', at(23));
-    messages.push(
-      { id: 'atlas-csi-comment', role: ERoles.user, text: 'Не сразу понял, где смотреть результат проверки.', timeCreated: at(23) },
-      {
-        id: 'atlas-csi-review',
-        role: ERoles.bot,
-        text: 'Я отделил ваши исходные ответы от интерпретации AI. Проверьте формулировку и состав данных перед демонстрационной отправкой.',
-        extras: { type: 'system', feedbackAddon: 'csi-review' },
-        timeCreated: at(24),
-      },
-    );
-  }
-  if (stepId === 'csi.edited' || stepId === 'csi.submitted') {
-    draft = {
-      ...updateCsiInterpretation(draft, 'Результат проверки сложно найти после завершения.'),
-      consentToSend: true,
-    };
-  }
-  if (stepId === 'csi.submitted') {
-    draft = submitCsi(draft);
-    messages.push({
-      id: 'atlas-csi-submitted',
-      role: ERoles.bot,
-      text: 'Готово. **Демонстрационная запись сохранена только в прототипе.** Реальной передачи команде и обещания обработки нет.',
-      extras: { type: 'system', feedbackAddon: 'csi-list' },
-      timeCreated: at(25),
-    });
-  }
   const threads = baseThreads.map((thread, index) => ({
     ...thread,
     updatedAt: previewTime - (stableThreadOffsets[thread.id] ?? (index + 1) * 24 * 60 * 60_000),
   })).map(thread => thread.id !== 'vnd' ? thread : {
     ...thread,
-    title: 'Оценка проверки ВНД',
-    scenario: 'csiProactive' as ScenarioId,
+    title,
+    scenario,
     pinned: false,
     updatedAt: previewTime,
     messages,
     runs: {},
-    csiDraft: draft,
+    feedbackDraft,
     vndStage: 'complete' as const,
     jobState: 'saved' as const,
     agentState: undefined,
     agentUnread: false,
   });
-  return {
-    stepId,
-    threads,
-    activeThreadId: 'vnd',
-    scenario: 'csiProactive',
-    agentMemory: [...initialMemory],
-  };
+  return { stepId, threads, activeThreadId: 'vnd', scenario, agentMemory: [...initialMemory] };
+}
+
+function createCsiPreview(stepId: Extract<AtlasStepId, `csi.${string}`>, baseThreads: AtlasPreviewThread[], initialMemory: string[]): AtlasPreview {
+  const outcome = stepId === 'csi.error' ? 'error' : 'success';
+  let draft = createCsiDraft('proactive', at(20), { mockOutcome: outcome });
+  const messages: IMessage[] = [
+    { id:'atlas-csi-context', role:ERoles.bot, text:'Сохранил «Регламент управления операционными рисками.docx» в базу знаний, в папку «Операционные риски».', timeCreated:at(19) },
+    { id:'atlas-csi-prompt', role:ERoles.bot, text:'Готово, документ сохранён. Можно ещё один короткий вопрос?', extras:{type:'system', feedbackAddon:'csi-rating'}, timeCreated:at(20) },
+  ];
+  if (stepId === 'csi.declined') {
+    draft = cancelCsi(draft);
+    messages.push({ id:'atlas-csi-declined', role:ERoles.bot, text:'Хорошо, вернёмся к работе.', timeCreated:at(21) });
+  } else if (stepId !== 'csi.prompt') {
+    const value = stepId === 'csi.low' || stepId === 'csi.error' ? 1 : stepId === 'csi.neutral' || stepId === 'csi.skipped' ? 3 : 5;
+    draft = selectCsiRating(draft, value, 'atlas-csi-rating', at(21));
+    messages.push(
+      { id:'atlas-csi-rating', role:ERoles.user, text:`${value} из 5`, timeCreated:at(21) },
+      { id:'atlas-csi-comment-prompt', role:ERoles.bot, text:getCsiCommentPrompt(value), extras:{type:'system', feedbackAddon:'csi-comment-actions'}, timeCreated:at(22) },
+    );
+    if (stepId === 'csi.saved') {
+      const comment = 'Не сразу понял, где смотреть результат проверки.';
+      draft = addCsiComment(draft, comment, 'atlas-csi-comment', at(23));
+      messages.push({ id:'atlas-csi-comment', role:ERoles.user, text:comment, timeCreated:at(23) });
+    }
+    if (stepId === 'csi.saved' || stepId === 'csi.skipped' || stepId === 'csi.error') {
+      if (draft.stage === 'comment') draft = skipCsiComment(draft);
+      draft = saveFeedbackMock(draft);
+      messages.push({
+        id:'atlas-csi-result', role:ERoles.bot,
+        text:draft.status === 'submitted'
+          ? 'Спасибо, записал оценку в демо. **Команде она пока не отправлена.**'
+          : 'Не удалось сохранить оценку даже в демо. Не буду говорить, что она передана.',
+        timeCreated:at(24),
+      });
+    }
+  }
+  return finishFeedbackPreview(stepId, 'csiProactive', 'Оценка проверки ВНД', messages, draft, baseThreads, initialMemory);
+}
+
+function createDirectCsiPreview(stepId: Extract<AtlasStepId, `csi-direct.${string}`>, baseThreads: AtlasPreviewThread[], initialMemory: string[]): AtlasPreview {
+  const unknown = stepId !== 'csi-direct.known';
+  let draft = createCsiDraft('user_initiated', at(20), { serviceKnown: !unknown });
+  const messages: IMessage[] = [
+    { id:'atlas-csi-direct-request', role:ERoles.user, text:unknown ? 'Хочу оценить сервис.' : 'Хочу оценить сервис проверки ВНД.', timeCreated:at(20) },
+  ];
+  if (unknown) messages.push({ id:'atlas-csi-direct-service', role:ERoles.bot, text:'Конечно. Какой сервис оценим?', timeCreated:at(21) });
+  else messages.push({ id:'atlas-csi-direct-prompt', role:ERoles.bot, text:'Конечно. Один короткий вопрос.', extras:{type:'system', feedbackAddon:'csi-rating'}, timeCreated:at(21) });
+  if (stepId === 'csi-direct.rating' || stepId === 'csi-direct.saved') {
+    messages.push({ id:'atlas-csi-direct-answer', role:ERoles.user, text:'Проверка ВНД', timeCreated:at(22) });
+    draft = setFeedbackService(draft, 'vnd-check', 'Проверка ВНД');
+    messages.push({ id:'atlas-csi-direct-rating', role:ERoles.bot, text:'Спасибо, понял. Тогда один короткий вопрос.', extras:{type:'system', feedbackAddon:'csi-rating'}, timeCreated:at(23) });
+  }
+  if (stepId === 'csi-direct.saved') {
+    draft = selectCsiRating(draft, 4, 'atlas-csi-direct-value', at(24));
+    messages.push({ id:'atlas-csi-direct-value', role:ERoles.user, text:'4 из 5', timeCreated:at(24) });
+    draft = saveFeedbackMock(skipCsiComment(draft));
+    messages.push({ id:'atlas-csi-direct-result', role:ERoles.bot, text:'Спасибо, записал оценку в демо. **Команде она пока не отправлена.**', timeCreated:at(25) });
+  }
+  return finishFeedbackPreview(stepId, unknown ? 'csiDirectUnknown' : 'csiDirect', 'Оценка проверки ВНД', messages, draft, baseThreads, initialMemory);
+}
+
+function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${string}`>, baseThreads: AtlasPreviewThread[], initialMemory: string[]): AtlasPreview {
+  const isIdea = stepId.startsWith('feedback.idea');
+  const isPraise = stepId === 'feedback.praise';
+  const isHelp = stepId === 'feedback.help';
+  const source = isIdea ? 'Добавьте быстрый фильтр по статусу.' : isPraise ? 'Проверка стала очень удобной.' : isHelp ? 'Помогите найти результат проверки.' : stepId === 'feedback.clarify' || stepId === 'feedback.clarified' ? 'После возврата всё сбросилось.' : 'Невозможно найти результат после проверки.';
+  const messages: IMessage[] = [{ id:'atlas-feedback-source', role:ERoles.user, text:source, timeCreated:at(20) }];
+  if (isHelp) {
+    messages.push({ id:'atlas-feedback-help', role:ERoles.bot, text:'Результат проверки можно открыть в истории чатов. **Я не записывал это как жалобу.**', timeCreated:at(21) });
+    return finishFeedbackPreview(stepId, 'feedbackHelp', 'Помощь с результатом', messages, undefined, baseThreads, initialMemory);
+  }
+  const needsClarification = stepId === 'feedback.clarify' || stepId === 'feedback.clarified' || stepId === 'feedback.idea-clarify' || stepId === 'feedback.idea-clarified';
+  const kind = isIdea ? 'idea' : isPraise ? 'praise' : 'complaint';
+  let draft = createQualitativeFeedback(kind, source, 'atlas-feedback-source', at(20), { serviceKnown:!needsClarification, mockOutcome:stepId === 'feedback.error' ? 'error' : 'success' });
+  if (needsClarification) {
+    messages.push({ id:'atlas-feedback-clarify', role:ERoles.bot, text:isIdea ? 'Хорошая мысль. Подскажете, для какого сервиса нужен фильтр?' : 'Понял, что было неудобно. Подскажете, в каком сервисе?', timeCreated:at(21) });
+  }
+  if (stepId === 'feedback.clarified' || stepId === 'feedback.idea-clarified') {
+    const clarification = 'В сервисе проверки ВНД.';
+    messages.push({ id:'atlas-feedback-clarification', role:ERoles.user, text:clarification, timeCreated:at(22) });
+    draft = addFeedbackClarification(draft, clarification, 'atlas-feedback-clarification', at(22), 'vnd-check', 'Проверка ВНД');
+  }
+  if (!needsClarification || stepId === 'feedback.clarified' || stepId === 'feedback.idea-clarified') {
+    draft = saveFeedbackMock(draft);
+    const success = draft.status === 'submitted';
+    const text = !success ? 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.'
+      : kind === 'idea' ? 'Хорошая мысль. Записал предложение в демо. **Команде пока не отправлено.**'
+        : kind === 'praise' ? 'Рад, что проверка пригодилась. Отзыв записан в демо, но **команде пока не отправлен.**'
+          : 'Понял: результат проверки было непросто найти. Отзыв записан в демо, но **команде пока не отправлен.**';
+    messages.push({ id:'atlas-feedback-result', role:ERoles.bot, text, timeCreated:at(23) });
+  }
+  const scenario: ScenarioId = isIdea || isPraise ? (isPraise ? 'feedbackPraise' : needsClarification ? 'feedbackIdeaClarify' : 'feedbackIdea') : stepId === 'feedback.error' ? 'feedbackError' : needsClarification ? 'feedbackComplaintClarify' : 'feedbackComplaint';
+  return finishFeedbackPreview(stepId, scenario, 'Обратная связь о проверке', messages, draft, baseThreads, initialMemory);
 }
 
 const knownSteps = new Set<AtlasStepId>([
   'vnd.start', 'vnd.running', 'vnd.history-running', 'vnd.unread', 'vnd.result', 'vnd.saved',
   'settings.history', 'settings.overview', 'settings.confirm', 'settings.updated',
-  'csi.prompt', 'csi.rating', 'csi.review', 'csi.edited', 'csi.submitted',
+  'csi.prompt', 'csi.low', 'csi.neutral', 'csi.high', 'csi.skipped', 'csi.saved', 'csi.error', 'csi.declined',
+  'csi-direct.known', 'csi-direct.service', 'csi-direct.rating', 'csi-direct.saved',
+  'feedback.complaint', 'feedback.help', 'feedback.clarify', 'feedback.clarified', 'feedback.error',
+  'feedback.idea', 'feedback.idea-clarify', 'feedback.idea-clarified', 'feedback.praise',
 ]);
+
+const legacySteps: Record<string, AtlasStepId> = {
+  'csi.rating': 'csi.high',
+  'csi.review': 'csi.saved',
+  'csi.edited': 'csi.saved',
+  'csi.submitted': 'csi.saved',
+};
 
 export function createAtlasPreview(
   requestedStep: string | null,
   baseThreads: AtlasPreviewThread[],
   initialMemory: string[],
 ): AtlasPreview | undefined {
-  if (!requestedStep || !knownSteps.has(requestedStep as AtlasStepId)) return undefined;
-  const stepId = requestedStep as AtlasStepId;
+  if (!requestedStep) return undefined;
+  const resolvedStep = legacySteps[requestedStep] ?? requestedStep;
+  if (!knownSteps.has(resolvedStep as AtlasStepId)) return undefined;
+  const stepId = resolvedStep as AtlasStepId;
   if (stepId.startsWith('csi.')) {
     return createCsiPreview(stepId as Extract<AtlasStepId, `csi.${string}`>, baseThreads, initialMemory);
+  }
+  if (stepId.startsWith('csi-direct.')) {
+    return createDirectCsiPreview(stepId as Extract<AtlasStepId, `csi-direct.${string}`>, baseThreads, initialMemory);
+  }
+  if (stepId.startsWith('feedback.')) {
+    return createQualitativePreview(stepId as Extract<AtlasStepId, `feedback.${string}`>, baseThreads, initialMemory);
   }
   const settingsStep = stepId.startsWith('settings.');
   const running = stepId === 'vnd.running' || stepId === 'vnd.history-running';

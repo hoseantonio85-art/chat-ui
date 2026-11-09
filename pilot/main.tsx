@@ -28,13 +28,23 @@ import { MessageAddonContext } from '../src/components/Chat/MessageAddonContext'
 import { FeedbackCard, type FeedbackAddon } from './FeedbackCard';
 import {
   addCsiComment,
+  addFeedbackClarification,
+  addUnresolvedFeedbackClarification,
   cancelCsi,
+  classifyFeedbackExample,
   createCsiDraft,
+  createQualitativeFeedback,
+  getCsiCommentPrompt,
+  isVndServiceMention as isVndServiceReply,
+  parseCsiRatingInput,
+  resolveFeedbackExampleScenario,
+  saveFeedbackMock,
   selectCsiRating,
+  setFeedbackService,
   skipCsiComment,
-  submitCsi,
-  updateCsiInterpretation,
   type CsiDraft,
+  type FeedbackDraft,
+  type QualitativeFeedbackDraft,
 } from './Feedback.model';
 
 type VndStage = 'start' | 'chooseStandard' | 'reviewed' | 'complete';
@@ -185,19 +195,34 @@ function App() {
     publishRun,
   });
 
-  const getActiveCsi = () => threadsRef.current.find(thread => thread.id === activeIdRef.current)?.csiDraft;
-  const updateCsiDraft = (draft: CsiDraft) => updateThreads(items => items.map(thread =>
-    thread.id === activeIdRef.current ? {...thread, csiDraft:draft, updatedAt:Date.now()} : thread,
+  const getActiveFeedback = () => threadsRef.current.find(thread => thread.id === activeIdRef.current)?.feedbackDraft;
+  const getActiveCsi = (): CsiDraft | undefined => {
+    const draft = getActiveFeedback();
+    return draft?.kind === 'csi' ? draft : undefined;
+  };
+  const updateFeedbackDraft = (draft: FeedbackDraft) => updateThreads(items => items.map(thread =>
+    thread.id === activeIdRef.current ? {...thread, feedbackDraft:draft, updatedAt:Date.now()} : thread,
   ));
-  const appendCsiReview = (draft: CsiDraft) => {
-    updateCsiDraft(draft);
+  const appendMockResult = (draft: FeedbackDraft) => {
+    const success = draft.status === 'submitted';
+    const text = success
+      ? draft.kind === 'csi'
+        ? 'Спасибо, записал оценку в демо. **Команде она пока не отправлена.**'
+        : 'Спасибо, записал отзыв в демо. **Команде он пока не отправлен.**'
+      : draft.kind === 'csi'
+        ? 'Не удалось сохранить оценку даже в демо. Не буду говорить, что она передана.'
+        : 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.';
     appendToThread(activeIdRef.current, {
-      id:`csi-review-${crypto.randomUUID()}`,
+      id:`feedback-result-${crypto.randomUUID()}`,
       role:ERoles.bot,
-      text:'Я отделил ваши исходные ответы от интерпретации AI. Проверьте формулировку и состав данных перед демонстрационной отправкой.',
-      extras:feedbackExtras('csi-review'),
+      text,
       timeCreated:new Date().toISOString(),
     });
+  };
+  const completeCsi = (ready: CsiDraft) => {
+    const saved = saveFeedbackMock(ready);
+    updateFeedbackDraft(saved);
+    appendMockResult(saved);
   };
   const selectCsiValue = (value: number) => {
     const current = getActiveCsi();
@@ -205,12 +230,12 @@ function App() {
     const messageId = `csi-rating-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const next = selectCsiRating(current, value, messageId, now);
-    updateCsiDraft(next);
+    updateFeedbackDraft(next);
     appendToThread(activeIdRef.current, {id:messageId, role:ERoles.user, text:`${value} из 5`, timeCreated:now});
     appendToThread(activeIdRef.current, {
       id:`csi-comment-prompt-${crypto.randomUUID()}`,
       role:ERoles.bot,
-      text:'Спасибо. Если хотите, коротко напишите, что повлияло на оценку. Комментарий необязателен.',
+      text:getCsiCommentPrompt(value),
       extras:feedbackExtras('csi-comment-actions'),
       timeCreated:new Date().toISOString(),
     });
@@ -218,76 +243,73 @@ function App() {
   const skipCsiText = () => {
     const current = getActiveCsi();
     if (!current || current.stage !== 'comment') return;
-    appendCsiReview(skipCsiComment(current));
-  };
-  const changeCsiSummary = (summary: string) => {
-    const current = getActiveCsi();
-    if (current?.stage === 'confirm') updateCsiDraft(updateCsiInterpretation(current, summary));
-  };
-  const changeCsiConsent = (consentToSend: boolean) => {
-    const current = getActiveCsi();
-    if (current?.stage === 'confirm') updateCsiDraft({...current, consentToSend});
-  };
-  const confirmCsi = () => {
-    const current = getActiveCsi();
-    if (!current || current.stage !== 'confirm' || !current.consentToSend) return;
-    const submitted = submitCsi(current);
-    updateCsiDraft(submitted);
-    appendToThread(activeIdRef.current, {
-      id:`csi-submitted-${crypto.randomUUID()}`,
-      role:ERoles.bot,
-      text:'Готово. **Демонстрационная запись сохранена только в прототипе.** Реальной передачи команде и обещания обработки нет.',
-      extras:feedbackExtras('csi-list'),
-      timeCreated:new Date().toISOString(),
-    });
+    completeCsi(skipCsiComment(current));
   };
   const declineCsi = () => {
     const current = getActiveCsi();
-    if (!current || current.stage === 'submitted' || current.stage === 'cancelled') return;
-    updateCsiDraft(cancelCsi(current));
+    if (!current || current.status !== 'draft') return;
+    updateFeedbackDraft(cancelCsi(current));
     appendToThread(activeIdRef.current, {
       id:`csi-cancelled-${crypto.randomUUID()}`,
       role:ERoles.bot,
-      text:'Хорошо, оценка отменена. Ничего не отправлено и не сохранено.',
+      text:'Хорошо, вернёмся к работе.',
       timeCreated:new Date().toISOString(),
     });
   };
 
-  function playCsiFlow(entry: Extract<ScenarioId, 'csiProactive' | 'csiDirect'>, instant = false) {
+  function playCsiFlow(entry: Extract<ScenarioId, 'csiProactive' | 'csiDirect' | 'csiDirectUnknown' | 'csiError'>, instant = false, directRequest?: string, preserveCurrent = false) {
     const threadId = activeIdRef.current;
-    clearThreadTimers(threadId); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false);
+    clearThreadTimers(threadId); resetPending();
+    if (!preserveCurrent) { resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false); }
     const startedAt = new Date().toISOString();
-    let draft = createCsiDraft(entry === 'csiProactive' ? 'proactive' : 'user_initiated', startedAt);
-    const messages: IMessage[] = entry === 'csiProactive'
+    const direct = entry === 'csiDirect' || entry === 'csiDirectUnknown';
+    let draft = createCsiDraft(direct ? 'user_initiated' : 'proactive', startedAt, {
+      serviceKnown: entry !== 'csiDirectUnknown',
+      mockOutcome: entry === 'csiError' ? 'error' : 'success',
+    });
+    const messages: IMessage[] = !direct
       ? [
           {id:'csi-context-save', role:ERoles.bot, text:'Сохранил «Регламент управления операционными рисками.docx» в базу знаний, в папку «Операционные риски».', timeCreated:startedAt},
-          {id:'csi-prompt', role:ERoles.bot, text:'Проверка завершена. Можно один короткий вопрос об этом сценарии?', extras:feedbackExtras('csi-rating'), timeCreated:startedAt},
+          {id:'csi-prompt', role:ERoles.bot, text:'Готово, документ сохранён. Можно ещё один короткий вопрос?', extras:feedbackExtras('csi-rating'), timeCreated:startedAt},
         ]
-      : [
-          {id:'csi-direct-request', role:ERoles.user, text:'Хочу оценить сервис проверки ВНД.', timeCreated:startedAt},
-          {id:'csi-prompt', role:ERoles.bot, text:'Конечно. Для сравнимой оценки задам один фиксированный вопрос.', extras:feedbackExtras('csi-rating'), timeCreated:startedAt},
+      : entry === 'csiDirectUnknown' ? [
+          {id:'csi-direct-request', role:ERoles.user, text:directRequest ?? 'Хочу оценить сервис.', timeCreated:startedAt},
+          {id:'csi-service-prompt', role:ERoles.bot, text:'Конечно. Какой сервис оценим?', timeCreated:startedAt},
+        ] : [
+          {id:'csi-direct-request', role:ERoles.user, text:directRequest ?? 'Хочу оценить сервис проверки ВНД.', timeCreated:startedAt},
+          {id:'csi-prompt', role:ERoles.bot, text:'Конечно. Один короткий вопрос.', extras:feedbackExtras('csi-rating'), timeCreated:startedAt},
         ];
     if (instant) {
+      if (draft.stage === 'service') {
+        messages.push(
+          {id:'csi-service-demo', role:ERoles.user, text:'Проверка ВНД', timeCreated:startedAt},
+          {id:'csi-prompt-demo', role:ERoles.bot, text:'Спасибо, понял. Тогда один короткий вопрос.', extras:feedbackExtras('csi-rating'), timeCreated:startedAt},
+        );
+        draft = setFeedbackService(draft, 'vnd-check', 'Проверка ВНД');
+      }
       draft = selectCsiRating(draft, 4, 'csi-rating-demo', startedAt);
       messages.push(
         {id:'csi-rating-demo', role:ERoles.user, text:'4 из 5', timeCreated:startedAt},
-        {id:'csi-comment-prompt-demo', role:ERoles.bot, text:'Спасибо. Если хотите, коротко напишите, что повлияло на оценку. Комментарий необязателен.', extras:feedbackExtras('csi-comment-actions'), timeCreated:startedAt},
+        {id:'csi-comment-prompt-demo', role:ERoles.bot, text:getCsiCommentPrompt(4), extras:feedbackExtras('csi-comment-actions'), timeCreated:startedAt},
         {id:'csi-comment-demo', role:ERoles.user, text:'Не сразу понял, где смотреть результат проверки.', timeCreated:startedAt},
       );
       draft = addCsiComment(draft, 'Не сразу понял, где смотреть результат проверки.', 'csi-comment-demo', startedAt);
-      draft = submitCsi({...draft, consentToSend:true});
-      messages.push(
-        {id:'csi-review-demo', role:ERoles.bot, text:'Я отделил ваши исходные ответы от интерпретации AI. Перед отправкой состав данных был подтверждён.', extras:feedbackExtras('csi-review'), timeCreated:startedAt},
-        {id:'csi-submitted-demo', role:ERoles.bot, text:'Готово. **Демонстрационная запись сохранена только в прототипе.** Реальной передачи команде и обещания обработки нет.', extras:feedbackExtras('csi-list'), timeCreated:startedAt},
-      );
+      draft = saveFeedbackMock(draft);
+      messages.push({
+        id:'csi-submitted-demo', role:ERoles.bot,
+        text:draft.status === 'submitted'
+          ? 'Спасибо, записал оценку в демо. **Команде она пока не отправлена.**'
+          : 'Не удалось сохранить оценку даже в демо. Не буду говорить, что она передана.',
+        timeCreated:startedAt,
+      });
     }
-    messages.forEach(message => addMessageAction(ctx, message));
+    messages.forEach(message => preserveCurrent ? appendToThread(threadId, message) : addMessageAction(ctx, message));
     updateThreads(items => items.map(thread => thread.id === threadId ? {
       ...thread,
       title:'Оценка проверки ВНД',
       scenario:entry,
-      csiDraft:draft,
-      messages:messages.map(message => ({...message})),
+      feedbackDraft:draft,
+      ...(preserveCurrent ? {} : {messages:messages.map(message => ({...message}))}),
       runs:{},
       updatedAt:Date.now(),
       pinned:false,
@@ -299,9 +321,35 @@ function App() {
     const current = getActiveCsi();
     if (!current) return;
     const body = request.body.trim();
+    if (current.stage === 'service') {
+      const messageId = `csi-service-${crypto.randomUUID()}`;
+      const now = new Date().toISOString();
+      appendToThread(activeIdRef.current, {id:messageId, role:ERoles.user, text:body, timeCreated:now});
+      if (/^(не сейчас|отмена|отменить)$/i.test(body)) { declineCsi(); return; }
+      if (!isVndServiceReply(body)) {
+        updateFeedbackDraft(cancelCsi(current));
+        appendToThread(activeIdRef.current, {
+          id:`csi-service-unsupported-${crypto.randomUUID()}`,
+          role:ERoles.bot,
+          text:'Не смог определить сервис. В демо поддержана только «Проверка ВНД», поэтому оценку не записал.',
+          timeCreated:new Date().toISOString(),
+        });
+        return;
+      }
+      const resolved = setFeedbackService(current, 'vnd-check', 'Проверка ВНД');
+      updateFeedbackDraft(resolved);
+      appendToThread(activeIdRef.current, {
+        id:`csi-prompt-${crypto.randomUUID()}`,
+        role:ERoles.bot,
+        text:'Спасибо, понял. В прототипе покажу путь для сервиса «Проверка ВНД».',
+        extras:feedbackExtras('csi-rating'),
+        timeCreated:new Date().toISOString(),
+      });
+      return;
+    }
     if (current.stage === 'rating') {
-      const value = Number(body.match(/^[1-5]/)?.[0]);
-      if (value) selectCsiValue(value);
+      const value = parseCsiRatingInput(body);
+      if (value !== undefined) selectCsiValue(value);
       else appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:'Выберите оценку от 1 до 5 звёзд или отправьте число от 1 до 5.', timeCreated:new Date().toISOString()});
       return;
     }
@@ -310,24 +358,126 @@ function App() {
       const messageId = `csi-comment-${crypto.randomUUID()}`;
       const now = new Date().toISOString();
       appendToThread(activeIdRef.current, {id:messageId, role:ERoles.user, text:body, timeCreated:now});
-      appendCsiReview(addCsiComment(current, body, messageId, now));
+      completeCsi(addCsiComment(current, body, messageId, now));
       return;
     }
-    if (current.stage === 'confirm') {
-      appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.user, text:body, timeCreated:new Date().toISOString()});
-      if (/^(отмена|отменить|не отправлять)$/i.test(body)) { declineCsi(); return; }
-      if (/^(да|подтвердить|отправить)$/i.test(body)) {
-        const withConsent = {...current, consentToSend:true};
-        updateCsiDraft(withConsent);
-        const submitted = submitCsi(withConsent);
-        updateCsiDraft(submitted);
-        appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:'Готово. **Демонстрационная запись сохранена только в прототипе.** Реальной передачи команде и обещания обработки нет.', extras:feedbackExtras('csi-list'), timeCreated:new Date().toISOString()});
-        return;
+    appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:current.stage === 'submitted' ? 'Эта оценка уже записана в демо — второй записи не будет.' : current.stage === 'error' ? 'Сохранение в демо завершилось ошибкой. Успешная запись не создана.' : 'Оценка отменена. Если захотите, начните сценарий заново.', timeCreated:new Date().toISOString()});
+  }
+
+  function playFeedbackFlow(entry: Extract<ScenarioId, 'feedbackComplaint' | 'feedbackComplaintClarify' | 'feedbackHelp' | 'feedbackIdea' | 'feedbackIdeaClarify' | 'feedbackPraise' | 'feedbackError'>, sourceOverride?: string, preserveCurrent = false, instant = false) {
+    const threadId = activeIdRef.current;
+    clearThreadTimers(threadId); resetPending();
+    if (!preserveCurrent) { resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false); }
+    const now = new Date().toISOString();
+    const source = sourceOverride ?? scenarios.find(item => item.id === entry)!.question;
+    const sourceMessage: IMessage = {id:`feedback-source-${entry}`, role:ERoles.user, text:source, timeCreated:now};
+    const messages: IMessage[] = [sourceMessage];
+    let draft: QualitativeFeedbackDraft | undefined;
+    if (entry === 'feedbackHelp') {
+      messages.push({
+        id:'feedback-help-result', role:ERoles.bot,
+        text:'Результат проверки можно открыть через историю чатов: выберите диалог «Проверка ВНД» и откройте последнее сообщение. **Я не записывал это как жалобу.**',
+        timeCreated:now,
+      });
+    } else {
+      const kind: QualitativeFeedbackDraft['kind'] = entry === 'feedbackIdea' || entry === 'feedbackIdeaClarify' ? 'idea' : entry === 'feedbackPraise' ? 'praise' : 'complaint';
+      draft = createQualitativeFeedback(kind, source, sourceMessage.id, now, {
+        serviceKnown: entry !== 'feedbackComplaintClarify' && entry !== 'feedbackIdeaClarify',
+        mockOutcome: entry === 'feedbackError' ? 'error' : 'success',
+      });
+      if (entry === 'feedbackComplaintClarify' || entry === 'feedbackIdeaClarify') {
+        messages.push({
+          id:'feedback-clarify-prompt', role:ERoles.bot,
+          text:entry === 'feedbackIdeaClarify'
+            ? 'Хорошая мысль. Подскажете, для какого сервиса нужен фильтр? Достаточно одного уточнения.'
+            : 'Понял, что было неудобно. Подскажете, в каком сервисе? Достаточно одного уточнения.',
+          timeCreated:now,
+        });
+        if (instant) {
+          const clarification = 'В сервисе проверки ВНД.';
+          messages.push({id:'feedback-clarification-demo', role:ERoles.user, text:clarification, timeCreated:now});
+          draft = saveFeedbackMock(addFeedbackClarification(draft, clarification, 'feedback-clarification-demo', now, 'vnd-check', 'Проверка ВНД'));
+          messages.push({id:'feedback-result-demo', role:ERoles.bot, text:'Спасибо, что уточнили. Отзыв записан в демо, но **команде пока не отправлен.**', timeCreated:now});
+        }
+      } else {
+        draft = saveFeedbackMock(draft);
+        const text = draft.status === 'error'
+          ? 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.'
+          : entry === 'feedbackIdea'
+            ? 'Хорошая мысль. Записал предложение про фильтр в демо. **Команде пока не отправлено.**'
+            : entry === 'feedbackPraise'
+              ? 'Рад, что проверка пригодилась. Спасибо! Отзыв записан в демо, но **команде пока не отправлен.**'
+              : 'Понял: результат проверки было непросто найти. Спасибо, что рассказали. Отзыв записан в демо, но **команде пока не отправлен.**';
+        messages.push({id:'feedback-result', role:ERoles.bot, text, timeCreated:now});
       }
-      appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:'Измените интерпретацию в карточке, подтвердите состав данных или отмените отправку.', timeCreated:new Date().toISOString()});
+    }
+    messages.forEach(message => preserveCurrent ? appendToThread(threadId, message) : addMessageAction(ctx, message));
+    updateThreads(items => items.map(thread => thread.id === threadId ? {
+      ...thread,
+      title: entry === 'feedbackHelp' ? 'Помощь с результатом' : 'Обратная связь о проверке',
+      scenario:entry,
+      feedbackDraft:draft,
+      ...(preserveCurrent ? {} : {messages:messages.map(message => ({...message}))}),
+      runs:{},
+      updatedAt:Date.now(),
+      pinned:false,
+    } : thread));
+    setRuns({}); setPlaying(false); setActionUrl(''); setScenario(entry); chat$.openChat();
+  }
+
+  function sendFeedbackClarification(request: {body: string}) {
+    const current = getActiveFeedback();
+    if (!current || current.kind === 'csi') return;
+    const body = request.body.trim();
+    if (current.stage !== 'clarification') {
+      appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:'Этот отзыв уже обработан в демо — второй записи не будет.', timeCreated:new Date().toISOString()});
       return;
     }
-    appendToThread(activeIdRef.current, {id:crypto.randomUUID(), role:ERoles.bot, text:current.stage === 'submitted' ? 'Эта демонстрационная оценка уже сохранена.' : 'Оценка отменена. Чтобы начать заново, выберите сценарий CSI ещё раз.', timeCreated:new Date().toISOString()});
+    const messageId = `feedback-clarification-${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    appendToThread(activeIdRef.current, {id:messageId, role:ERoles.user, text:body, timeCreated:now});
+    const resolvedService = isVndServiceReply(body);
+    const ready = resolvedService
+      ? addFeedbackClarification(current, body, messageId, now, 'vnd-check', 'Проверка ВНД')
+      : addUnresolvedFeedbackClarification(current, body, messageId, now);
+    const saved = saveFeedbackMock(ready);
+    updateFeedbackDraft(saved);
+    appendToThread(activeIdRef.current, {
+      id:`feedback-clarified-${crypto.randomUUID()}`,
+      role:ERoles.bot,
+      text:saved.status === 'error'
+        ? 'Не удалось сохранить отзыв даже в демо. Не буду говорить, что он передан.'
+        : resolvedService
+          ? 'Понял, речь о проверке ВНД. Спасибо, что уточнили. Отзыв записан в демо, но **команде пока не отправлен.**'
+          : 'Не смог определить сервис. Сохранил исходное сообщение в общей демо-очереди, но **команде ничего не отправлено.**',
+      timeCreated:new Date().toISOString(),
+    });
+  }
+
+  function sendGeneral(request: {body: string; extras?: Record<string, string>}) {
+    const intent = classifyFeedbackExample(request.body);
+    const existing = getActiveFeedback();
+    if (existing && (existing.status === 'submitted' || existing.status === 'error') && intent !== 'unknown' && intent !== 'help_request') {
+      appendToThread(activeIdRef.current, {
+        id:`feedback-duplicate-${crypto.randomUUID()}`,
+        role:ERoles.bot,
+        text:existing.status === 'submitted'
+          ? 'Этот отзыв уже записан в демо — второй записи не будет.'
+          : 'Предыдущая попытка завершилась ошибкой. Успешная запись не создана.',
+        timeCreated:new Date().toISOString(),
+      });
+      return;
+    }
+    if (intent === 'csi_request') {
+      playCsiFlow(isVndServiceReply(request.body) ? 'csiDirect' : 'csiDirectUnknown', false, request.body, true);
+      return;
+    }
+    const feedbackScenario = resolveFeedbackExampleScenario(intent, request.body);
+    if (feedbackScenario) {
+      playFeedbackFlow(feedbackScenario, request.body, true);
+      return;
+    }
+    play(selectedSkillId === 'methodologist' ? 'subagent' : scenario, false, request.body, request.extras);
   }
 
   function runVndReview(corrected: boolean, instant = false) {
@@ -480,7 +630,8 @@ function App() {
 
   const runScenario = (id: ScenarioId, instant = false) => {
     attachmentLookups.current.delete(activeIdRef.current);
-    if (id === 'csiProactive' || id === 'csiDirect') return playCsiFlow(id, instant);
+    if (id === 'csiProactive' || id === 'csiDirect' || id === 'csiDirectUnknown' || id === 'csiError') return playCsiFlow(id, instant);
+    if (id.startsWith('feedback')) return playFeedbackFlow(id as Extract<ScenarioId, 'feedbackComplaint' | 'feedbackComplaintClarify' | 'feedbackHelp' | 'feedbackIdea' | 'feedbackIdeaClarify' | 'feedbackPraise' | 'feedbackError'>, undefined, false, instant);
     return id.startsWith('vnd') ? playVndFlow(instant, id) : play(id, instant);
   };
 
@@ -489,7 +640,7 @@ function App() {
     clearThreadTimers(threadId); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false);
     const registration = id === 'registration' || selectedSkillId === 'createIncident';
     contextChatAtom(ctx, registration ? {intent:'createIncident', company_id:'demo-company'} : {company_id:'demo-company'});
-    updateThreads(items => items.map(thread => thread.id === threadId ? {...thread, scenario:id, csiDraft:undefined, initialSkill: registration ? 'createIncident' : undefined, updatedAt:Date.now()} : thread));
+    updateThreads(items => items.map(thread => thread.id === threadId ? {...thread, scenario:id, feedbackDraft:undefined, initialSkill: registration ? 'createIncident' : undefined, updatedAt:Date.now()} : thread));
     startActivity(threadId);
     setActionUrl(''); setScenario(id); setPlaying(!instant);
     const startedAt = Date.now(); const requestId = `question-${crypto.randomUUID()}`; const responseId = `answer-${requestId}`; const {events, backendSteps, answer} = fixture(id, responseId, startedAt);
@@ -548,12 +699,12 @@ function App() {
       }
       focusTarget?.focus();
       const previewTargetId = initialState.previewStepId === 'csi.prompt' ? 'atlas-csi-prompt'
-        : initialState.previewStepId === 'csi.rating' ? 'atlas-csi-comment-prompt'
-          : initialState.previewStepId === 'csi.review' ? 'atlas-csi-review'
-            : initialState.previewStepId === 'csi.edited' ? 'csi-actions'
-              : initialState.previewStepId === 'csi.submitted' ? 'atlas-csi-submitted'
+        : initialState.previewStepId?.startsWith('csi.') ? (initialState.previewStepId === 'csi.saved' || initialState.previewStepId === 'csi.skipped' || initialState.previewStepId === 'csi.error' ? 'atlas-csi-result' : 'atlas-csi-comment-prompt')
+          : initialState.previewStepId === 'csi-direct.service' ? 'atlas-csi-direct-service'
+            : initialState.previewStepId?.startsWith('csi-direct.') ? (initialState.previewStepId === 'csi-direct.saved' ? 'atlas-csi-direct-result' : 'atlas-csi-direct-rating')
+              : initialState.previewStepId?.startsWith('feedback.') ? (initialState.previewStepId.includes('clarif') ? 'atlas-feedback-clarify' : initialState.previewStepId === 'feedback.help' ? 'atlas-feedback-help' : 'atlas-feedback-result')
                 : undefined;
-      if (previewTargetId) document.getElementById(previewTargetId)?.scrollIntoView({ block: initialState.previewStepId === 'csi.edited' ? 'end' : 'start' });
+      if (previewTargetId) document.getElementById(previewTargetId)?.scrollIntoView({ block:'start' });
       if (window.parent !== window) window.parent.postMessage({ type: 'atlas:live-preview-ready' }, window.location.origin);
     };
     readyTimer = window.setTimeout(announceReady, 150);
@@ -562,9 +713,11 @@ function App() {
   useEffect(() => {
     setDemoSender(request => scenario.startsWith('vnd')
       ? sendVnd(request)
-      : scenario === 'csiProactive' || scenario === 'csiDirect'
+      : scenario.startsWith('csi')
         ? sendCsi(request)
-        : play(selectedSkillId === 'methodologist' ? 'subagent' : scenario, false, request.body, request.extras));
+        : scenario === 'feedbackComplaintClarify' || scenario === 'feedbackIdeaClarify'
+          ? sendFeedbackClarification(request)
+        : sendGeneral(request));
   }, [scenario, selectedSkillId]);
   const threadUi = {
     enabled:true,
@@ -585,22 +738,19 @@ function App() {
   const selectedSkill = demoFlags.assistantSkills ? assistantSkills.find(item => item.id === selectedSkillId) : undefined;
   const renderMessageAddon = (message: IMessage) => {
     const addon = message.extras?.feedbackAddon as FeedbackAddon | undefined;
-    const draft = threads.find(thread => thread.id === activeThreadId)?.csiDraft;
-    if (!addon || !draft) return null;
+    const draft = threads.find(thread => thread.id === activeThreadId)?.feedbackDraft;
+    if (!addon || draft?.kind !== 'csi') return null;
     return <FeedbackCard
       addon={addon}
       draft={draft}
       onRate={selectCsiValue}
       onSkipComment={skipCsiText}
-      onSummaryChange={changeCsiSummary}
-      onConsentChange={changeCsiConsent}
-      onConfirm={confirmCsi}
       onCancel={declineCsi}
     />;
   };
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><AgentRunsContext.Provider value={runs}>
     <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
-    {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario.startsWith('csi') ? 'CSI · демонстрационный сбор оценки' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Демонстрационные данные'}</span></div><label className="scenario-picker"><span className="sr-only">Сценарий</span><select aria-label="Сценарий" value={scenario} onChange={event => runScenario(event.target.value as ScenarioId)}>{scenarios.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') || scenario.startsWith('csi') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{scenario === 'vndBackground' ? 'Демо проверки' : scenario.startsWith('csi') ? 'Показать результат' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
+    {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario.startsWith('csi') ? 'CSI · разговорный демо-сценарий' : scenario.startsWith('feedback') ? 'Обратная связь · разговорный демо-сценарий' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Демонстрационные данные'}</span></div><label className="scenario-picker"><span className="sr-only">Сценарий</span><select aria-label="Сценарий" value={scenario} onChange={event => runScenario(event.target.value as ScenarioId)}>{scenarios.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') || scenario.startsWith('csi') || scenario.startsWith('feedback') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{scenario === 'vndBackground' ? 'Демо проверки' : scenario.startsWith('csi') ? 'Показать результат' : scenario.startsWith('feedback') ? 'Показать ветку' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
     {!initialState.embedded && <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div><div><small>Источники</small><strong>4</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main>}<ModalContainer/>{background.ui}
     {actionUrl && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Переход в НОРМ"><h2>Переход в форму НОРМ</h2><p>Продуктовый чат передал команду открытия формы. В демо она перехвачена локально.</p><code>{actionUrl}</code><Button onClick={() => {setActionUrl('');chat$.openChat();}}>Вернуться в чат</Button></div>}
   </AgentRunsContext.Provider></MessageAddonContext.Provider></AssistantSkillsContext.Provider></ThreadUiContext.Provider></reatomContext.Provider>;

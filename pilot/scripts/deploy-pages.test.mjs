@@ -26,7 +26,7 @@ test('requires both the chat and scenario map artifacts', () => {
     mkdirSync(join(root, 'scenario-map', 'screens'), { recursive: true });
     writeFileSync(join(root, 'scenario-map', 'index.html'), '<!doctype html>');
     writeFileSync(join(root, 'scenario-map', 'screens', 'screen.png'), 'image');
-    assert.throws(() => assertPagesBuild(root), /15 scenario map screenshots/);
+    assert.throws(() => assertPagesBuild(root), /31 scenario map screenshots/);
 
     for (const screen of PAGES_SCREEN_ASSETS) {
       writeFileSync(join(root, 'scenario-map', 'screens', screen), 'image');
