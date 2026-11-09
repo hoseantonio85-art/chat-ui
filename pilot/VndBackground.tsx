@@ -79,13 +79,13 @@ export function useVndBackground<T extends BackgroundThread>(options: {
       runId: pendingId,
       at: startedAt,
       kind: 'plan',
+      label: 'Проверяю ВНД по групповому стандарту',
       tool: 'write_todos',
       todos: [
         { content: 'Изучить документ', status: 'in_progress' },
         { content: 'Сверить с групповым стандартом', status: 'pending' },
       ],
     });
-    run = { ...run, currentActivity: 'Проверяю ВНД по групповому стандарту…' };
 
     const isActive = latest.current.activeId.current === id;
     if (isActive) {

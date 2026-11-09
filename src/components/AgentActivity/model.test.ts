@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { appendEvent, createRun, runSummary, sourcesForRun, type AgentEvent } from './model';
+import { activityLabel, appendEvent, callDuration, createRun, hasTrace, openCalls, runSummary, sourcesForRun, traceSteps, type AgentEvent } from './model';
 const event = (id: string, kind: AgentEvent['kind'], extra: Partial<AgentEvent> = {}): AgentEvent => ({ id, kind, runId: 'run', at: 1000, ...extra });
 describe('UI run protocol', () => {
   it('isolates runs and deduplicates reconnect replay', () => {
@@ -35,13 +35,57 @@ describe('UI run protocol', () => {
     expect(run.status).toBe('failed');
     expect(runSummary(run)).toContain('Прогон прерван');
   });
-  it('switches to answer formation when every plan item is completed', () => {
+  it('uses the thinking status between calls, including when the plan completes', () => {
     let run = createRun('run', 'request', 0);
     run = appendEvent(run, event('done', 'plan', {todos: [
       {content: 'Проверить источник', status: 'completed'},
       {content: 'Подготовить ответ', status: 'completed'},
     ]}));
-    expect(run.currentActivity).toBe('Формирую ответ…');
+    expect(activityLabel(run)).toBe('Думаю');
+    const storedRun = {...run, currentActivity: 'Старая подпись из истории'};
+    expect(activityLabel(storedRun)).toBe('Думаю');
+  });
+  it('keeps each parallel call active until its outcome and freezes its own timer', () => {
+    const first = event('first', 'toolCall', {callId: 'profile'});
+    const second = event('second', 'toolCall', {callId: 'risks', at: 1600});
+    const expert = event('expert', 'delegation', {callId: 'expert', at: 1800});
+    let run = [first, second, expert].reduce(appendEvent, createRun('run', 'request', 0));
+    expect(activityLabel(run)).toBe('Делегирую');
+    expect(openCalls(run)).toEqual([first, second, expert]);
+    expect(callDuration(run, second, 3700)).toBe('2 с');
+
+    run = appendEvent(run, event('profile-error', 'error', {callId: 'profile', at: 3900}));
+    expect(openCalls(run)).toEqual([second, expert]);
+    expect(callDuration(run, first, 9000)).toBe('2 с');
+    run = appendEvent(run, event('expert-result', 'handback', {callId: 'expert', parentCallId: 'expert', at: 4700}));
+    expect(activityLabel(run)).toBe('Собираю источники');
+    expect(callDuration(run, expert, 9000)).toBe('2 с');
+    run = appendEvent(run, event('finished', 'finish', {at: 5000}));
+    expect(openCalls(run)).toEqual([]);
+    expect(callDuration(run, second, 9000)).toBe('3 с');
+  });
+  it('keeps a public detail attached to its own step through interleaved events', () => {
+    const raw = event('raw', 'thinking', {text: 'private reasoning'});
+    let run = appendEvent(createRun('run', 'request', 0), raw);
+    expect(hasTrace(run)).toBe(false);
+    expect(traceSteps(run)).toEqual([]);
+
+    const delta = event('part-one', 'thinking', {progressDelta: {stepId: 'target', text: 'Проверяю профиль.'}});
+    run = appendEvent(run, delta);
+    expect(traceSteps(run)[0].event).toBe(delta);
+    const unrelated = event('other', 'toolCall', {callId: 'other'});
+    const target = event('target', 'toolCall', {callId: 'profile'});
+    run = [
+      unrelated,
+      event('part-two', 'thinking', {progressDelta: {stepId: 'target', text: ' Сверяю данные.'}}),
+      target,
+      event('expert-detail', 'thinking', {parentCallId: 'expert', progressDelta: {text: 'Работа эксперта.'}}),
+      event('final-detail', 'thinking', {progressDelta: {text: 'Готовлю выводы.'}}),
+      event('finish', 'finish'),
+    ].reduce(appendEvent, run);
+    expect(traceSteps(run).map(step => step.event.id)).toEqual(['other', 'target', 'final-detail']);
+    expect(traceSteps(run)[1].detail).toMatchObject({event: delta, text: 'Проверяю профиль. Сверяю данные.'});
+    expect(traceSteps(run, 'expert')[0].detail?.text).toBe('Работа эксперта.');
   });
   it('summarizes backend text steps without inventing source-call counts', () => {
     let run = createRun('run', 'request', 0);

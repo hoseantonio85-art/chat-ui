@@ -66,7 +66,7 @@ function historicalThread(id: string, title: string, scenario: ScenarioId, minut
   const {events, answer} = fixture(scenario, responseId, startedAt);
   let run = createRun(responseId, requestId, startedAt);
   events.forEach(event => { run = appendEvent(run, event); });
-  if (events.length) run = appendEvent(run, {id: `${responseId}-finish`, runId: responseId, at: startedAt + 10_000, kind: 'finish'});
+  if (events.length) run = appendEvent(run, {id: `${responseId}-finish`, runId: responseId, at: events.at(-1)!.at, kind: 'finish'});
   return {id, title, scenario, pinned, initialSkill, updatedAt: startedAt, runs: events.length ? {[responseId]: run} : {}, messages: [
     {id: requestId, role: ERoles.user, text: scenarios.find(item => item.id === scenario)!.question, timeCreated: new Date(startedAt).toISOString()},
     {id: responseId, requestId, role: ERoles.bot, text: answer, timeCreated: new Date(startedAt + 1).toISOString(), extras: scenario === 'rich' ? {fileIds:'["demo-report"]', chart} as IMessage['extras'] : undefined},
@@ -504,18 +504,23 @@ function App() {
       if (activeIdRef.current === threadId) setPlaying(false);
       completeActivity(threadId);
     };
+    const compareStep = `${responseId}-compare`;
+    const accept = () => {
+      run = appendEvent(run, {id:`${responseId}-accepted`, runId:responseId, at:Date.now(), kind:'message', label:'Документ принят в работу'});
+      run = appendEvent(run, {id:`${responseId}-compare-note`, runId:responseId, at:Date.now(), kind:'thinking',
+        progressDelta:{stepId:compareStep, text:corrected ? 'Проверяю пункты, отмеченные в предыдущем отчёте.' : 'Проверяю, какие требования выбранного стандарта применимы к документу.'}});
+      updateRun();
+    };
+    const compare = () => {
+      run = appendEvent(run, {id:compareStep, runId:responseId, at:Date.now(), kind:'message', label:corrected ? 'Проверяю внесённые изменения' : 'Сверяю документ с требованиями'});
+      updateRun();
+    };
     updateRun();
-    if (instant) { finish(); return; }
+    if (instant) { accept(); compare(); finish(); return; }
     if (activeIdRef.current === threadId) setPlaying(true);
     appendToThread(threadId, {...base, text:'', extras:{agentPending:'true'}});
-    later(threadId, () => {
-      run = appendEvent(run, {id:`${responseId}-accepted`, runId:responseId, at:Date.now(), kind:'message', label:'Документ принят в работу'});
-      updateRun();
-    }, 650);
-    later(threadId, () => {
-      run = appendEvent(run, {id:`${responseId}-compare`, runId:responseId, at:Date.now(), kind:'message', label:corrected ? 'Проверяю внесённые изменения' : 'Сверяю документ с требованиями'});
-      updateRun();
-    }, 1_350);
+    later(threadId, accept, 650);
+    later(threadId, compare, 1_350);
     later(threadId, finish, 2_400);
   }
 
@@ -650,7 +655,7 @@ function App() {
     const base: IMessage = {id:responseId, requestId, role:ERoles.bot, timeCreated:new Date(startedAt + 1).toISOString()}; const resultExtras = id === 'rich' ? {fileIds:'["demo-report"]', chart} : undefined;
     if (!instant) appendToThread(threadId, {...base, text:'', extras:{agentPending:'true'}});
     const finish = () => {
-      const completedAt = Date.now();
+      const completedAt = Math.max(Date.now(), run.events.at(-1)?.at ?? startedAt);
       // The current backend sends service texts only after /ainvoke completes.
       // Put those exact texts into the activity trace in one update, not chat bubbles.
       backendSteps.forEach((serviceText, index) => {
@@ -670,7 +675,22 @@ function App() {
     };
     if (instant) { events.forEach(event => { run = appendEvent(run,event); }); finish(); }
     else if (!events.length) { later(threadId, finish, 2200); }
-    else { events.forEach((event,index) => later(threadId, () => {run = appendEvent(run, {...event, at:Date.now()}); updateRun();}, (index + 1) * 700)); const chunks = answer.match(/.{1,36}(?:\s|$)|.{1,36}/gs) || [answer]; let text = ''; chunks.forEach((chunk,index) => later(threadId, () => {text += chunk; appendToThread(threadId, {...base,text,extras:{agentPending:'true'}});}, events.length * 700 + (index + 1) * 65)); later(threadId, finish, events.length * 700 + (chunks.length + 1) * 65); }
+    else {
+      for (const event of events) {
+        later(threadId, () => {
+          run = appendEvent(run, {...event, at:Date.now()});
+          updateRun();
+        }, event.at - startedAt);
+      }
+      const answerDelay = events.at(-1)!.at - startedAt;
+      const chunks = answer.match(/.{1,36}(?:\s|$)|.{1,36}/gs) || [answer];
+      let text = '';
+      chunks.forEach((chunk, index) => later(threadId, () => {
+        text += chunk;
+        appendToThread(threadId, {...base,text,extras:{agentPending:'true'}});
+      }, answerDelay + (index + 1) * 65));
+      later(threadId, finish, answerDelay + (chunks.length + 1) * 65);
+    }
     chat$.openChat();
   }
   useEffect(() => { const listener = (event: Event) => setActionUrl((event as CustomEvent<string>).detail); window.addEventListener('pilot:navigate',listener); const bootstrap = setTimeout(() => {const thread=threadsRef.current.find(item=>item.id===initialState.activeThreadId) || threadsRef.current[0]; loadThread(thread); if (initialState.embedded || window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen); chat$.openChat();}, 50); return () => {clearTimeout(bootstrap); clearAllTimers(); window.removeEventListener('pilot:navigate',listener);}; }, []);

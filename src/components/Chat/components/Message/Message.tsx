@@ -1,5 +1,6 @@
 import { AgentActivity } from '@/components/AgentActivity';
 import { useAgentRun } from '@/components/AgentActivity/context';
+import { hasTrace } from '@/components/AgentActivity/model';
 import cn from 'classnames';
 import React, {
 	useCallback,
@@ -47,7 +48,7 @@ export const Message = React.memo((props: IMessageProps) => {
 	const renderMessageAddon = useMessageAddon();
 	const messageAddon = renderMessageAddon?.(message as IMessage);
 	const isAgentPending = message.extras?.agentPending === 'true';
-	const hasAgentTrace = !!agentRun?.events.some(event => event.kind !== 'finish');
+	const hasAgentTrace = hasTrace(agentRun);
 
 	const [hidden, setHidden] = useState(!isLastMessage);
 	const [fileIds, setFileIds] = useState<string[]>([]);
@@ -147,7 +148,7 @@ export const Message = React.memo((props: IMessageProps) => {
 			onMouseLeave={onMouseLeave}
 			onMouseOver={onMouseOver}
 		>
-			{(hasAgentTrace || isAgentPending) && <AgentActivity run={hasAgentTrace ? agentRun : undefined} />}
+			{(hasAgentTrace || isAgentPending) && <AgentActivity run={agentRun} />}
 			{(loader || text || fileIds.length > 0 || !!graphsData || !!messageAddon) && <div
 				className={cn(classes.message, {
 					[classes.messageBot]: role === ERoles.bot || loader,
