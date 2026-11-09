@@ -497,20 +497,15 @@ function App() {
     const requestId = `vnd-request-${crypto.randomUUID()}`;
     const responseId = `vnd-answer-${crypto.randomUUID()}`;
     const base: IMessage = {id:responseId, requestId, role:ERoles.bot, timeCreated:new Date(startedAt).toISOString()};
-    const plan = corrected
-      ? [{content:'Проверить исправления',status:'in_progress' as const},{content:'Подтвердить соответствие',status:'pending' as const}]
-      : [{content:'Изучить ВНД',status:'in_progress' as const},{content:'Сверить с групповым стандартом',status:'pending' as const},{content:'Подготовить отчёт',status:'pending' as const}];
     let run = createRun(responseId, requestId, startedAt);
-    run = appendEvent(run, {id:`${responseId}-plan`, runId:responseId, at:startedAt, kind:'plan', tool:'write_todos', todos:plan});
     const updateRun = () => publishRun(threadId, run);
     const finish = () => {
-      const completedTodos = plan.map(item => ({...item,status:'completed' as const}));
       const completedAt = Date.now();
       const completeStep = `${responseId}-complete`;
       run = appendExplanation(run, completeStep, corrected
         ? 'Сверка подтвердила, что замечания из предыдущего отчёта устранены. Подготовлю итог по каждому пункту.'
         : 'Сведу найденные расхождения в таблицу. Для каждого отмечу, что изменить в документе.', completedAt);
-      run = appendEvent(run, {id:completeStep, runId:responseId, at:completedAt, kind:'plan', label:'Готовлю итог проверки', tool:'write_todos', todos:completedTodos});
+      run = appendEvent(run, {id:completeStep, runId:responseId, at:completedAt, kind:'message', label:'Готовлю итог проверки'});
       run = appendEvent(run, {id:`${responseId}-finish`, runId:responseId, at:Date.now() + 1, kind:'finish'});
       updateRun();
       appendToThread(threadId, {...base, text:corrected ? vndCorrectedAnswer : vndResultAnswer});
@@ -519,8 +514,7 @@ function App() {
       completeActivity(threadId);
     };
     const compareStep = `${responseId}-compare`;
-    const accept = () => {
-      run = appendEvent(run, {id:`${responseId}-accepted`, runId:responseId, at:Date.now(), kind:'message', label:'Документ принят в работу'});
+    const prepareComparison = () => {
       run = appendExplanation(run, compareStep, corrected
         ? 'Пользователь приложил исправленный ВНД. Проверю порог регистрации потерь, сроки расследования и ответственность коллегиального органа по предыдущим замечаниям.'
         : 'Пользователь выбрал стандарт для сверки. Проверю порог регистрации потерь, сроки расследования и распределение ответственности в документе.', Date.now());
@@ -530,11 +524,10 @@ function App() {
       run = appendEvent(run, {id:compareStep, runId:responseId, at:Date.now(), kind:'message', label:corrected ? 'Проверяю внесённые изменения' : 'Сверяю документ с требованиями'});
       updateRun();
     };
-    updateRun();
-    if (instant) { accept(); compare(); finish(); return; }
+    if (instant) { prepareComparison(); compare(); finish(); return; }
     if (activeIdRef.current === threadId) setPlaying(true);
     appendToThread(threadId, {...base, text:'', extras:{agentPending:'true'}});
-    later(threadId, accept, 650);
+    later(threadId, prepareComparison, 650);
     later(threadId, compare, 1_350);
     later(threadId, finish, 2_400);
   }

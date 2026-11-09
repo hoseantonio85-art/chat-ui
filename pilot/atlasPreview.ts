@@ -135,19 +135,15 @@ const savedMessage: IMessage = {
 };
 
 function createRunningRun(): AgentRun {
+  const comparisonStep = 'atlas-vnd-running-compare';
   const run = appendExplanation(createRun('atlas-vnd-running', 'atlas-vnd-request', previewTime + 4_000),
-    'atlas-vnd-running-plan', vndBackgroundExplanation, previewTime + 4_000);
+    comparisonStep, vndBackgroundExplanation, previewTime + 4_000);
   return appendEvent(run, {
-    id: 'atlas-vnd-running-plan',
+    id: comparisonStep,
     runId: 'atlas-vnd-running',
     at: previewTime + 4_000,
-    kind: 'plan',
+    kind: 'message',
     label: 'Проверяю ВНД по групповому стандарту',
-    tool: 'write_todos',
-    todos: [
-      { content: 'Изучить документ', status: 'completed' },
-      { content: 'Сверить с групповым стандартом', status: 'in_progress' },
-    ],
   });
 }
 
