@@ -134,19 +134,19 @@ const savedMessage: IMessage = {
 };
 
 function createRunningRun(): AgentRun {
-  let run = createRun('atlas-vnd-running', 'atlas-vnd-request', previewTime + 4_000);
-  run = appendEvent(run, {
+  const run = createRun('atlas-vnd-running', 'atlas-vnd-request', previewTime + 4_000);
+  return appendEvent(run, {
     id: 'atlas-vnd-running-plan',
     runId: 'atlas-vnd-running',
     at: previewTime + 4_000,
     kind: 'plan',
+    label: 'Проверяю ВНД по групповому стандарту',
     tool: 'write_todos',
     todos: [
       { content: 'Изучить документ', status: 'completed' },
       { content: 'Сверить с групповым стандартом', status: 'in_progress' },
     ],
   });
-  return { ...run, currentActivity: 'Проверяю ВНД по групповому стандарту…' };
 }
 
 function finishFeedbackPreview(

@@ -11,6 +11,8 @@ export interface AgentEvent {
   source?: string;
   label?: string;
   text?: string;
+  /** User-facing thinking fragment. stepId references a step in the same scope, or is omitted for the answer summary. */
+  progressDelta?: { text: string; stepId?: string };
   args?: unknown;
   result?: unknown;
   todos?: { content: string; status: 'pending' | 'in_progress' | 'completed' }[];
@@ -21,24 +23,69 @@ export interface AgentRun {
   requestId: string;
   startedAt: number;
   finishedAt?: number;
-  currentActivity: string;
   status: 'running' | 'done' | 'failed';
   events: AgentEvent[];
 }
-export const activeLabels: Record<string, string> = {
-  get_company_profile: 'Проверяю данные компании…',
-  ask_methodologist: 'Подключаю методолога…',
-  get_company_risks: 'Сверяю с реестром рисков…',
-  profiler_search: 'Изучаю профиль компании…',
-  ask_analyst: 'Подключаю аналитика…',
-  get_company_fin_indicators: 'Проверяю финансовые показатели…',
-  task: 'Подключаю профильного эксперта…',
-  write_todos: 'Составляю план проверки…',
-  get_incident_form: 'Готовлю форму события…',
-  create_incident: 'Обращаюсь к регистрации события…',
-};
+export function callOutcome(run: AgentRun, call: AgentEvent): AgentEvent | undefined {
+  if (!call.callId || (call.kind !== 'toolCall' && call.kind !== 'delegation')) return;
+  return run.events.find(event => event.callId === call.callId && (
+    event.kind === 'error' || event.kind === 'empty' ||
+    (call.kind === 'delegation' ? event.kind === 'handback' : event.kind === 'toolResult')
+  ));
+}
+
+export function openCalls(run: AgentRun): AgentEvent[] {
+  if (run.status !== 'running') return [];
+  return run.events.filter(event => (event.kind === 'toolCall' || event.kind === 'delegation') &&
+    event.callId && !callOutcome(run, event));
+}
+
+export function activityLabel(run?: AgentRun): string {
+  if (!run) return 'Думаю';
+  if (run.status === 'failed') return 'Не удалось завершить ответ';
+  if (run.status === 'done') return 'Ответ готов';
+  const calls = openCalls(run);
+  if (calls.some(call => call.kind === 'delegation')) return 'Делегирую';
+  return calls.length ? 'Собираю источники' : 'Думаю';
+}
+
+export function callDuration(run: AgentRun, call: AgentEvent, now: number): string {
+  const end = callOutcome(run, call)?.at ?? run.finishedAt ??
+    (run.status === 'running' ? now : run.events.at(-1)?.at ?? call.at);
+  return `${Math.max(0, Math.floor((end - call.at) / 1000))} с`;
+}
+
+export function traceSteps(run: AgentRun, parentCallId?: string) {
+  const events = run.events.filter(event => event.parentCallId === parentCallId && event.kind !== 'finish');
+  const stepIds = new Set(events.filter(event => event.kind !== 'thinking').map(event => event.id));
+  const details = new Map<string | undefined, { event: AgentEvent; lastId: string; text: string }>();
+  for (const event of events) {
+    // Only explicitly public fragments can enter the trace. Older thinking events contain raw text.
+    const delta = event.kind === 'thinking' ? event.progressDelta : undefined;
+    if (!delta?.text) continue;
+    const detail = details.get(delta.stepId);
+    if (detail) {
+      detail.text += delta.text;
+      detail.lastId = event.id;
+    } else details.set(delta.stepId, { event, lastId: event.id, text: delta.text });
+  }
+
+  const steps = events.filter(event => event.kind !== 'thinking').map(event => ({
+    event,
+    detail: details.get(event.id),
+  }));
+  for (const [stepId, detail] of details) {
+    if (!stepId || !stepIds.has(stepId)) steps.push({ event: detail.event, detail });
+  }
+  return steps;
+}
+
+export function hasTrace(run?: AgentRun): boolean {
+  return !!run?.events.some(event => event.kind === 'thinking' ? !!event.progressDelta?.text : event.kind !== 'finish');
+}
+
 export function createRun(runId: string, requestId: string, startedAt: number): AgentRun {
-  return { runId, requestId, startedAt, currentActivity: 'Начинаю проверку…', status: 'running', events: [] };
+  return { runId, requestId, startedAt, status: 'running', events: [] };
 }
 export function appendEvent(run: AgentRun, event: AgentEvent): AgentRun {
   // A reconnect replay must not duplicate events or reopen a completed run.
@@ -46,16 +93,9 @@ export function appendEvent(run: AgentRun, event: AgentEvent): AgentRun {
   const events = [...run.events, event];
   if (event.kind === 'finish' || (event.kind === 'error' && event.fatal)) {
     const status = event.fatal ? 'failed' : 'done';
-    return { ...run, events, status, finishedAt: event.at, currentActivity: status === 'failed' ? 'Не удалось завершить ответ' : 'Ответ готов' };
+    return { ...run, events, status, finishedAt: event.at };
   }
-  const currentActivity = event.kind === 'toolCall' || event.kind === 'delegation'
-    ? event.label || activeLabels[event.tool || ''] || 'Проверяю источник…'
-    : event.kind === 'error' ? 'Продолжаю с доступными источниками…'
-    : event.kind === 'empty' ? 'Уточняю по другим источникам…'
-    : event.kind === 'handback' ? 'Собираю итоговый ответ…'
-    : event.kind === 'plan' ? (event.todos?.every(todo => todo.status === 'completed') ? 'Формирую ответ…' : 'Составляю план проверки…')
-    : run.currentActivity;
-  return { ...run, events, currentActivity };
+  return { ...run, events };
 }
 export type SourceState = { name: string; status: 'running' | 'success' | 'empty' | 'error'; calls: number };
 export function sourcesForRun(run: AgentRun): SourceState[] {
