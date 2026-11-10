@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button } from '@sber-orm/ui-kit';
+import { Button, Select } from '@sber-orm/ui-kit';
 import { vndFolders, type VndFolder } from './VndBackground.model';
 import { vndStandards } from './scenarios';
 import './VndToBeActions.css';
@@ -17,29 +17,32 @@ export function VndStandardActions({ onSelect }: { onSelect: (number: number) =>
         <span>{standard}</span>
       </button>)}
     </div>
-    <p className="vnd-to-be-hint">Или впишите номер от 1 до 4 в поле сообщения.</p>
   </div>;
 }
 
 export function VndSaveActions({
   onConfirm,
-  onDecline,
 }: {
   onConfirm: (folder: VndFolder) => void;
-  onDecline: () => void;
 }) {
   const [folder, setFolder] = useState<VndFolder>(vndFolders[0]);
+  const folderOptions = vndFolders.map(value => ({ value, label: value }));
 
   return <div className="vnd-to-be-card vnd-to-be-save" aria-label="Подтверждение сохранения ВНД">
-    <label>
-      <span>Папка в базе знаний</span>
-      <select value={folder} onChange={event => setFolder(event.target.value as VndFolder)}>
-        {vndFolders.map(item => <option key={item}>{item}</option>)}
-      </select>
-    </label>
+    <Select
+      className="vnd-to-be-select"
+      dropdownProps={{ className: 'vnd-to-be-select-dropdown' }}
+      label="Папка в базе знаний"
+      labelInside
+      limitByWidth
+      options={folderOptions}
+      showCheckMark={false}
+      size="M"
+      value={folder}
+      onChange={value => setFolder(value as VndFolder)}
+    />
     <div className="vnd-to-be-actions">
       <Button size="S" onClick={() => onConfirm(folder)}>Сохранить</Button>
-      <Button size="S" variant="secondary" onClick={onDecline}>Не сохранять</Button>
     </div>
   </div>;
 }

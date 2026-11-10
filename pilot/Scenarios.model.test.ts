@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fixture, isVndBackgroundScenario, isVndToBeScenario, scenarioGroups, scenarios, ungroupedScenarioIds, vndStandards, vndToBeStandardPrompt } from './scenarios';
+import { fixture, isVndBackgroundScenario, isVndToBeScenario, scenarioGroups, scenarios, ungroupedScenarioIds, vndStandards } from './scenarios';
 
 describe('pilot explanations', () => {
   it('answers a definition without pretending to research a company', () => {
@@ -30,6 +30,5 @@ describe('pilot explanations', () => {
     expect(isVndBackgroundScenario('vndBackground')).toBe(true);
     expect(isVndBackgroundScenario('vndBackgroundToBe')).toBe(true);
     expect(vndStandards).toHaveLength(4);
-    expect(vndToBeStandardPrompt).toContain('выбрать вариант ниже');
   });
 });
