@@ -68,6 +68,7 @@ describe('canResolveVndAttachmentLookup', () => {
 
   it('allows the current lookup after switching away from its thread', () => {
     expect(canResolveVndAttachmentLookup('lookup-1', 'lookup-1', waitingThread)).toBe(true);
+    expect(canResolveVndAttachmentLookup('lookup-1', 'lookup-1', { ...waitingThread, scenario: 'vndBackgroundToBe' })).toBe(true);
   });
 
   it('rejects a stale lookup after the scenario was restarted', () => {

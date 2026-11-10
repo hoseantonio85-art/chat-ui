@@ -14,7 +14,7 @@ import { completeThreadActivity, markThreadActivityRead, startThreadActivity } f
 import { clearMemoryFacts, forgetMemoryFact, resetThreads } from '../src/components/ThreadDrawer/settings';
 import { chat$, EChatState } from './mocks/auth';
 import { resetPending, setDemoOnline, setDemoSender } from './mocks/useChat';
-import { chart, fixture, scenarios, type ScenarioId, usesReferenceFlow, vndCorrectedAnswer, vndResultAnswer, vndStandardPrompt } from './scenarios';
+import { chart, fixture, isVndBackgroundScenario, isVndToBeScenario, scenarios, type ScenarioId, usesReferenceFlow, vndCorrectedAnswer, vndResultAnswer, vndStandardPrompt, vndToBeStandardPrompt } from './scenarios';
 import { appendExplanation, csiComment, csiServiceResolved, explainedReply, feedbackRuns, feedbackSaveExplanation } from './scenarioExplanations';
 import modalClasses from '@/components/ModalContainer/styles.module.scss';
 import chatClasses from '@/components/Chat/styles.module.scss';
@@ -22,12 +22,13 @@ import '@/i18n';
 import './vendor/ui-kit/dist/index.css';
 import './styles.css';
 import {useVndBackground} from './VndBackground';
-import {canResolveVndAttachmentLookup} from './VndBackground.model';
+import {canResolveVndAttachmentLookup, type VndFolder} from './VndBackground.model';
 import {methodologistService} from './mocks/files';
 import {createAtlasPreview, type AtlasPreviewThread} from './atlasPreview';
 import { MessageAddonContext } from '../src/components/Chat/MessageAddonContext';
 import { FeedbackCancelAction, FeedbackCard, type FeedbackAddon } from './FeedbackCard';
 import { ScenarioPicker } from './ScenarioPicker';
+import { VndSaveActions, VndStandardActions } from './VndToBeActions';
 import {
   addCsiComment,
   addFeedbackClarification,
@@ -49,7 +50,7 @@ import {
   type QualitativeFeedbackDraft,
 } from './Feedback.model';
 
-type VndStage = 'start' | 'chooseStandard' | 'reviewed' | 'complete';
+type VndStage = 'start' | 'chooseStandard' | 'reviewing' | 'reviewed' | 'confirmSave' | 'complete';
 type DemoThread = AtlasPreviewThread;
 const assistantSkills: AssistantSkill[] = [
   {id: 'methodologist', title: 'Методолог'}, {id: 'risk-review', title: 'Проверка рисков'}, {id: 'createIncident', title: 'Регистрация события'},
@@ -200,6 +201,35 @@ function App() {
     append:message=>addMessageAction(ctx,message),
     publishRun,
   });
+
+  const confirmVndSave = (folder: VndFolder) => {
+    const active = threadsRef.current.find(thread => thread.id === activeIdRef.current);
+    if (!active) return;
+    if (active.jobState === 'ready') background.save(active.id, folder);
+    else {
+      appendToThread(active.id, {
+        id: `vnd-saved-${crypto.randomUUID()}`,
+        role: ERoles.bot,
+        text: `Сохранил «Регламент управления операционными рисками — исправленный.docx» в базу знаний, в папку «${folder}».`,
+        timeCreated: new Date().toISOString(),
+      });
+      updateThreads(items => items.map(thread => thread.id === active.id ? {...thread, folder, updatedAt:Date.now()} : thread));
+    }
+    setVndStage('complete', active.id);
+  };
+
+  const declineVndSave = () => {
+    const active = threadsRef.current.find(thread => thread.id === activeIdRef.current);
+    if (!active) return;
+    if (active.jobState === 'ready') background.declineSave(active.id);
+    else appendToThread(active.id, {
+      id: `vnd-save-declined-${crypto.randomUUID()}`,
+      role: ERoles.bot,
+      text: 'Хорошо, ВНД пока не сохраняю. Вернуться к сохранению можно позже из этого диалога.',
+      timeCreated: new Date().toISOString(),
+    });
+    setVndStage('complete', active.id);
+  };
 
   const getActiveFeedback = () => threadsRef.current.find(thread => thread.id === activeIdRef.current)?.feedbackDraft;
   const getActiveCsi = (): CsiDraft | undefined => {
@@ -492,6 +522,8 @@ function App() {
 
   function runVndReview(corrected: boolean, instant = false) {
     const threadId = activeIdRef.current;
+    const threadScenario = threadsRef.current.find(thread => thread.id === threadId)?.scenario ?? scenario;
+    const showToBeSave = corrected && isVndToBeScenario(threadScenario);
     clearThreadTimers(threadId);
     startActivity(threadId);
     const startedAt = Date.now();
@@ -509,8 +541,14 @@ function App() {
       run = appendEvent(run, {id:completeStep, runId:responseId, at:completedAt, kind:'message', label:'Готовлю итог проверки'});
       run = appendEvent(run, {id:`${responseId}-finish`, runId:responseId, at:Date.now() + 1, kind:'finish'});
       updateRun();
-      appendToThread(threadId, {...base, text:corrected ? vndCorrectedAnswer : vndResultAnswer});
-      setVndStage(corrected ? 'complete' : 'reviewed', threadId);
+      appendToThread(threadId, {
+        ...base,
+        text: showToBeSave
+          ? `${vndCorrectedAnswer}\n\nВыберите папку и подтвердите сохранение актуального ВНД в базе знаний.`
+          : corrected ? vndCorrectedAnswer : vndResultAnswer,
+        extras: showToBeSave ? { vndAddon: 'save-confirmation' } : undefined,
+      });
+      setVndStage(showToBeSave ? 'confirmSave' : corrected ? 'complete' : 'reviewed', threadId);
       if (activeIdRef.current === threadId) setPlaying(false);
       completeActivity(threadId);
     };
@@ -541,7 +579,7 @@ function App() {
     updateThreads(items => items.map(thread => thread.id === activeIdRef.current ? {...thread, title:'Проверка ВНД', scenario:entry, vndStage:'start', agentState:undefined, agentUnread:false, jobState:undefined, unread:false, pinned:false, updatedAt:Date.now()} : thread));
     vndStageRef.current = 'start';
     if (!instant) {
-      if (entry === 'vndWelcome' || entry === 'vndBackground') addMessageAction(ctx, {id:crypto.randomUUID(), role:ERoles.bot, text:'Здравствуйте! Я помогу проверить ваш ВНД на соответствие стандартам группы. Прикрепите документ — затем я предложу выбрать групповой стандарт для проверки.', timeCreated:new Date().toISOString()});
+      if (entry === 'vndWelcome' || entry === 'vndBackground' || entry === 'vndWelcomeToBe' || entry === 'vndBackgroundToBe') addMessageAction(ctx, {id:crypto.randomUUID(), role:ERoles.bot, text:'Здравствуйте! Я помогу проверить ваш ВНД на соответствие стандартам группы. Прикрепите документ — затем я предложу выбрать групповой стандарт для проверки.', timeCreated:new Date().toISOString()});
       storeCurrent();
       chat$.openChat();
       return;
@@ -549,17 +587,19 @@ function App() {
     const startedAt = Date.now();
     addMessageAction(ctx, {id:`vnd-start-${crypto.randomUUID()}`, role:ERoles.user, text:'Проверь ВНД на соответствие стандартам группы.', timeCreated:new Date(startedAt).toISOString(), extras:{fileIds:'["vnd-draft"]'}});
     const addPrompt = () => {
-      addMessageAction(ctx, {id:`vnd-prompt-${crypto.randomUUID()}`, role:ERoles.bot, text:vndStandardPrompt, timeCreated:new Date().toISOString()});
+      const toBe = isVndToBeScenario(entry);
+      addMessageAction(ctx, {id:`vnd-prompt-${crypto.randomUUID()}`, role:ERoles.bot, text:toBe ? vndToBeStandardPrompt : vndStandardPrompt, extras:toBe ? {vndAddon:'standard-picker'} : undefined, timeCreated:new Date().toISOString()});
       setVndStage('chooseStandard');
     };
     const addChoice = () => {
       addMessageAction(ctx, {id:`vnd-choice-${crypto.randomUUID()}`, role:ERoles.user, text:'2', timeCreated:new Date().toISOString()});
-      if (entry === 'vndBackground') background.start(activeIdRef.current,'["vnd-draft"]','Регламент управления операционными рисками.docx');
+      setVndStage('reviewing');
+      if (isVndBackgroundScenario(entry)) background.start(activeIdRef.current,'["vnd-draft"]','Регламент управления операционными рисками.docx');
       else runVndReview(false, instant);
     };
     if (instant) {
       addPrompt(); addChoice();
-      if (entry === 'vndBackground') return;
+      if (isVndBackgroundScenario(entry)) return;
       addMessageAction(ctx, {id:`vnd-corrected-${crypto.randomUUID()}`, role:ERoles.user, text:'Загрузил исправленную версию. Проверь повторно.', timeCreated:new Date().toISOString(), extras:{fileIds:'["vnd-corrected"]'}});
       addMessageAction(ctx, {id:`vnd-corrected-note-${crypto.randomUUID()}`, role:ERoles.bot, text:'Исправленная версия получена. Повторяю проверку по ранее выбранному стандарту.', timeCreated:new Date().toISOString()});
       runVndReview(true, true);
@@ -579,7 +619,8 @@ function App() {
     }
     if (jobState === 'ready') {
       if (background.saveFromChat(activeIdRef.current,request.body)) return;
-      addMessageAction(ctx,{id:crypto.randomUUID(),role:ERoles.bot,text:'Отклонений не найдено. Сохранить актуальный ВНД в папку «Операционные риски»? Напишите «Да» или назовите другую папку: «Внутренние нормативные документы» либо «Методология».',timeCreated:new Date().toISOString()});
+      const toBe = isVndToBeScenario(scenario);
+      addMessageAction(ctx,{id:crypto.randomUUID(),role:ERoles.bot,text:toBe ? 'Отклонений не найдено. Выберите папку и подтвердите сохранение актуального ВНД.' : 'Отклонений не найдено. Сохранить актуальный ВНД в папку «Операционные риски»? Напишите «Да» или назовите другую папку: «Внутренние нормативные документы» либо «Методология».',extras:toBe ? {vndAddon:'save-confirmation'} : undefined,timeCreated:new Date().toISOString()});
       return;
     }
     if (jobState === 'saved') {
@@ -587,7 +628,8 @@ function App() {
       return;
     }
     if (vndStageRef.current === 'start') {
-      addMessageAction(ctx, {id:`vnd-reply-${crypto.randomUUID()}`, role:ERoles.bot, text:hasFile ? vndStandardPrompt : 'Я помогу проверить ВНД на соответствие стандартам группы. Загрузите документ, который хотите проверить.', timeCreated:new Date(sentAt + 1).toISOString()});
+      const toBe = isVndToBeScenario(scenario);
+      addMessageAction(ctx, {id:`vnd-reply-${crypto.randomUUID()}`, role:ERoles.bot, text:hasFile ? (toBe ? vndToBeStandardPrompt : vndStandardPrompt) : 'Я помогу проверить ВНД на соответствие стандартам группы. Загрузите документ, который хотите проверить.', extras:hasFile && toBe ? {vndAddon:'standard-picker'} : undefined, timeCreated:new Date(sentAt + 1).toISOString()});
       if (hasFile) setVndStage('chooseStandard');
       return;
     }
@@ -597,7 +639,7 @@ function App() {
         addMessageAction(ctx, {id:`vnd-error-${crypto.randomUUID()}`, role:ERoles.bot, text:'Не удалось определить выбранный документ. Отправьте номер от 1 до 4.', timeCreated:new Date(sentAt + 1).toISOString()});
         return;
       }
-      if (scenario === 'vndBackground') {
+      if (isVndBackgroundScenario(scenario)) {
         const id=activeIdRef.current;
         const userFiles=ctx.get(messagesAtom).filter(item=>item.role===ERoles.user && item.extras?.fileIds);
         const fileIds=userFiles[userFiles.length-1]?.extras?.fileIds as string || '[]';
@@ -621,13 +663,17 @@ function App() {
           if (!canResolveLookup()) return;
           attachmentLookups.current.delete(id);
           const name=result.body.userDocuments[0]?.fields.fileName.value || 'ВНД.docx';
+          setVndStage('reviewing', id);
           background.start(id,fileIds,name);
         }).catch(() => {
           if (!canResolveLookup()) return;
           attachmentLookups.current.delete(id);
           appendToThread(id, {id:crypto.randomUUID(), role:ERoles.bot, text:'Не удалось получить сведения о вложении. Попробуйте начать проверку ещё раз.', timeCreated:new Date().toISOString()});
         });
-      } else runVndReview(false);
+      } else {
+        setVndStage('reviewing');
+        runVndReview(false);
+      }
       return;
     }
     if (vndStageRef.current === 'reviewed') {
@@ -776,6 +822,14 @@ function App() {
   };
   const selectedSkill = demoFlags.assistantSkills ? assistantSkills.find(item => item.id === selectedSkillId) : undefined;
   const renderMessageAddon = (message: IMessage) => {
+    const vndAddon = message.extras?.vndAddon;
+    const activeThread = threads.find(thread => thread.id === activeThreadId);
+    if (vndAddon === 'standard-picker' && activeThread?.vndStage === 'chooseStandard') {
+      return <VndStandardActions onSelect={number => sendVnd({body:String(number)})} />;
+    }
+    if (vndAddon === 'save-confirmation' && (activeThread?.vndStage === 'confirmSave' || activeThread?.jobState === 'ready')) {
+      return <VndSaveActions onConfirm={confirmVndSave} onDecline={declineVndSave} />;
+    }
     const addon = message.extras?.feedbackAddon as FeedbackAddon | undefined;
     const draft = threads.find(thread => thread.id === activeThreadId)?.feedbackDraft;
     if (!addon || draft?.kind !== 'csi') return null;
@@ -792,7 +846,7 @@ function App() {
   };
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><AgentRunsContext.Provider value={runs}>
     <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
-    {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario.startsWith('csi') ? 'CSI · оценка сервиса' : scenario.startsWith('feedback') ? 'Обратная связь с командой сервиса' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Сценарии универсального агента'}</span></div><ScenarioPicker value={scenario} onChange={runScenario}/><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') || scenario.startsWith('csi') || scenario.startsWith('feedback') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{scenario === 'vndBackground' ? 'Показать проверку' : scenario.startsWith('csi') ? 'Показать результат' : scenario.startsWith('feedback') ? 'Показать ветку' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
+    {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario.startsWith('csi') ? 'CSI · оценка сервиса' : scenario.startsWith('feedback') ? 'Обратная связь с командой сервиса' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Сценарии универсального агента'}</span></div><ScenarioPicker value={scenario} onChange={runScenario}/><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') || scenario.startsWith('csi') || scenario.startsWith('feedback') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{isVndBackgroundScenario(scenario) ? 'Показать проверку' : scenario.startsWith('csi') ? 'Показать результат' : scenario.startsWith('feedback') ? 'Показать ветку' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
     {!initialState.embedded && <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main>}<ModalContainer/>{background.ui}
     {actionUrl && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Переход в НОРМ"><h2>Переход в форму НОРМ</h2><p>Форма регистрации события готова к открытию.</p><code>{actionUrl}</code><Button onClick={() => {setActionUrl('');chat$.openChat();}}>Вернуться в чат</Button></div>}
   </AgentRunsContext.Provider></MessageAddonContext.Provider></AssistantSkillsContext.Provider></ThreadUiContext.Provider></reatomContext.Provider>;

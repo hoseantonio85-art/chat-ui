@@ -14,6 +14,7 @@ import {
 } from './VndBackground.model';
 
 export interface BackgroundThread extends ChatThread, VndBackgroundThreadState {
+  scenario?: string;
   documentIds?: string;
   documentName?: string;
   folder?: VndFolder;
@@ -119,10 +120,14 @@ export function useVndBackground<T extends BackgroundThread>(options: {
       run = appendEvent(run, { id: `${pendingId}-finish`, runId: pendingId, at: Date.now(), kind: 'finish' });
       latest.current.publishRun(id, run);
 
+      const isToBe = current.scenario?.endsWith('ToBe') === true;
       const message: IMessage = {
         id: crypto.randomUUID(),
         role: ERoles.bot,
-        text: '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено.\n\nПредлагаю сохранить актуальный ВНД в базу знаний, в папку «Операционные риски». **Напишите «Да»**, чтобы подтвердить, или укажите другую папку: «Внутренние нормативные документы» или «Методология».',
+        text: isToBe
+          ? '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено.\n\nВыберите папку и подтвердите сохранение актуального ВНД в базе знаний.'
+          : '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено.\n\nПредлагаю сохранить актуальный ВНД в базу знаний, в папку «Операционные риски». **Напишите «Да»**, чтобы подтвердить, или укажите другую папку: «Внутренние нормативные документы» или «Методология».',
+        extras: isToBe ? { vndAddon: 'save-confirmation' } : undefined,
         timeCreated: new Date().toISOString(),
       };
       const isActiveNow = latest.current.activeId.current === id;
@@ -185,6 +190,21 @@ export function useVndBackground<T extends BackgroundThread>(options: {
     return false;
   };
 
+  const declineSave = (id: string) => {
+    const thread = latest.current.getThreads().find(item => item.id === id);
+    if (!thread || thread.jobState !== 'ready') return;
+    latest.current.append({
+      id: crypto.randomUUID(),
+      role: ERoles.bot,
+      text: 'Хорошо, ВНД пока не сохраняю. Вернуться к сохранению можно позже из этого диалога.',
+      timeCreated: new Date().toISOString(),
+    });
+    latest.current.snapshot();
+    latest.current.update(items => items.map(item => item.id === id
+      ? { ...item, jobState: undefined, unread: false, agentUnread: false, updatedAt: Date.now() }
+      : item));
+  };
+
   const active = options.getThreads().find(item => item.id === options.activeId.current);
   const cancel = (id: string) => {
     const timer = timers.current.get(id);
@@ -197,6 +217,8 @@ export function useVndBackground<T extends BackgroundThread>(options: {
     start,
     markRead,
     cancel,
+    save,
+    declineSave,
     saveFromChat,
     ui: <>
       {legacySaveControls && chatOpen && active?.jobState === 'ready' && <div className="vnd-save-actions">

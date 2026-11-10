@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fixture, scenarioGroups, scenarios, ungroupedScenarioIds } from './scenarios';
+import { fixture, isVndBackgroundScenario, isVndToBeScenario, scenarioGroups, scenarios, ungroupedScenarioIds, vndStandards, vndToBeStandardPrompt } from './scenarios';
 
 describe('pilot explanations', () => {
   it('answers a definition without pretending to research a company', () => {
@@ -21,5 +21,15 @@ describe('pilot explanations', () => {
     const treeIds = [...scenarioGroups.flatMap(group => group.scenarioIds), ...ungroupedScenarioIds];
     expect(new Set(treeIds).size).toBe(treeIds.length);
     expect(new Set(treeIds)).toEqual(new Set(scenarios.map(scenario => scenario.id)));
+  });
+
+  it('keeps future VND flows separate from the current MVP flows', () => {
+    const futureGroup = scenarioGroups.find(group => group.id === 'vnd-to-be');
+    expect(futureGroup?.scenarioIds).toEqual(['vndBackgroundToBe', 'vndToBe', 'vndWelcomeToBe']);
+    expect(futureGroup?.scenarioIds.every(isVndToBeScenario)).toBe(true);
+    expect(isVndBackgroundScenario('vndBackground')).toBe(true);
+    expect(isVndBackgroundScenario('vndBackgroundToBe')).toBe(true);
+    expect(vndStandards).toHaveLength(4);
+    expect(vndToBeStandardPrompt).toContain('выбрать вариант ниже');
   });
 });
