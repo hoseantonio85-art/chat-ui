@@ -96,6 +96,10 @@
   &Addon {
     width: min(620px, 100%);
     margin-top: 12px;
+
+    &:has(:global(.vnd-to-be-card)) {
+      width: 100%;
+    }
   }
 }
 
