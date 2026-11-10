@@ -21,7 +21,10 @@ describe('pilot explanations', () => {
     const {events} = fixture('subagent', 'run', 0);
     expect(events.every(event => !event.parentCallId)).toBe(true);
     expect(events.filter(event => event.kind === 'delegation').map(event => event.callId)).toEqual(['expert']);
-    expect(events.filter(event => event.kind === 'toolCall').map(event => event.callId)).toEqual(['profile', 'method', 'risks']);
+    expect(events.filter(event => event.kind === 'toolCall').map(event => event.callId)).toEqual(['profile', 'risks']);
+    const expert = events.find(event => event.kind === 'delegation');
+    const handback = events.find(event => event.kind === 'handback');
+    expect(handback!.at - expert!.at).toBe(2100);
   });
 
   it('places every scenario in the tree exactly once', () => {
