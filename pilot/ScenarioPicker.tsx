@@ -11,6 +11,7 @@ const byId = new Map(scenarios.map(scenario => [scenario.id, scenario]));
 function itemTitle(id: ScenarioId, groupId?: string) {
   const title = byId.get(id)?.title ?? id;
   if (groupId === 'vnd') return title.replace(/^ВНД · /, '');
+  if (groupId === 'vnd-to-be') return title.replace(/^ВНД to be · /, '');
   if (groupId === 'csi') return title.replace(/^CSI · /, '');
   if (groupId === 'feedback') return title.replace(/^ОС · /, '');
   return title;

@@ -73,7 +73,7 @@ export function canResolveVndAttachmentLookup(
   thread: VndAttachmentLookupThread | undefined,
 ): boolean {
   return currentToken === expectedToken
-    && thread?.scenario === 'vndBackground'
+    && (thread?.scenario === 'vndBackground' || thread?.scenario === 'vndBackgroundToBe')
     && thread.vndStage === 'chooseStandard'
     && thread.jobState !== 'running';
 }

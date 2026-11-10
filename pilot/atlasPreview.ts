@@ -52,7 +52,7 @@ export type AtlasStepId =
   | 'feedback.idea-clarified'
   | 'feedback.praise';
 
-type VndStage = 'start' | 'chooseStandard' | 'reviewed' | 'complete';
+type VndStage = 'start' | 'chooseStandard' | 'reviewing' | 'reviewed' | 'confirmSave' | 'complete';
 
 export interface AtlasPreviewThread extends BackgroundThread {
   scenario: ScenarioId;

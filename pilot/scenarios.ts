@@ -4,6 +4,9 @@ export const scenarios = [
   {id: 'vndBackground', title: 'ВНД · проверка в фоне', question: 'Проверь ВНД на соответствие стандартам группы.'},
   {id: 'vnd', title: 'ВНД · сам пишу в чат', question: 'Проверь ВНД на соответствие стандартам группы.'},
   {id: 'vndWelcome', title: 'ВНД · пришёл по кнопке', question: 'Проверь ВНД на соответствие стандартам группы.'},
+  {id: 'vndBackgroundToBe', title: 'ВНД to be · проверка в фоне', question: 'Проверь ВНД на соответствие стандартам группы.'},
+  {id: 'vndToBe', title: 'ВНД to be · сам пишу в чат', question: 'Проверь ВНД на соответствие стандартам группы.'},
+  {id: 'vndWelcomeToBe', title: 'ВНД to be · пришёл по кнопке', question: 'Проверь ВНД на соответствие стандартам группы.'},
   {id: 'csiProactive', title: 'CSI · после проверки ВНД', question: 'Оценить завершённую проверку ВНД.'},
   {id: 'csiDirect', title: 'CSI · пользователь, сервис известен', question: 'Хочу оценить сервис проверки ВНД.'},
   {id: 'csiDirectUnknown', title: 'CSI · сначала уточнить сервис', question: 'Хочу оценить сервис.'},
@@ -31,6 +34,7 @@ export type ScenarioId = typeof scenarios[number]['id'];
 
 export const scenarioGroups = [
   {id:'vnd', title:'ВНД', scenarioIds:['vndBackground', 'vnd', 'vndWelcome']},
+  {id:'vnd-to-be', title:'ВНД · to be (на будущее)', scenarioIds:['vndBackgroundToBe', 'vndToBe', 'vndWelcomeToBe']},
   {id:'csi', title:'CSI', scenarioIds:['csiProactive', 'csiDirect', 'csiDirectUnknown', 'csiError']},
   {id:'feedback', title:'Обратная связь', scenarioIds:['feedbackComplaint', 'feedbackComplaintClarify', 'feedbackHelp', 'feedbackIdea', 'feedbackIdeaClarify', 'feedbackPraise', 'feedbackError']},
   {id:'agent', title:'Работа агента', scenarioIds:['normal', 'noReasoning', 'parallel', 'subagent', 'empty', 'error', 'backendCallback']},
@@ -40,12 +44,21 @@ export const scenarioGroups = [
 export const ungroupedScenarioIds = ['registration'] as const satisfies readonly ScenarioId[];
 export const usesReferenceFlow = (id: ScenarioId) => id === 'normal' || id === 'noReasoning' || id === 'parallel';
 
-export const vndStandardPrompt = `Документ загружен. С каким групповым документом его нужно сверить? Отправьте номер выбранного варианта.
+export const vndStandards = [
+  'Методика сбора данных об инцидентах операционного риска',
+  'Регламент сбора данных об инцидентах операционного риска',
+  'Политика по управлению операционным риском',
+  'Общий стандарт по организации системы управления операционными рисками в компаниях с участием ПАО Сбербанк',
+] as const;
 
-1. Методика сбора данных об инцидентах операционного риска
-2. Регламент сбора данных об инцидентах операционного риска
-3. Политика по управлению операционным риском
-4. Общий стандарт по организации системы управления операционными рисками в компаниях с участием ПАО Сбербанк`;
+const vndStandardList = vndStandards.map((standard, index) => `${index + 1}. ${standard}`).join('\n');
+
+export const vndStandardPrompt = `Документ загружен. С каким групповым документом его нужно сверить? Отправьте номер выбранного варианта.\n\n${vndStandardList}`;
+
+export const vndToBeStandardPrompt = 'Документ загружен. Выберите групповой документ для сверки. Можно выбрать вариант ниже или отправить его номер сообщением.';
+
+export const isVndToBeScenario = (id: ScenarioId): boolean => id === 'vndBackgroundToBe' || id === 'vndToBe' || id === 'vndWelcomeToBe';
+export const isVndBackgroundScenario = (id: ScenarioId): boolean => id === 'vndBackground' || id === 'vndBackgroundToBe';
 
 export const vndResultAnswer = `**Проверка завершена.** В документе выявлены отклонения от групповых требований.
 
