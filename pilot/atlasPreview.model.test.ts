@@ -102,6 +102,10 @@ describe('atlas live preview states', () => {
 
     expect(prompt?.scenario).toBe('csiProactive');
     expect(prompt?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.stage).toBe('rating');
+    expect(prompt?.threads.find(thread => thread.id === 'vnd')?.messages.slice(-2).map(message => message.text)).toEqual([
+      'Готово, «Регламент управления операционными рисками.docx» сохранён в базе знаний в папке «Операционные риски».',
+      'Можно ещё один короткий вопрос?',
+    ]);
     expect(low?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.rating?.value).toBe(1);
     expect(low?.threads.find(thread => thread.id === 'vnd')?.messages.at(-1)?.text).toContain('что помешало');
     expect(neutral?.threads.find(thread => thread.id === 'vnd')?.messages.at(-1)?.text).toContain('Что стоит улучшить');
