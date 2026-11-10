@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@sber-orm/ui-kit';
 import type { CsiDraft } from './Feedback.model';
+import { MessageSecondaryAction } from './MessageSecondaryAction';
 import './FeedbackCard.css';
 
 type FeedbackAddon = 'csi-rating' | 'csi-comment-actions';
@@ -53,7 +54,7 @@ export function FeedbackCard(props: FeedbackCardProps) {
 }
 
 export function FeedbackCancelAction({ onCancel }: { onCancel: () => void }) {
-  return <button type="button" className="feedback-cancel-action" onClick={onCancel}>Не сейчас</button>;
+  return <MessageSecondaryAction onClick={onCancel}>Не сейчас</MessageSecondaryAction>;
 }
 
 export type { FeedbackAddon };

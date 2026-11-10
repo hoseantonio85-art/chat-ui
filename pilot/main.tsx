@@ -28,6 +28,7 @@ import {createAtlasPreview, type AtlasPreviewThread} from './atlasPreview';
 import { MessageAddonContext } from '../src/components/Chat/MessageAddonContext';
 import { FeedbackCancelAction, FeedbackCard, type FeedbackAddon } from './FeedbackCard';
 import { ScenarioPicker } from './ScenarioPicker';
+import { MessageSecondaryAction } from './MessageSecondaryAction';
 import { VndSaveActions, VndStandardActions } from './VndToBeActions';
 import {
   addCsiComment,
@@ -828,7 +829,10 @@ function App() {
       return <VndStandardActions onSelect={number => sendVnd({body:String(number)})} />;
     }
     if (vndAddon === 'save-confirmation' && (activeThread?.vndStage === 'confirmSave' || activeThread?.jobState === 'ready')) {
-      return <VndSaveActions onConfirm={confirmVndSave} onDecline={declineVndSave} />;
+      return {
+        inMessage: <VndSaveActions onConfirm={confirmVndSave} />,
+        afterMessage: <MessageSecondaryAction onClick={declineVndSave}>Не сейчас</MessageSecondaryAction>,
+      };
     }
     const addon = message.extras?.feedbackAddon as FeedbackAddon | undefined;
     const draft = threads.find(thread => thread.id === activeThreadId)?.feedbackDraft;

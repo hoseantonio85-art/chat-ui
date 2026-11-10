@@ -23,7 +23,7 @@
   font: inherit;
   text-align: left;
   border: 1px solid var(--borderDefault);
-  border-radius: 10px;
+  border-radius: 16px;
   background: var(--backgroundBasicDefault);
   cursor: pointer;
 }
@@ -57,30 +57,17 @@
   outline-offset: 2px;
 }
 
-.vnd-to-be-hint {
-  margin: 0;
-  color: var(--textBaseSecondary);
-  font-size: 12px;
-  line-height: 16px;
-}
-
-.vnd-to-be-save label {
-  display: grid;
-  gap: 6px;
-  color: var(--textBaseSecondary);
-  font-size: 12px;
-  line-height: 16px;
-}
-
-.vnd-to-be-save select {
+.vnd-to-be-select {
   width: 100%;
-  min-height: 38px;
-  padding: 8px 34px 8px 10px;
-  color: var(--textBaseDefault);
-  font: inherit;
-  border: 1px solid var(--borderDefault);
-  border-radius: 10px;
-  background: var(--backgroundBasicDefault);
+}
+
+.vnd-to-be-select-dropdown {
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.vnd-to-be-select-dropdown [role="option"] svg {
+  display: none;
 }
 
 .vnd-to-be-actions {
