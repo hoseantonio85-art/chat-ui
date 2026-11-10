@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button } from '@sber-orm/ui-kit';
 import type { CsiDraft } from './Feedback.model';
 import { MessageSecondaryAction } from './MessageSecondaryAction';
 import './FeedbackCard.css';
@@ -48,9 +47,7 @@ function RatingCard({ draft, onRate }: Pick<FeedbackCardProps, 'draft' | 'onRate
 
 export function FeedbackCard(props: FeedbackCardProps) {
   if (props.addon === 'csi-rating') return <RatingCard draft={props.draft} onRate={props.onRate} />;
-  return <div className="feedback-inline-action">
-    <Button size="S" variant="secondary" disabled={props.draft.stage !== 'comment'} onClick={props.onSkipComment}>Без комментария</Button>
-  </div>;
+  return <MessageSecondaryAction onClick={props.onSkipComment}>Без комментария</MessageSecondaryAction>;
 }
 
 export function FeedbackCancelAction({ onCancel }: { onCancel: () => void }) {

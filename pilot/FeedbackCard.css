@@ -14,8 +14,6 @@
 .feedback-stars label.disabled { cursor:default; opacity:.78; }
 .feedback-stars svg { width:20px; height:20px; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round; }
 .feedback-star-control>span { font-size:12px; }
-.feedback-inline-action { display:flex; justify-content:flex-start; }
-.feedback-inline-action button { min-height:40px; }
 @media(max-width:680px){.feedback-stars{gap:4px}.feedback-stars label{width:38px}.feedback-star-control{min-height:38px;grid-template-columns:18px 10px}.feedback-stars svg{width:18px;height:18px}}
 @media(prefers-reduced-motion:reduce){.feedback-card *{scroll-behavior:auto!important;transition:none!important}}
 @media(forced-colors:active){.feedback-stars label.selected .feedback-star-control{border:2px solid CanvasText}}
