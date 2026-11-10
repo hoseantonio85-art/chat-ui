@@ -17,6 +17,13 @@ describe('pilot explanations', () => {
     expect(events.find(event => event.kind === 'toolResult')?.at).toBe(4500);
   });
 
+  it('keeps expert work in one flat activity trace', () => {
+    const {events} = fixture('subagent', 'run', 0);
+    expect(events.every(event => !event.parentCallId)).toBe(true);
+    expect(events.filter(event => event.kind === 'delegation').map(event => event.callId)).toEqual(['expert']);
+    expect(events.filter(event => event.kind === 'toolCall').map(event => event.callId)).toEqual(['profile', 'method', 'risks']);
+  });
+
   it('places every scenario in the tree exactly once', () => {
     const treeIds = [...scenarioGroups.flatMap(group => group.scenarioIds), ...ungroupedScenarioIds];
     expect(new Set(treeIds).size).toBe(treeIds.length);
