@@ -30,7 +30,7 @@ import { Graphs } from '@/components/UniversalChart/components/Graphs';
 import { IChartData } from '@/components/UniversalChart/types';
 import { ERoles } from '../../types';
 import { Table } from '../Table';
-import { useMessageAddon } from '../../MessageAddonContext';
+import { isMessageAddonSlots, useMessageAddon } from '../../MessageAddonContext';
 import classes from './styles.module.scss';
 import type { IMessageProps } from './types';
 
@@ -46,7 +46,13 @@ export const Message = React.memo((props: IMessageProps) => {
 	const { reaction, role, skill, text } = message;
 	const agentRun = useAgentRun(id as string);
 	const renderMessageAddon = useMessageAddon();
-	const messageAddon = renderMessageAddon?.(message as IMessage);
+	const renderedMessageAddon = renderMessageAddon?.(message as IMessage);
+	const messageAddon = renderedMessageAddon && isMessageAddonSlots(renderedMessageAddon)
+		? renderedMessageAddon.inMessage
+		: renderedMessageAddon;
+	const messageAfter = renderedMessageAddon && isMessageAddonSlots(renderedMessageAddon)
+		? renderedMessageAddon.afterMessage
+		: undefined;
 	const isAgentPending = message.extras?.agentPending === 'true';
 	const hasAgentTrace = hasTrace(agentRun);
 
@@ -205,6 +211,7 @@ export const Message = React.memo((props: IMessageProps) => {
 					/>
 				)}
 			</div>}
+			{messageAfter && <div className={classes.messageAfter}>{messageAfter}</div>}
 			{(isReactionsVisible || skill) && (
 				<Row
 					className={cn(classes.attributes, {

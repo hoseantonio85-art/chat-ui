@@ -180,8 +180,8 @@ function createCsiPreview(stepId: Extract<AtlasStepId, `csi.${string}`>, baseThr
   const outcome = stepId === 'csi.error' ? 'error' : 'success';
   let draft = createCsiDraft('proactive', at(20), { mockOutcome: outcome });
   const messages: IMessage[] = [
-    { id:'atlas-csi-context', role:ERoles.bot, text:'Сохранил «Регламент управления операционными рисками.docx» в базу знаний, в папку «Операционные риски».', timeCreated:at(19) },
-    { id:'atlas-csi-prompt', role:ERoles.bot, text:'Готово, документ сохранён. Можно ещё один короткий вопрос?', extras:{type:'system', feedbackAddon:'csi-rating'}, timeCreated:at(20) },
+    { id:'atlas-csi-context', role:ERoles.bot, text:'Готово, «Регламент управления операционными рисками.docx» сохранён в базе знаний в папке «Операционные риски».', timeCreated:at(19) },
+    { id:'atlas-csi-prompt', role:ERoles.bot, text:'Можно ещё один короткий вопрос?', extras:{type:'system', feedbackAddon:'csi-rating'}, timeCreated:at(20) },
   ];
   if (stepId === 'csi.declined') {
     draft = cancelCsi(draft);

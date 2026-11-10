@@ -10,7 +10,6 @@ interface FeedbackCardProps {
   draft: CsiDraft;
   onRate: (value: number) => void;
   onSkipComment: () => void;
-  onCancel: () => void;
 }
 
 const Star = ({ selected }: { selected: boolean }) => (
@@ -19,13 +18,9 @@ const Star = ({ selected }: { selected: boolean }) => (
   </svg>
 );
 
-function RatingCard({ draft, onRate, onCancel }: Pick<FeedbackCardProps, 'draft' | 'onRate' | 'onCancel'>) {
+function RatingCard({ draft, onRate }: Pick<FeedbackCardProps, 'draft' | 'onRate'>) {
   const selected = draft.rating.value;
   return <section className="feedback-card feedback-rating-card" aria-labelledby="csi-question">
-    <div className="feedback-card-heading">
-      <span className="feedback-demo-badge">CSI</span>
-      <span>Можно пропустить</span>
-    </div>
     <fieldset>
       <legend id="csi-question">{draft.rating.question}</legend>
       <p>1 — совсем не доволен, 5 — полностью доволен</p>
@@ -47,15 +42,18 @@ function RatingCard({ draft, onRate, onCancel }: Pick<FeedbackCardProps, 'draft'
         </label>)}
       </div>
     </fieldset>
-    <div className="feedback-rating-actions"><Button size="S" variant="secondary" disabled={draft.stage !== 'rating'} onClick={onCancel}>Не сейчас</Button></div>
   </section>;
 }
 
 export function FeedbackCard(props: FeedbackCardProps) {
-  if (props.addon === 'csi-rating') return <RatingCard draft={props.draft} onRate={props.onRate} onCancel={props.onCancel} />;
+  if (props.addon === 'csi-rating') return <RatingCard draft={props.draft} onRate={props.onRate} />;
   return <div className="feedback-inline-action">
     <Button size="S" variant="secondary" disabled={props.draft.stage !== 'comment'} onClick={props.onSkipComment}>Без комментария</Button>
   </div>;
+}
+
+export function FeedbackCancelAction({ onCancel }: { onCancel: () => void }) {
+  return <button type="button" className="feedback-cancel-action" onClick={onCancel}>Не сейчас</button>;
 }
 
 export type { FeedbackAddon };
