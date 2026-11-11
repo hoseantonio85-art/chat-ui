@@ -1,14 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Button } from '@sber-orm/ui-kit';
+import { useEffect, useRef } from 'react';
 import { chat$ } from './mocks/auth';
+import { saveVndToKnowledge } from './mocks/files';
 import { ERoles, type IMessage } from '@/types';
 import type { ChatThread } from '../src/components/ThreadDrawer/context';
 import { appendEvent, createRun, type AgentRun } from '../src/components/AgentActivity/model';
 import { appendExplanation, vndBackgroundExplanation } from './scenarioExplanations';
 import {
   applyVndBackgroundEvent,
-  parseVndSaveIntent,
-  vndFolders,
+  canSaveVnd,
+  vndSaveQuestion,
   type VndBackgroundThreadState,
   type VndFolder,
 } from './VndBackground.model';
@@ -31,11 +31,6 @@ export function useVndBackground<T extends BackgroundThread>(options: {
   const latest = useRef(options);
   latest.current = options;
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  const [folderDialog, setFolderDialog] = useState<string>();
-  const [folder, setFolder] = useState<VndFolder>(vndFolders[0]);
-  const [knowledge, setKnowledge] = useState(false);
-  const [files, setFiles] = useState<{ id: string; name: string; folder: VndFolder; documentIds: string }[]>([]);
-  const [chatOpen, setChatOpen] = useState(chat$.value.isPortalOpen);
 
   const markRead = (id: string) => {
     latest.current.update(items => applyVndBackgroundEvent(items, id, { type: 'markRead' }));
@@ -49,7 +44,6 @@ export function useVndBackground<T extends BackgroundThread>(options: {
     };
     const sub = chat$.observer$.subscribe({
       next: value => {
-        setChatOpen(value.isPortalOpen);
         if (value.isPortalOpen) markVisibleResultRead();
       },
     });
@@ -121,139 +115,69 @@ export function useVndBackground<T extends BackgroundThread>(options: {
       latest.current.publishRun(id, run);
 
       const isToBe = current.scenario?.endsWith('ToBe') === true;
-      const message: IMessage = {
+      const result: IMessage = {
         id: crypto.randomUUID(),
         role: ERoles.bot,
         text: isToBe
-          ? '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено.\n\nВыберите папку и подтвердите сохранение актуального ВНД в базе знаний.'
+          ? '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено.'
           : '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено.\n\nПредлагаю сохранить актуальный ВНД в базу знаний, в папку «Операционные риски». **Напишите «Да»**, чтобы подтвердить, или укажите другую папку: «Внутренние нормативные документы» или «Методология».',
-        extras: isToBe ? { vndAddon: 'save-confirmation' } : undefined,
-        timeCreated: new Date().toISOString(),
+        timeCreated: new Date(completedAt).toISOString(),
       };
+      const messages = [result];
+      if (isToBe) messages.push({
+        id: crypto.randomUUID(),
+        role: ERoles.bot,
+        text: vndSaveQuestion,
+        extras: { vndAddon: 'save-confirmation' },
+        timeCreated: new Date(completedAt + 1).toISOString(),
+      });
       const isActiveNow = latest.current.activeId.current === id;
       if (isActiveNow) {
-        latest.current.append(message);
+        messages.forEach(latest.current.append);
         latest.current.snapshot();
       }
       latest.current.update(items => applyVndBackgroundEvent(items, id, {
         type: 'complete',
         unread: !visible,
-        message: isActiveNow ? undefined : message,
+        messages: isActiveNow ? undefined : messages,
         at: Date.now(),
       }));
     }, 10_000));
   };
 
-  const save = (id: string, targetFolder: VndFolder = folder) => {
+  const save = (id: string, targetFolder: VndFolder) => {
     const thread = latest.current.getThreads().find(item => item.id === id);
-    if (!thread || thread.jobState !== 'ready') return;
-    setFiles(items => [
-      ...items.filter(item => item.id !== id),
-      {
-        id,
-        name: thread.documentName || 'ВНД.docx',
-        folder: targetFolder,
-        documentIds: thread.documentIds || '[]',
-      },
-    ]);
-    latest.current.append({
-      id: crypto.randomUUID(),
-      role: ERoles.bot,
-      text: `Сохранил «${thread.documentName || 'ВНД.docx'}» в базу знаний, в папку «${targetFolder}».`,
-      timeCreated: new Date().toISOString(),
-    });
-    latest.current.snapshot();
-    latest.current.update(items => applyVndBackgroundEvent(items, id, {
-      type: 'save',
-      folder: targetFolder,
-      at: Date.now(),
-    }));
-    setFolderDialog(undefined);
-  };
-
-  const saveFromChat = (id: string, text: string): boolean => {
-    const intent = parseVndSaveIntent(text);
-    if (intent.kind === 'decline') {
+    if (!thread || latest.current.activeId.current !== id || !canSaveVnd(thread)) return false;
+    const record = saveVndToKnowledge(thread.documentIds, targetFolder);
+    if (!record) {
       latest.current.append({
         id: crypto.randomUUID(),
         role: ERoles.bot,
-        text: 'Хорошо, пока не сохраняю. Если решите сохранить ВНД позднее, напишите «Сохрани».',
+        text: 'Актуальный файл недоступен. Начните проверку заново и прикрепите документ ещё раз.',
         timeCreated: new Date().toISOString(),
       });
       latest.current.snapshot();
-      return true;
+      return false;
     }
-    if (intent.kind === 'save') {
-      save(id, intent.folder);
-      return true;
-    }
-    return false;
-  };
-
-  const declineSave = (id: string) => {
-    const thread = latest.current.getThreads().find(item => item.id === id);
-    if (!thread || thread.jobState !== 'ready') return;
+    latest.current.update(items => applyVndBackgroundEvent(items, id, {
+      type: 'save',
+      folder: record.folder,
+      at: Date.now(),
+    }));
     latest.current.append({
       id: crypto.randomUUID(),
       role: ERoles.bot,
-      text: 'Хорошо, ВНД пока не сохраняю. Вернуться к сохранению можно позже из этого диалога.',
+      text: `Сохранил «${record.name}» в базу знаний, в папку «${record.folder}».`,
       timeCreated: new Date().toISOString(),
     });
     latest.current.snapshot();
-    latest.current.update(items => items.map(item => item.id === id
-      ? { ...item, jobState: undefined, unread: false, agentUnread: false, updatedAt: Date.now() }
-      : item));
+    return true;
   };
 
-  const active = options.getThreads().find(item => item.id === options.activeId.current);
   const cancel = (id: string) => {
     const timer = timers.current.get(id);
     if (timer) clearTimeout(timer);
     timers.current.delete(id);
   };
-  const legacySaveControls = false; // Retain the previous folder picker flow for a later iteration.
-
-  return {
-    start,
-    markRead,
-    cancel,
-    save,
-    declineSave,
-    saveFromChat,
-    ui: <>
-      {legacySaveControls && chatOpen && active?.jobState === 'ready' && <div className="vnd-save-actions">
-        <span>База знаний · {active.documentName}</span>
-        <Button size="S" onClick={() => { setFolder(vndFolders[0]); setFolderDialog(active.id); }}>Сохранить ВНД</Button>
-        <Button size="S" variant="secondary" onClick={() => { setFolder(vndFolders[0]); setFolderDialog(active.id); }}>Выбрать папку</Button>
-      </div>}
-      {legacySaveControls && chatOpen && active?.jobState === 'saved' && <div className="vnd-save-actions">
-        <span>ВНД сохранён в базе знаний</span>
-        <Button size="S" variant="secondary" onClick={() => setKnowledge(true)}>Открыть в базе знаний</Button>
-      </div>}
-      {legacySaveControls && folderDialog && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Сохранить ВНД">
-        <h2>Сохранить ВНД в базу знаний</h2>
-        <p>{active?.documentName}</p>
-        <label>Папка
-          <select autoFocus value={folder} onChange={event => setFolder(event.target.value as VndFolder)}>
-            {vndFolders.map(item => <option key={item}>{item}</option>)}
-          </select>
-        </label>
-        <p>Будет сохранён только актуальный файл ВНД.</p>
-        <div className="vnd-dialog-actions">
-          <Button onClick={() => save(folderDialog)}>Сохранить</Button>
-          <Button variant="secondary" onClick={() => setFolderDialog(undefined)}>Отмена</Button>
-        </div>
-      </div>}
-      {knowledge && <div className="demo-action" role="dialog" aria-modal="true" aria-label="База знаний">
-        <h2>База знаний</h2>
-        {files.map(file => <div key={file.id} className="vnd-knowledge-file">
-          <small>{file.folder}</small>
-          <strong>{file.name}</strong>
-          <span>Актуальная версия · DOCX</span>
-        </div>)}
-        <p>Здесь хранятся актуальные версии сохранённых документов.</p>
-        <Button variant="secondary" onClick={() => setKnowledge(false)}>Вернуться в чат</Button>
-      </div>}
-    </>,
-  };
+  return { start, markRead, cancel, save };
 }

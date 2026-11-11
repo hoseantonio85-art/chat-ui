@@ -23,11 +23,13 @@ describe('parseVndSaveIntent', () => {
   it.each([
     ['Да', 'Операционные риски'],
     ['Да, сохраняй', 'Операционные риски'],
+    ['Да, сохранить', 'Операционные риски'],
     ['Да пожалуйста', 'Операционные риски'],
     ['Хорошо, сохраняй', 'Операционные риски'],
     ['Ок, сохраняй', 'Операционные риски'],
     ['Сохрани', 'Операционные риски'],
     ['Методология', 'Методология'],
+    ['В папку «Методология»', 'Методология'],
     ['  «Внутренние нормативные документы»  ', 'Внутренние нормативные документы'],
     ['Сохрани в папку «Методология»', 'Методология'],
   ])('recognizes save request %j', (input, folder) => {
@@ -36,6 +38,7 @@ describe('parseVndSaveIntent', () => {
 
   it.each([
     'Нет',
+    'Не сейчас',
     'Не сохраняй',
     'Не сохранить',
     'Я не хочу сохранять',
@@ -58,9 +61,26 @@ describe('parseVndSaveIntent', () => {
     'Что находится в папке Методология?',
     'нетерпение',
     'Расскажи подробнее',
+    'Что мне делать, если я не уверен?',
+    'Сохранить?',
+    'Как сохранить ВНД?',
+    'Сохрани в папку «Другое»',
   ])('leaves unrelated text unknown for %j', input => {
     expect(parseVndSaveIntent(input)).toEqual({ kind: 'unknown' });
   });
+
+  it('recognizes requests to reopen the save choices and open the folder dialog', () => {
+    expect(parseVndSaveIntent('Вернуться к сохранению')).toEqual({ kind: 'resume' });
+    expect(parseVndSaveIntent('Выбрать другую папку')).toEqual({ kind: 'chooseFolder' });
+  });
+});
+
+it('saves a deferred foreground review once and keeps the checked document attached to the record', () => {
+  const source = [thread({ vndStage: 'saveDeferred', documentIds: '["corrected"]' })];
+  const event = { type: 'save', folder: 'Методология', at: 2 } as const;
+  const saved = applyVndBackgroundEvent(source, 'vnd', event);
+  expect(saved[0]).toMatchObject({ jobState: 'saved', documentIds: '["corrected"]', folder: 'Методология' });
+  expect(applyVndBackgroundEvent(saved, 'vnd', { ...event, folder: 'Операционные риски' })).toBe(saved);
 });
 
 describe('canResolveVndAttachmentLookup', () => {
@@ -112,18 +132,18 @@ describe('applyVndBackgroundEvent', () => {
   });
 
   it('completes an inactive thread exactly once and stores its result', () => {
-    const message = { id: 'result', text: 'Готово' };
+    const messages = [{ id: 'result', text: 'Готово' }, { id: 'save-prompt', text: 'Сохранить ВНД?' }];
     const running = thread({ jobState: 'running' });
     const first = applyVndBackgroundEvent([running], 'vnd', {
       type: 'complete',
       unread: true,
-      message,
+      messages,
       at: 20,
     });
     const second = applyVndBackgroundEvent(first, 'vnd', {
       type: 'complete',
       unread: true,
-      message,
+      messages,
       at: 21,
     });
 
@@ -132,7 +152,7 @@ describe('applyVndBackgroundEvent', () => {
       agentState: 'ready', agentUnread: true,
       updatedAt: 20,
     });
-    expect(first[0].messages).toEqual([message]);
+    expect(first[0].messages).toEqual(messages);
     expect(second).toBe(first);
   });
 

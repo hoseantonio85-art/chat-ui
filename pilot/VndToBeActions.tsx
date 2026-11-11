@@ -1,48 +1,95 @@
-import React, { useState } from 'react';
-import { Button, Select } from '@sber-orm/ui-kit';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { vndFolders, type VndFolder } from './VndBackground.model';
 import { vndStandards } from './scenarios';
 import './VndToBeActions.css';
 
-export function VndStandardActions({ onSelect }: { onSelect: (number: number) => void }) {
-  return <div className="vnd-to-be-card" aria-label="Выбор группового документа">
-    <div className="vnd-to-be-options">
-      {vndStandards.map((standard, index) => <button
-        type="button"
-        className="vnd-to-be-option"
-        key={standard}
-        onClick={() => onSelect(index + 1)}
-      >
-        <span aria-hidden="true">{index + 1}</span>
-        <span>{standard}</span>
-      </button>)}
-    </div>
+type Action = { label: string; onSelect: () => void };
+type Placement = 'inline' | 'sticky';
+
+function ContextualActions({ label, actions, placement, long }: {
+  label: string;
+  actions: Action[];
+  placement: Placement;
+  long?: boolean;
+}) {
+  const buttons = <div className={long ? 'context-actions context-actions-long' : 'context-actions'} role="group" aria-label={label}>
+    {actions.map(({ label: text, onSelect }, index) => (
+      <button type="button" className="context-action" key={text} onClick={onSelect}>
+        {long && <span className="context-action-number">{index + 1}</span>}
+        <span>{text}</span>
+      </button>
+    ))}
+  </div>;
+
+  if (placement === 'inline') return buttons;
+  return <div className="context-actions-sticky">
+    {long ? <details><summary>{label}</summary>{buttons}</details> : <>
+      <div className="context-actions-label">{label}</div>
+      {buttons}
+    </>}
   </div>;
 }
 
-export function VndSaveActions({
-  onConfirm,
-}: {
+export function VndStandardActions({ placement, onSelect }: {
+  placement: Placement;
+  onSelect: (standard: string) => void;
+}) {
+  return <ContextualActions
+    label="Выберите групповой стандарт"
+    placement={placement}
+    long
+    actions={vndStandards.map(standard => ({ label: standard, onSelect: () => onSelect(standard) }))}
+  />;
+}
+
+export function VndSaveActions({ placement, onReply }: {
+  placement: Placement;
+  onReply: (reply: string) => void;
+}) {
+  return <ContextualActions
+    label="Сохранить ВНД в «Операционные риски»?"
+    placement={placement}
+    actions={['Да, сохранить', 'Выбрать другую папку', 'Не сейчас'].map(label => ({
+      label,
+      onSelect: () => onReply(label),
+    }))}
+  />;
+}
+
+export function VndFolderDialog({ onCancel, onConfirm }: {
+  onCancel: () => void;
   onConfirm: (folder: VndFolder) => void;
 }) {
-  const [folder, setFolder] = useState<VndFolder>(vndFolders[0]);
-  const folderOptions = vndFolders.map(value => ({ value, label: value }));
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [folder, setFolder] = useState<VndFolder>();
 
-  return <div className="vnd-to-be-card vnd-to-be-save" aria-label="Подтверждение сохранения ВНД">
-    <Select
-      className="vnd-to-be-select"
-      dropdownProps={{ className: 'vnd-to-be-select-dropdown' }}
-      label="Папка в базе знаний"
-      labelInside
-      limitByWidth
-      options={folderOptions}
-      showCheckMark={false}
-      size="M"
-      value={folder}
-      onChange={value => setFolder(value as VndFolder)}
-    />
-    <div className="vnd-to-be-actions">
-      <Button size="S" onClick={() => onConfirm(folder)}>Сохранить</Button>
-    </div>
-  </div>;
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    element?.showModal();
+    return () => element?.close();
+  }, []);
+
+  return <dialog className="vnd-folder-dialog" ref={dialog} aria-labelledby="vnd-folder-title" onCancel={event => {
+    event.preventDefault();
+    event.stopPropagation();
+    onCancel();
+  }}>
+    <form onSubmit={event => {
+      event.preventDefault();
+      if (folder) onConfirm(folder);
+    }}>
+      <h2 id="vnd-folder-title">Папка для актуального ВНД</h2>
+      <fieldset>
+        <legend className="sr-only">Выберите папку в базе знаний</legend>
+        {vndFolders.map(item => <label key={item}>
+          <input type="radio" name="vnd-folder" value={item} checked={folder === item} onChange={() => setFolder(item)} />
+          {item}
+        </label>)}
+      </fieldset>
+      <div className="vnd-folder-footer">
+        <button type="button" className="context-action" onClick={onCancel}>Отмена</button>
+        <button type="submit" className="context-action" disabled={!folder}>Сохранить</button>
+      </div>
+    </form>
+  </dialog>;
 }

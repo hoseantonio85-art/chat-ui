@@ -1,7 +1,6 @@
 import { useAction, useAtom } from '@reatom/npm-react';
 import cn from 'classnames';
 import React, {
-	useDeferredValue,
 	useEffect,
 	useLayoutEffect,
 	useRef,
@@ -84,8 +83,6 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 		const [text, setText] = useState('');
 		const [clearingContext, setClearingContext] = useState(false);
 
-		const textDefer = useDeferredValue(text);
-
 		const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
 		const canClearContext =
@@ -109,7 +106,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 			const fileIds = await handleUploadFiles();
 
 			send({
-				body: textDefer,
+				body: text,
 				extras: {
 					...(fileIds.length > 0 ? { fileIds: JSON.stringify(fileIds) } : {}),
 					...(selectedSkill ? { skill: selectedSkill.id, skillTitle: selectedSkill.title } : {}),
@@ -137,7 +134,8 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 		const handleKeyDown = async (event: React.KeyboardEvent) => {
 			if (
 				event.key === 'Enter' &&
-				!(event.key === 'Enter' && event.shiftKey) &&
+				!event.shiftKey &&
+				!uploadingFiles &&
 				(text?.trim() || attachments.length > 0)
 			) {
 				event.preventDefault();
@@ -223,7 +221,7 @@ export const ChatInput = React.forwardRef<HTMLDivElement, IChatInputProps>(
 			}
 
 			if (size === 'lg') {
-				setUserTextAtom(textDefer);
+				setUserTextAtom(text);
 
 				setText('');
 				onSubmit?.();

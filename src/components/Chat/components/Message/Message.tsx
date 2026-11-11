@@ -42,6 +42,8 @@ export const Message = React.memo((props: IMessageProps) => {
 		message = {},
 		sending,
 		onOpenChart,
+		contextualPrompt,
+		contextualActions,
 	} = props;
 	const { reaction, role, skill, text } = message;
 	const agentRun = useAgentRun(id as string);
@@ -156,6 +158,7 @@ export const Message = React.memo((props: IMessageProps) => {
 		>
 			{(hasAgentTrace || isAgentPending) && <AgentActivity run={agentRun} />}
 			{(loader || text || fileIds.length > 0 || !!graphsData || !!messageAddon) && <div
+				data-contextual-prompt={contextualPrompt || undefined}
 				className={cn(classes.message, {
 					[classes.messageBot]: role === ERoles.bot || loader,
 					[classes.messageLoader]: loader,
@@ -212,6 +215,7 @@ export const Message = React.memo((props: IMessageProps) => {
 				)}
 			</div>}
 			{messageAfter && <div className={classes.messageAfter}>{messageAfter}</div>}
+			{contextualActions}
 			{(isReactionsVisible || skill) && (
 				<Row
 					className={cn(classes.attributes, {
