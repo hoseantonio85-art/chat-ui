@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
+import { EIconName, Icon } from '@sber-orm/ui-kit';
 import { vndFolders, type VndFolder } from './VndBackground.model';
 import { vndStandards } from './scenarios';
 import './VndToBeActions.css';
@@ -24,7 +25,15 @@ function ContextualActions({ label, actions, placement, layout }: {
 
   if (placement === 'inline') return buttons;
   return <div className="context-actions-sticky">
-    {isList ? <details><summary>{label}</summary>{buttons}</details> : <>
+    {isList ? <details>
+      <summary>
+        <span className="context-actions-chevron" aria-hidden="true">
+          <Icon name={EIconName.chevronFillRight} width={16} height={16} />
+        </span>
+        {label}
+      </summary>
+      {buttons}
+    </details> : <>
       <div className="context-actions-label">{label}</div>
       {buttons}
     </>}

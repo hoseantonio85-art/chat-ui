@@ -132,6 +132,19 @@
   overflow-x: hidden;
 }
 
+// Keep the observed scroll viewport the same size as the panel opens and closes.
+.stickyActionsAnchor {
+  position: relative;
+  flex: 0 0 0;
+}
+
+.stickyActions {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 3;
+}
+
 .messages {
   margin-right: -40px;
   padding-right: 24px;

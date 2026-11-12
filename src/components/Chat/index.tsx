@@ -287,8 +287,9 @@ export const Chat = React.memo(
 								sending={isMessageSending(message.id as string)}
 								onOpenChart={!isPhone ? handleOpenChart : undefined}
 								contextualPrompt={Boolean(promptId && message.id === promptId)}
-								contextualActions={promptId && message.id === promptId && !showStickyActions
+								contextualActions={promptId && message.id === promptId
 									? contextualActions?.render('inline') : undefined}
+								hideContextualActions={showStickyActions && message.id === promptId}
 							/>
 						))}
 						{messages.length > 0 ? (
@@ -298,7 +299,9 @@ export const Chat = React.memo(
 							/>
 						) : null}
 					</div>
-					{showStickyActions && contextualActions?.render('sticky')}
+					{showStickyActions && <div className={classes.stickyActionsAnchor}>
+						<div className={classes.stickyActions}>{contextualActions?.render('sticky')}</div>
+					</div>}
 					<ChatInput
 						size="sm"
 						buttonText={t('send') || ''}

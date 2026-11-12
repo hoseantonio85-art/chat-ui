@@ -122,6 +122,11 @@
   contain: inline-size;
 }
 
+.contextualActionsHidden {
+  // Preserve the prompt's position in the scroll history during the move.
+  visibility: hidden;
+}
+
 .attributes {
   @extend .row;
 

@@ -10,5 +10,6 @@ export interface IMessageProps {
 	sending?: boolean;
 	contextualPrompt?: boolean;
 	contextualActions?: ReactNode;
+	hideContextualActions?: boolean;
 	onOpenChart?: (value: IChartData) => void;
 }

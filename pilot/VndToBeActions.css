@@ -75,9 +75,28 @@
 }
 
 .context-actions-sticky summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
   cursor: pointer;
   font-weight: 600;
 }
+
+.context-actions-sticky summary::-webkit-details-marker { display: none; }
+
+.context-actions-chevron {
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  height: 24px;
+  color: var(--iconBaseSecondary, #6d7682);
+  background: var(--backgroundSecondaryDefault, #f0f2f5);
+  border-radius: 50%;
+}
+
+.context-actions-chevron svg { transition: transform 160ms ease-out; }
+.context-actions-sticky details[open] .context-actions-chevron svg { transform: rotate(90deg); }
 
 .context-actions-sticky .context-actions {
   margin-top: 16px;
@@ -86,6 +105,7 @@
 .context-actions-sticky .context-actions-list {
   max-height: min(35dvh, 244px);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .context-actions-sticky .context-actions-list .context-action:focus-visible { outline-offset: -2px; }
@@ -99,6 +119,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .context-actions-sticky { animation: none; }
+  .context-actions-chevron svg { transition: none; }
 }
 
 .vnd-folder-dialog {

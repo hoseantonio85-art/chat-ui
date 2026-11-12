@@ -44,6 +44,7 @@ export const Message = React.memo((props: IMessageProps) => {
 		onOpenChart,
 		contextualPrompt,
 		contextualActions,
+		hideContextualActions,
 	} = props;
 	const { reaction, role, skill, text } = message;
 	const agentRun = useAgentRun(id as string);
@@ -220,7 +221,10 @@ export const Message = React.memo((props: IMessageProps) => {
 			{contextualPrompt ? (
 				<div className={classes.contextualPrompt}>
 					{bubble}
-					{contextualActions && <div className={classes.contextualActions}>{contextualActions}</div>}
+					{contextualActions && <div
+						className={cn(classes.contextualActions, { [classes.contextualActionsHidden]: hideContextualActions })}
+						aria-hidden={hideContextualActions || undefined}
+					>{contextualActions}</div>}
 				</div>
 			) : bubble}
 			{messageAfter && <div className={classes.messageAfter}>{messageAfter}</div>}
