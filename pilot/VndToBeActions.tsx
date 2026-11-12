@@ -6,16 +6,17 @@ import './VndToBeActions.css';
 type Action = { label: string; onSelect: () => void };
 type Placement = 'inline' | 'sticky';
 
-function ContextualActions({ label, actions, placement, long }: {
+function ContextualActions({ label, actions, placement, layout }: {
   label: string;
   actions: Action[];
   placement: Placement;
-  long?: boolean;
+  layout: 'list' | 'row';
 }) {
-  const buttons = <div className={long ? 'context-actions context-actions-long' : 'context-actions'} role="group" aria-label={label}>
+  const isList = layout === 'list';
+  const buttons = <div className={isList ? 'context-actions context-actions-list' : 'context-actions'} role="group" aria-label={label}>
     {actions.map(({ label: text, onSelect }, index) => (
       <button type="button" className="context-action" key={text} onClick={onSelect}>
-        {long && <span className="context-action-number">{index + 1}</span>}
+        {isList && <span className="context-action-number">{index + 1}</span>}
         <span>{text}</span>
       </button>
     ))}
@@ -23,7 +24,7 @@ function ContextualActions({ label, actions, placement, long }: {
 
   if (placement === 'inline') return buttons;
   return <div className="context-actions-sticky">
-    {long ? <details><summary>{label}</summary>{buttons}</details> : <>
+    {isList ? <details><summary>{label}</summary>{buttons}</details> : <>
       <div className="context-actions-label">{label}</div>
       {buttons}
     </>}
@@ -37,7 +38,7 @@ export function VndStandardActions({ placement, onSelect }: {
   return <ContextualActions
     label="Выберите групповой стандарт"
     placement={placement}
-    long
+    layout="list"
     actions={vndStandards.map(standard => ({ label: standard, onSelect: () => onSelect(standard) }))}
   />;
 }
@@ -49,6 +50,7 @@ export function VndSaveActions({ placement, onReply }: {
   return <ContextualActions
     label="Сохранить ВНД в «Операционные риски»?"
     placement={placement}
+    layout="row"
     actions={['Да, сохранить', 'Выбрать другую папку', 'Не сейчас'].map(label => ({
       label,
       onSelect: () => onReply(label),

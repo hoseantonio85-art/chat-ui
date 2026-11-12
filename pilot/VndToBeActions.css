@@ -32,7 +32,13 @@
   width: max-content;
 }
 
-.context-actions-long .context-action {
+.context-actions-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.context-actions-list .context-action {
+  width: 100%;
   border-radius: 14px;
 }
 
@@ -73,12 +79,12 @@
   margin-top: 16px;
 }
 
-.context-actions-sticky .context-actions-long {
+.context-actions-sticky .context-actions-list {
   max-height: min(35dvh, 244px);
   overflow-y: auto;
 }
 
-.context-actions-sticky .context-actions-long .context-action:focus-visible { outline-offset: -2px; }
+.context-actions-sticky .context-actions-list .context-action:focus-visible { outline-offset: -2px; }
 .context-actions-label { font-weight: 600; }
 .context-actions-sticky .context-action { min-height: 34px; padding: 5px 12px; }
 
