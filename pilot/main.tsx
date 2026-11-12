@@ -770,7 +770,24 @@ function App() {
     }
     chat$.openChat();
   }
-  useEffect(() => { const listener = (event: Event) => setActionUrl((event as CustomEvent<string>).detail); window.addEventListener('pilot:navigate',listener); const bootstrap = setTimeout(() => {const thread=threadsRef.current.find(item=>item.id===initialState.activeThreadId) || threadsRef.current[0]; loadThread(thread); if (initialState.embedded || window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen); chat$.openChat();}, 50); return () => {clearTimeout(bootstrap); clearAllTimers(); window.removeEventListener('pilot:navigate',listener);}; }, []);
+  useEffect(() => {
+    const listener = (event: Event) => setActionUrl((event as CustomEvent<string>).detail);
+    window.addEventListener('pilot:navigate', listener);
+    const bootstrap = setTimeout(() => {
+      const thread = threadsRef.current.find(item => item.id === initialState.activeThreadId) ?? threadsRef.current[0];
+      loadThread(thread);
+      if (initialState.embedded || window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen);
+      chat$.openChat();
+      if (initialState.previewStepId === 'reply-ready.switch' && thread.documentIds && thread.documentName) {
+        background.start(thread.id, thread.documentIds, thread.documentName);
+      }
+    }, 50);
+    return () => {
+      clearTimeout(bootstrap);
+      clearAllTimers();
+      window.removeEventListener('pilot:navigate', listener);
+    };
+  }, []);
   useEffect(() => {
     if (!initialState.embedded || window.parent === window) return;
     const forwardEscape = (event: KeyboardEvent) => {

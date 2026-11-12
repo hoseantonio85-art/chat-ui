@@ -26,6 +26,9 @@ export type AtlasStepId =
   | 'vnd.unread'
   | 'vnd.result'
   | 'vnd.saved'
+  | 'reply-ready.switch'
+  | 'reply-ready.unread'
+  | 'reply-ready.read'
   | 'settings.history'
   | 'settings.overview'
   | 'settings.confirm'
@@ -271,6 +274,7 @@ function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${strin
 
 const knownSteps = new Set<AtlasStepId>([
   'vnd.start', 'vnd.running', 'vnd.history-running', 'vnd.unread', 'vnd.result', 'vnd.saved',
+  'reply-ready.switch', 'reply-ready.unread', 'reply-ready.read',
   'settings.history', 'settings.overview', 'settings.confirm', 'settings.updated',
   'settings-clear.overview', 'settings-clear.confirm', 'settings-clear.empty',
   'csi.prompt', 'csi.low', 'csi.neutral', 'csi.high', 'csi.skipped', 'csi.saved', 'csi.error', 'csi.declined',
@@ -305,8 +309,11 @@ export function createAtlasPreview(
     return createQualitativePreview(stepId as Extract<AtlasStepId, `feedback.${string}`>, baseThreads, initialMemory);
   }
   const settingsStep = stepId.startsWith('settings.') || stepId.startsWith('settings-clear.');
+  const replyReadyStep = stepId.startsWith('reply-ready.');
+  const switchChat = stepId === 'reply-ready.switch';
+  const unread = stepId === 'vnd.unread' || stepId === 'reply-ready.unread';
   const running = stepId === 'vnd.running' || stepId === 'vnd.history-running';
-  const ready = stepId === 'vnd.unread' || stepId === 'vnd.result';
+  const ready = unread || stepId === 'vnd.result' || stepId === 'reply-ready.read';
   const saved = stepId === 'vnd.saved';
   const vndMessages = stepId === 'vnd.start'
     ? [startMessage]
@@ -314,7 +321,9 @@ export function createAtlasPreview(
       ? [requestMessage, standardMessage, choiceMessage, resultMessage, saveRequestMessage, savedMessage]
       : ready
         ? [requestMessage, standardMessage, choiceMessage, resultMessage]
-        : [requestMessage, standardMessage, choiceMessage, pendingMessage];
+        : switchChat
+          ? [requestMessage, standardMessage, choiceMessage]
+          : [requestMessage, standardMessage, choiceMessage, pendingMessage];
   const runningRun = running ? createRunningRun() : undefined;
   const completedRun = ready || saved || settingsStep ? explainedReply(resultMessage, [
     'Готовлю итог проверки', 'В документе не найдено отклонений от выбранного стандарта. Предложу сохранить актуальную версию ВНД.',
@@ -332,17 +341,17 @@ export function createAtlasPreview(
     updatedAt: previewTime,
     messages: vndMessages,
     runs: reviewRun ? { [reviewRun.runId]: reviewRun } : {},
-    vndStage: stepId === 'vnd.start' ? 'start' as const : 'complete' as const,
+    vndStage: stepId === 'vnd.start' ? 'start' as const : switchChat ? 'reviewing' as const : 'complete' as const,
     documentIds: stepId === 'vnd.start' ? undefined : '["vnd-draft"]',
     documentName: stepId === 'vnd.start' ? undefined : 'Регламент управления операционными рисками.docx',
     jobState: running ? 'running' as const : ready ? 'ready' as const : saved || settingsStep ? 'saved' as const : undefined,
     agentState: running ? 'running' as const : ready ? 'ready' as const : undefined,
-    agentUnread: stepId === 'vnd.unread',
+    agentUnread: unread,
   });
 
   const emptyMemory = stepId === 'settings-clear.empty';
   let drawer: ThreadDrawerInitialState | undefined;
-  if (stepId === 'vnd.history-running' || stepId === 'vnd.unread' || stepId === 'settings.history') drawer = 'history';
+  if (stepId === 'vnd.history-running' || unread || replyReadyStep || stepId === 'settings.history') drawer = 'history';
   if (stepId === 'settings.overview' || stepId === 'settings.updated' || stepId === 'settings-clear.overview' || emptyMemory) drawer = 'settings';
   if (stepId === 'settings.confirm') drawer = 'memory-confirm';
   if (stepId === 'settings-clear.confirm') drawer = 'memory-clear-confirm';
@@ -350,8 +359,8 @@ export function createAtlasPreview(
   return {
     stepId,
     threads,
-    activeThreadId: stepId === 'vnd.unread' ? 'risk' : 'vnd',
-    scenario: stepId.startsWith('vnd.') ? 'vndBackground' : 'vnd',
+    activeThreadId: unread ? 'risk' : 'vnd',
+    scenario: stepId.startsWith('vnd.') || replyReadyStep ? 'vndBackground' : 'vnd',
     agentMemory: emptyMemory ? [] : stepId === 'settings.updated' ? initialMemory.slice(1) : [...initialMemory],
     drawer,
     drawerFocus: emptyMemory || stepId === 'settings.updated' ? 'memory-heading' : undefined,

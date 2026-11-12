@@ -26,7 +26,7 @@ const SCREEN_POSITIONS = [
 ];
 const SCREEN_BASE = `${import.meta.env.BASE_URL}scenario-map/`;
 const SCENARIO_LABELS: Record<ScenarioId, string> = {
-  vnd:'Проверка ВНД', settings:'Настройки', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
+  vnd:'Проверка ВНД', 'reply-ready':'Ответ готов в другом чате', settings:'Настройки', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
   'feedback-complaint':'Жалоба / помощь', 'feedback-positive':'Идея / похвала',
 };
 
@@ -118,6 +118,8 @@ export function App() {
   const selectedStep = getScenarioStep(scenario.id, location.stepId) ?? scenario.steps[0];
   const isStory = location.view === 'story';
   const isSettings = scenario.id === 'settings';
+  const isReplyReady = scenario.id === 'reply-ready';
+  const fitWholeFlow = isSettings || isReplyReady;
   const cardSize = isStory ? { width: 330, height: 250 } : { width: 510, height: 405 };
   const column = cardSize.width + 64;
   const row = cardSize.height + 56;
@@ -125,10 +127,14 @@ export function App() {
     { x: 0, y: row / 2 }, { x: column, y: row / 2 },
     { x: column * 2, y: 0 }, { x: column * 3, y: 0 },
     { x: column * 2, y: row }, { x: column * 3, y: row },
-  ] : isStory ? STORY_POSITIONS : SCREEN_POSITIONS;
+  ] : isReplyReady
+    ? scenario.steps.map((_, index) => ({ x: column * index, y: 0 }))
+    : isStory ? STORY_POSITIONS : SCREEN_POSITIONS;
   const boardSize = isSettings
     ? { width: column * 3 + cardSize.width, height: row + cardSize.height }
-    : isStory ? { width: 1640, height: 790 } : { width: 2160, height: 1090 };
+    : isReplyReady
+      ? { width: column * (scenario.steps.length - 1) + cardSize.width, height: cardSize.height }
+      : isStory ? { width: 1640, height: 790 } : { width: 2160, height: 1090 };
   const selectedBranches = isSettings ? getSettingsNextSteps(selectedStep.id) : [];
   const liveBranches = isSettings && fullScreenStep ? getSettingsNextSteps(fullScreenStep.id) : [];
 
@@ -145,18 +151,18 @@ export function App() {
   const fitBoard = useCallback(() => {
     const workspace = workspaceRef.current;
     if (!workspace) return;
-    const padding = isSettings ? 24 : 56;
+    const padding = fitWholeFlow ? 24 : 56;
     const fitZoom = Math.min(
       1,
       Math.min((workspace.clientWidth - padding * 2) / boardSize.width, (workspace.clientHeight - padding * 2) / boardSize.height),
     );
-    const zoom = Math.max(isSettings ? .14 : isStory ? .86 : .22, fitZoom);
+    const zoom = Math.max(fitWholeFlow ? .14 : isStory ? .86 : .22, fitZoom);
     setTransform({
       zoom,
-      x: isStory && !isSettings ? 24 : Math.max(12, (workspace.clientWidth - boardSize.width * zoom) / 2),
+      x: isStory && !fitWholeFlow ? 24 : Math.max(12, (workspace.clientWidth - boardSize.width * zoom) / 2),
       y: Math.max(24, (workspace.clientHeight - boardSize.height * zoom) / 2),
     });
-  }, [boardSize.height, boardSize.width, isSettings, isStory]);
+  }, [boardSize.height, boardSize.width, fitWholeFlow, isStory]);
 
   useEffect(() => {
     fitBoard();
@@ -282,7 +288,7 @@ export function App() {
     const rect = workspace.getBoundingClientRect();
     const pointX = event.clientX - rect.left;
     const pointY = event.clientY - rect.top;
-    const nextZoom = Math.min(1.25, Math.max(isSettings ? .14 : .2, transform.zoom * (event.deltaY > 0 ? .9 : 1.1)));
+    const nextZoom = Math.min(1.25, Math.max(fitWholeFlow ? .14 : .2, transform.zoom * (event.deltaY > 0 ? .9 : 1.1)));
     const ratio = nextZoom / transform.zoom;
     setTransform({
       zoom: nextZoom,
@@ -311,7 +317,7 @@ export function App() {
 
   const rootPosition = { x: 70, y: isStory ? 275 : 425, width: isStory ? 300 : 285, height: isStory ? 180 : 200 };
   const stepPoints = scenario.steps.map((_, index) => ({ ...positions[index], ...cardSize }));
-  const connectorPoints = [rootPosition, ...stepPoints];
+  const connectorPoints = isReplyReady ? stepPoints : [rootPosition, ...stepPoints];
   const settingsPoints = new Map(scenario.steps.map((step, index) => [step.id, stepPoints[index]]));
   const connections = isSettings
     ? settingsTransitions.map(([from, to]) => [settingsPoints.get(from)!, settingsPoints.get(to)!])
@@ -358,10 +364,10 @@ export function App() {
         <div className="workspace-title">
           <div><span>{scenario.eyebrow}</span><h1>{scenario.title}</h1></div>
           <div className="zoom-controls" aria-label="Масштаб карты">
-            <button onClick={() => setTransform(current => ({ ...current, zoom: Math.max(isSettings ? .14 : .2, current.zoom - .1) }))} aria-label="Уменьшить масштаб"><Icon name="minus" /></button>
+            <button onClick={() => setTransform(current => ({ ...current, zoom: Math.max(fitWholeFlow ? .14 : .2, current.zoom - .1) }))} aria-label="Уменьшить масштаб"><Icon name="minus" /></button>
             <span>{Math.round(transform.zoom * 100)}%</span>
             <button onClick={() => setTransform(current => ({ ...current, zoom: Math.min(1.25, current.zoom + .1) }))} aria-label="Увеличить масштаб"><Icon name="plus" /></button>
-            <button onClick={fitBoard} aria-label={isStory && !isSettings ? 'Установить читаемый масштаб' : 'Вписать карту'}><Icon name="fit" /></button>
+            <button onClick={fitBoard} aria-label={isStory && !fitWholeFlow ? 'Установить читаемый масштаб' : 'Вписать карту'}><Icon name="fit" /></button>
           </div>
         </div>
 
@@ -393,7 +399,7 @@ export function App() {
               })}
             </svg>
 
-            {!isSettings && <section className="scenario-root" data-accent={scenario.accent} style={{ left: rootPosition.x, top: rootPosition.y, width: rootPosition.width, height: rootPosition.height }}>
+            {!fitWholeFlow && <section className="scenario-root" data-accent={scenario.accent} style={{ left: rootPosition.x, top: rootPosition.y, width: rootPosition.width, height: rootPosition.height }}>
               <span>{scenario.eyebrow}</span><h2>{scenario.title}</h2><p>{scenario.description}</p>
             </section>}
 

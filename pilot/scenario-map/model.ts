@@ -1,4 +1,4 @@
-export type ScenarioId = 'vnd' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
+export type ScenarioId = 'vnd' | 'reply-ready' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
 export type MapView = 'story' | 'screens';
 export type StepKind = 'entry' | 'action' | 'system' | 'state' | 'result';
 
@@ -79,6 +79,36 @@ export const scenarios: Scenario[] = [
         detail: 'Отдельная модалка не нужна. Старый UI выбора папки сохранён в исходниках, но не участвует в основном пути.',
         screen: 'screens/vnd-06-saved.png', screenAlt: 'Подтверждение сохранения ВНД в базе знаний',
         tags: ['подтверждение', 'сохранение'],
+      },
+    ],
+  },
+  {
+    id: 'reply-ready',
+    eyebrow: 'История чатов',
+    title: 'Ответ готов в другом чате',
+    description: 'Звёздочка отмечает готовый ответ, пока пользователь находится в другом диалоге.',
+    accent: 'mint',
+    steps: [
+      {
+        id: 'reply-ready.switch', number: '01', title: 'Перейти в другой чат', actor: 'Пользователь', kind: 'entry',
+        summary: 'Агент ещё готовит ответ. Пользователь открывает другой диалог из истории.',
+        detail: 'Откройте живой экран и выберите «Анализ рисков компании», пока идёт проверка ВНД. Примерно через 10 секунд ответ будет готов, и у кнопки истории появится звёздочка.',
+        screen: 'screens/reply-ready-01-switch.png', screenAlt: 'История чатов открыта, пока идёт проверка ВНД',
+        tags: ['история', 'фоновая работа'],
+      },
+      {
+        id: 'reply-ready.unread', number: '02', title: 'Звёздочка у готового ответа', actor: 'Система', kind: 'state',
+        summary: 'Звёздочка отмечает исходный чат в истории, пока открыт другой диалог.',
+        detail: 'В живом экране нажмите «Проверка ВНД» со звёздочкой. Откроется исходный чат с готовым ответом.',
+        screen: 'screens/reply-ready-02-unread.png', screenAlt: 'Звёздочка рядом с исходным чатом в истории',
+        tags: ['звёздочка', 'новый ответ'],
+      },
+      {
+        id: 'reply-ready.read', number: '03', title: 'Ответ открыт, звёздочка снята', actor: 'Система', kind: 'result',
+        summary: 'При открытии исходного чата отметка исчезает в истории и у её кнопки.',
+        detail: 'В истории выбран чат «Проверка ВНД». Закройте панель, чтобы увидеть готовый ответ.',
+        screen: 'screens/reply-ready-03-read.png', screenAlt: 'Выбран исходный чат, звёздочки рядом с ним больше нет',
+        tags: ['готовый ответ', 'прочитано'],
       },
     ],
   },
