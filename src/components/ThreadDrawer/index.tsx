@@ -15,12 +15,12 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 	const settingsBackRef = useRef<HTMLButtonElement>(null);
 	const settingsEntryRef = useRef<HTMLButtonElement>(null);
 	const memoryHeadingRef = useRef<HTMLHeadingElement>(null);
-	const popoverRef = useRef<HTMLDivElement>(null);
 	const popoverCancelRef = useRef<HTMLButtonElement>(null);
 	const previewMemoryDeleteRef = useRef<HTMLButtonElement>(null);
+	const clearMemoryRef = useRef<HTMLButtonElement>(null);
 	const previewDeletionOpenedRef = useRef(false);
 	const pendingFocusRef = useRef<FocusTarget>();
-	const [view, setView] = useState<DrawerView>(ui.initialDrawerState === 'settings' || ui.initialDrawerState === 'memory-confirm' ? 'settings' : 'history');
+	const [view, setView] = useState<DrawerView>(ui.initialDrawerState && ui.initialDrawerState !== 'history' ? 'settings' : 'history');
 	const [deletion, setDeletion] = useState<ActiveDeletion>();
 	const [renaming, setRenaming] = useState<string>();
 	const [draft, setDraft] = useState('');
@@ -86,8 +86,9 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 	useEffect(() => {
 		if (!deletion) return;
 		const outside = (event: PointerEvent) => {
-			const target = event.target as Node;
-			if (!popoverRef.current?.contains(target) && !deletion.anchor.contains(target)) closeDeletion();
+			// The UI-kit Popover renders through a portal and doesn't forward its ref.
+			const insidePopover = event.target instanceof Element && event.target.closest(`.${classes.deletePopover}`);
+			if (!insidePopover && !deletion.anchor.contains(event.target as Node)) closeDeletion();
 		};
 		const escape = (event: KeyboardEvent) => {
 			if (event.key !== 'Escape') return;
@@ -97,19 +98,25 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 		};
 		document.addEventListener('pointerdown', outside);
 		document.addEventListener('keydown', escape);
-		requestAnimationFrame(() => popoverCancelRef.current?.focus());
+		const focusFrame = requestAnimationFrame(() => popoverCancelRef.current?.focus());
 		return () => {
+			cancelAnimationFrame(focusFrame);
 			document.removeEventListener('pointerdown', outside);
 			document.removeEventListener('keydown', escape);
 		};
 	}, [deletion]);
 	useEffect(() => {
-		if (!open || view !== 'settings' || ui.initialDrawerState !== 'memory-confirm' || previewDeletionOpenedRef.current) return;
-		const anchor = previewMemoryDeleteRef.current;
+		if (!open || view !== 'settings' || previewDeletionOpenedRef.current) return;
 		const fact = ui.agentMemory[0];
-		if (!anchor || !fact) return;
+		if (!fact) return;
+		const previewDeletion = ui.initialDrawerState === 'memory-confirm'
+			? { target: { kind: 'memory-fact', fact } as const, anchor: previewMemoryDeleteRef.current }
+			: ui.initialDrawerState === 'memory-clear-confirm'
+				? { target: { kind: 'memory-all' } as const, anchor: clearMemoryRef.current }
+				: undefined;
+		if (!previewDeletion?.anchor) return;
 		previewDeletionOpenedRef.current = true;
-		setDeletion({ target: { kind: 'memory-fact', fact }, anchor });
+		setDeletion({ target: previewDeletion.target, anchor: previewDeletion.anchor });
 	}, [open, ui.agentMemory, ui.initialDrawerState, view]);
 	useEffect(() => {
 		if (!menu) return;
@@ -161,13 +168,12 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 						<div className={classes.sectionHeading}><div><h2 ref={memoryHeadingRef} tabIndex={-1} id="agent-memory-title">Память агента</h2><span>{ui.agentMemory.length ? `Сохранено: ${ui.agentMemory.length}` : 'Память пуста'}</span></div></div>
 						<p className={classes.sectionNote}>Факты о вас и предпочтениях, которые агент использует во всех чатах.</p>
 						{ui.agentMemory.length ? <ul className={classes.memoryList}>{ui.agentMemory.map((fact, index) => <li key={`${index}-${fact}`}><span>{fact}</span><Tooltip content="Удалить из памяти" placement="left" showOnChildFocus><Button ref={index === 0 ? previewMemoryDeleteRef : undefined} variant="ellipse" size="XS" icon={EIconName.trash} iconOnly aria-label={`Удалить из памяти: ${fact}`} onClick={event => setDeletion({ target: { kind: 'memory-fact', fact }, anchor: event.currentTarget })}/></Tooltip></li>)}</ul> : <div className={classes.emptyMemory}>Пока ничего. Агент запомнит только то, что вы сообщите о себе и предпочитаемом формате работы.</div>}
-						<Button variant="danger" size="S" fullWidth disabled={!ui.agentMemory.length} onClick={event => setDeletion({ target: { kind: 'memory-all' }, anchor: event.currentTarget })}>Очистить память</Button>
+						<Button ref={clearMemoryRef} variant="danger" size="S" fullWidth disabled={!ui.agentMemory.length} onClick={event => setDeletion({ target: { kind: 'memory-all' }, anchor: event.currentTarget })}>Очистить память</Button>
 					</section>
 				</div>
 			</>}
 		</aside>
 		{deletion && deletionCopy && <Popover
-			ref={popoverRef}
 			className={classes.deletePopover}
 			open
 			anchor={deletion.anchor}

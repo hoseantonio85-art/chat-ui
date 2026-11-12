@@ -1,6 +1,7 @@
 import type { IMessage } from '@/types';
 import { ERoles } from '@/types';
 import { appendEvent, createRun, type AgentRun } from '../src/components/AgentActivity/model';
+import type { ThreadDrawerInitialState } from '../src/components/ThreadDrawer/context';
 import { appendExplanation, explainedReply, feedbackRuns, vndBackgroundExplanation } from './scenarioExplanations';
 import type { BackgroundThread } from './VndBackground';
 import { type ScenarioId, vndStandardPrompt } from './scenarios';
@@ -18,7 +19,6 @@ import {
   type FeedbackDraft,
 } from './Feedback.model';
 
-export type AtlasDrawerState = 'history' | 'settings' | 'memory-confirm';
 export type AtlasStepId =
   | 'vnd.start'
   | 'vnd.running'
@@ -30,6 +30,9 @@ export type AtlasStepId =
   | 'settings.overview'
   | 'settings.confirm'
   | 'settings.updated'
+  | 'settings-clear.overview'
+  | 'settings-clear.confirm'
+  | 'settings-clear.empty'
   | 'csi.prompt'
   | 'csi.low'
   | 'csi.neutral'
@@ -65,7 +68,7 @@ export interface AtlasPreview {
   activeThreadId: string;
   scenario: ScenarioId;
   agentMemory: string[];
-  drawer?: AtlasDrawerState;
+  drawer?: ThreadDrawerInitialState;
   drawerFocus?: 'memory-heading';
 }
 
@@ -269,6 +272,7 @@ function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${strin
 const knownSteps = new Set<AtlasStepId>([
   'vnd.start', 'vnd.running', 'vnd.history-running', 'vnd.unread', 'vnd.result', 'vnd.saved',
   'settings.history', 'settings.overview', 'settings.confirm', 'settings.updated',
+  'settings-clear.overview', 'settings-clear.confirm', 'settings-clear.empty',
   'csi.prompt', 'csi.low', 'csi.neutral', 'csi.high', 'csi.skipped', 'csi.saved', 'csi.error', 'csi.declined',
   'csi-direct.known', 'csi-direct.service', 'csi-direct.rating', 'csi-direct.saved',
   'feedback.complaint', 'feedback.help', 'feedback.clarify', 'feedback.clarified', 'feedback.error',
@@ -300,7 +304,7 @@ export function createAtlasPreview(
   if (stepId.startsWith('feedback.')) {
     return createQualitativePreview(stepId as Extract<AtlasStepId, `feedback.${string}`>, baseThreads, initialMemory);
   }
-  const settingsStep = stepId.startsWith('settings.');
+  const settingsStep = stepId.startsWith('settings.') || stepId.startsWith('settings-clear.');
   const running = stepId === 'vnd.running' || stepId === 'vnd.history-running';
   const ready = stepId === 'vnd.unread' || stepId === 'vnd.result';
   const saved = stepId === 'vnd.saved';
@@ -336,18 +340,20 @@ export function createAtlasPreview(
     agentUnread: stepId === 'vnd.unread',
   });
 
-  let drawer: AtlasDrawerState | undefined;
+  const emptyMemory = stepId === 'settings-clear.empty';
+  let drawer: ThreadDrawerInitialState | undefined;
   if (stepId === 'vnd.history-running' || stepId === 'vnd.unread' || stepId === 'settings.history') drawer = 'history';
-  if (stepId === 'settings.overview' || stepId === 'settings.updated') drawer = 'settings';
+  if (stepId === 'settings.overview' || stepId === 'settings.updated' || stepId === 'settings-clear.overview' || emptyMemory) drawer = 'settings';
   if (stepId === 'settings.confirm') drawer = 'memory-confirm';
+  if (stepId === 'settings-clear.confirm') drawer = 'memory-clear-confirm';
 
   return {
     stepId,
     threads,
     activeThreadId: stepId === 'vnd.unread' ? 'risk' : 'vnd',
     scenario: stepId.startsWith('vnd.') ? 'vndBackground' : 'vnd',
-    agentMemory: stepId === 'settings.updated' ? initialMemory.slice(1) : [...initialMemory],
+    agentMemory: emptyMemory ? [] : stepId === 'settings.updated' ? initialMemory.slice(1) : [...initialMemory],
     drawer,
-    drawerFocus: stepId === 'settings.updated' ? 'memory-heading' : undefined,
+    drawerFocus: emptyMemory || stepId === 'settings.updated' ? 'memory-heading' : undefined,
   };
 }

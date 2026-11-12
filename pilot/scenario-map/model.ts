@@ -1,4 +1,4 @@
-export type ScenarioId = 'vnd' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
+export type ScenarioId = 'vnd' | 'settings' | 'settings-clear' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
 export type MapView = 'story' | 'screens';
 export type StepKind = 'entry' | 'action' | 'system' | 'state' | 'result';
 
@@ -116,6 +116,36 @@ export const scenarios: Scenario[] = [
         detail: 'История чатов не затрагивается. Очистка памяти и очистка истории остаются независимыми действиями.',
         screen: 'screens/settings-04-updated.png', screenAlt: 'Настройки после удаления одного факта памяти',
         tags: ['focus', 'updated'],
+      },
+    ],
+  },
+  {
+    id: 'settings-clear',
+    eyebrow: 'Настройки агента',
+    title: 'Очистка памяти агента',
+    description: 'Удаление всех сохранённых фактов из настроек.',
+    accent: 'blue',
+    steps: [
+      {
+        id: 'settings-clear.overview', number: '01', title: 'В памяти есть записи', actor: 'Пользователь', kind: 'entry',
+        summary: 'В настройках под списком фактов доступна кнопка «Очистить память».',
+        detail: 'Откройте живой экран и нажмите «Очистить память», чтобы перейти к подтверждению.',
+        screen: 'screens/settings-clear-01-overview.png', screenAlt: 'Настройки со списком фактов и кнопкой очистки памяти',
+        tags: ['настройки', 'память'],
+      },
+      {
+        id: 'settings-clear.confirm', number: '02', title: 'Подтверждение очистки', actor: 'Пользователь', kind: 'action',
+        summary: 'Настройки запрашивают подтверждение удаления всех фактов.',
+        detail: 'Нажмите «Очистить» в живом экране. Если выбрать «Отмена» или нажать Escape, факты сохранятся.',
+        screen: 'screens/settings-clear-02-confirm.png', screenAlt: 'Окно подтверждения очистки памяти агента',
+        tags: ['подтверждение', 'очистка'],
+      },
+      {
+        id: 'settings-clear.empty', number: '03', title: 'Память пуста', actor: 'Система', kind: 'result',
+        summary: 'После очистки список исчезает, а кнопка «Очистить память» становится недоступной.',
+        detail: 'Фокус переходит на заголовок «Память агента». Сохранённые чаты по-прежнему доступны в истории.',
+        screen: 'screens/settings-clear-03-empty.png', screenAlt: 'Пустая память агента после очистки',
+        tags: ['пустое состояние', 'память'],
       },
     ],
   },

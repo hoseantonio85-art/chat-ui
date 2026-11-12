@@ -24,7 +24,7 @@ const SCREEN_POSITIONS = [
 ];
 const SCREEN_BASE = `${import.meta.env.BASE_URL}scenario-map/`;
 const SCENARIO_LABELS: Record<ScenarioId, string> = {
-  vnd:'Проверка ВНД', settings:'Настройки', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
+  vnd:'Проверка ВНД', settings:'Настройки', 'settings-clear':'Очистка памяти', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
   'feedback-complaint':'Жалоба / помощь', 'feedback-positive':'Идея / похвала',
 };
 

@@ -90,6 +90,18 @@ describe('atlas live preview states', () => {
       .toEqual(second?.threads.map(thread => [thread.id, thread.updatedAt]));
   });
 
+  it('previews full memory, confirmation and empty memory with the same chat history', () => {
+    const threads = baseThreads();
+    const overview = createAtlasPreview('settings-clear.overview', threads, memory);
+    const confirm = createAtlasPreview('settings-clear.confirm', threads, memory);
+    const empty = createAtlasPreview('settings-clear.empty', threads, memory);
+
+    expect(overview).toMatchObject({ drawer: 'settings', agentMemory: memory });
+    expect(confirm).toMatchObject({ drawer: 'memory-clear-confirm', agentMemory: memory });
+    expect(empty).toMatchObject({ drawer: 'settings', drawerFocus: 'memory-heading', agentMemory: [] });
+    expect(empty?.threads).toEqual(overview?.threads);
+  });
+
   it('builds conversational CSI branches without a review or consent state', () => {
     const prompt = createAtlasPreview('csi.prompt', baseThreads(), memory);
     const low = createAtlasPreview('csi.low', baseThreads(), memory);

@@ -12,7 +12,7 @@ export interface ChatThread {
 	jobState?: 'running' | 'ready' | 'saved';
 }
 
-export type ThreadDrawerInitialState = 'history' | 'settings' | 'memory-confirm';
+export type ThreadDrawerInitialState = 'history' | 'settings' | 'memory-confirm' | 'memory-clear-confirm';
 
 interface ThreadUiValue {
 	enabled: boolean;

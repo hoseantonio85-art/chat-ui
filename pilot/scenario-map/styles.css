@@ -24,7 +24,7 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .top-meta{justify-self:end;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
 .top-meta>span{padding:4px 7px;border-radius:7px;background:var(--mint-soft);color:#087a65;font-weight:700;letter-spacing:.04em}
 .top-meta strong{font-size:14px;color:var(--ink)}
-.scenario-rail{grid-area:rail;min-height:0;padding:24px 14px;display:flex;flex-direction:column;gap:8px;border-right:1px solid var(--border);background:#fff}
+.scenario-rail{grid-area:rail;min-height:0;padding:24px 14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;border-right:1px solid var(--border);background:#fff}
 .rail-title{padding:0 10px 12px;display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
 .rail-title small{font-size:12px;letter-spacing:0;text-transform:none}
 .scenario-button{width:100%;padding:11px 10px;display:grid;grid-template-columns:38px 1fr;gap:10px;align-items:center;text-align:left;border:1px solid transparent;border-radius:14px;background:transparent;cursor:pointer}

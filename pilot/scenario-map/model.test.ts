@@ -15,7 +15,7 @@ describe('scenario map model', () => {
 
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(screens).size).toBe(screens.length);
-    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 4, 8, 4, 5, 4]);
+    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 4, 3, 8, 4, 5, 4]);
     expect(scenarios.every(scenario => scenario.steps.every(step => step.screen.endsWith('.png')))).toBe(true);
   });
 
@@ -25,6 +25,15 @@ describe('scenario map model', () => {
       stepId: 'settings.confirm',
       view: 'screens',
     });
+  });
+
+  it('restores the empty memory branch and navigates to its confirmation', () => {
+    expect(getInitialLocation('?scenario=settings-clear&step=settings-clear.empty&view=screens')).toEqual({
+      scenarioId: 'settings-clear',
+      stepId: 'settings-clear.empty',
+      view: 'screens',
+    });
+    expect(getAdjacentStep('settings-clear', 'settings-clear.empty', -1)?.id).toBe('settings-clear.confirm');
   });
 
   it('falls back safely when a deep link is inconsistent', () => {
