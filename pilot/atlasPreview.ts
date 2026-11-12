@@ -27,6 +27,7 @@ export type AtlasStepId =
   | 'vnd.result'
   | 'vnd.saved'
   | 'reply-ready.switch'
+  | 'reply-ready.menu'
   | 'reply-ready.unread'
   | 'reply-ready.read'
   | 'settings.history'
@@ -274,7 +275,7 @@ function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${strin
 
 const knownSteps = new Set<AtlasStepId>([
   'vnd.start', 'vnd.running', 'vnd.history-running', 'vnd.unread', 'vnd.result', 'vnd.saved',
-  'reply-ready.switch', 'reply-ready.unread', 'reply-ready.read',
+  'reply-ready.switch', 'reply-ready.menu', 'reply-ready.unread', 'reply-ready.read',
   'settings.history', 'settings.overview', 'settings.confirm', 'settings.updated',
   'settings-clear.overview', 'settings-clear.confirm', 'settings-clear.empty',
   'csi.prompt', 'csi.low', 'csi.neutral', 'csi.high', 'csi.skipped', 'csi.saved', 'csi.error', 'csi.declined',
@@ -311,7 +312,8 @@ export function createAtlasPreview(
   const settingsStep = stepId.startsWith('settings.') || stepId.startsWith('settings-clear.');
   const replyReadyStep = stepId.startsWith('reply-ready.');
   const switchChat = stepId === 'reply-ready.switch';
-  const unread = stepId === 'vnd.unread' || stepId === 'reply-ready.unread';
+  const closedHistory = stepId === 'reply-ready.menu';
+  const unread = closedHistory || stepId === 'vnd.unread' || stepId === 'reply-ready.unread';
   const running = stepId === 'vnd.running' || stepId === 'vnd.history-running';
   const ready = unread || stepId === 'vnd.result' || stepId === 'reply-ready.read';
   const saved = stepId === 'vnd.saved';
@@ -351,7 +353,7 @@ export function createAtlasPreview(
 
   const emptyMemory = stepId === 'settings-clear.empty';
   let drawer: ThreadDrawerInitialState | undefined;
-  if (stepId === 'vnd.history-running' || unread || replyReadyStep || stepId === 'settings.history') drawer = 'history';
+  if (stepId === 'vnd.history-running' || stepId === 'vnd.unread' || (replyReadyStep && !closedHistory) || stepId === 'settings.history') drawer = 'history';
   if (stepId === 'settings.overview' || stepId === 'settings.updated' || stepId === 'settings-clear.overview' || emptyMemory) drawer = 'settings';
   if (stepId === 'settings.confirm') drawer = 'memory-confirm';
   if (stepId === 'settings-clear.confirm') drawer = 'memory-clear-confirm';

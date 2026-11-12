@@ -25,6 +25,7 @@ export const PAGES_SCREEN_ASSETS = [
   'feedback-positive-03-idea-clarified.png',
   'feedback-positive-04-praise.png',
   'reply-ready-01-switch.png',
+  'reply-ready-02-menu.png',
   'reply-ready-02-unread.png',
   'reply-ready-03-read.png',
   'settings-01-history.png',

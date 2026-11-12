@@ -58,17 +58,22 @@ describe('atlas live preview states', () => {
 
   it('seeds switching chats, an unread reply, and the same reply after it is read', () => {
     const start = createAtlasPreview('reply-ready.switch', baseThreads(), memory);
+    const menu = createAtlasPreview('reply-ready.menu', baseThreads(), memory);
     const unread = createAtlasPreview('reply-ready.unread', baseThreads(), memory);
     const read = createAtlasPreview('reply-ready.read', baseThreads(), memory);
     const vnd = (preview: typeof start) => preview?.threads.find(thread => thread.id === 'vnd');
     expect(start).toMatchObject({ activeThreadId: 'vnd', drawer: 'history' });
     expect(vnd(start)).toMatchObject({ vndStage: 'reviewing', documentName: expect.any(String), agentUnread: false });
     expect(vnd(start)?.jobState).toBeUndefined();
+    expect(menu?.activeThreadId).toBe('risk');
+    expect(menu?.drawer).toBeUndefined();
+    expect(vnd(menu)?.agentUnread).toBe(true);
     expect(unread).toMatchObject({ activeThreadId: 'risk', drawer: 'history' });
     expect(vnd(unread)).toMatchObject({ jobState: 'ready', agentState: 'ready', agentUnread: true });
     expect(read).toMatchObject({ activeThreadId: 'vnd', drawer: 'history' });
     expect(vnd(read)).toMatchObject({ jobState: 'ready', agentState: 'ready', agentUnread: false });
     expect(vnd(read)?.messages).toEqual(vnd(unread)?.messages);
+    expect(menu?.threads).toEqual(unread?.threads);
   });
 
   it('builds result and saved chat states without timers', () => {
