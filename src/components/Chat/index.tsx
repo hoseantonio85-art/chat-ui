@@ -1,5 +1,5 @@
 import cn from 'classnames';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { navigateToUrl } from 'single-spa';
 
@@ -31,6 +31,7 @@ import { Button, EIconName, Row, Title, Tooltip } from '@sber-orm/ui-kit';
 import { IChartData } from '@/components/UniversalChart/types';
 import { useMobileDetect } from '@/helpers/useMobileDetect';
 import { LoadHistory, Message } from './components';
+import { ContextualActionsContext } from './ContextualActionsContext';
 import {
 	ClickCollapse,
 	ClickExpand,
@@ -82,7 +83,25 @@ export const Chat = React.memo(
 		const resizeLabel = chatState === EChatState.fullScreen ? 'Свернуть чат' : 'Развернуть чат';
 
 		const messageContainerRef = useRef<HTMLDivElement | null>(null);
+		const contextualActions = useContext(ContextualActionsContext);
+		const promptId = contextualActions && [...messages].reverse().find(contextualActions.matches)?.id;
+		const [hiddenPromptId, setHiddenPromptId] = useState<string>();
+		const showStickyActions = Boolean(promptId && promptId === hiddenPromptId);
 		const { t } = useTranslation();
+
+		useLayoutEffect(() => {
+			const root = messageContainerRef.current;
+			const prompt = root?.querySelector('[data-contextual-prompt]');
+			if (!root || !prompt || !promptId) {
+				setHiddenPromptId(undefined);
+				return;
+			}
+			const observer = new IntersectionObserver(([entry]) => {
+				setHiddenPromptId(entry.isIntersecting ? undefined : promptId);
+			}, { root });
+			observer.observe(prompt);
+			return () => observer.disconnect();
+		}, [promptId]);
 
 		const handleSubmit = () => {
 			setSendingMessage(true);
@@ -267,6 +286,10 @@ export const Chat = React.memo(
 								isLastMessage={index === 0}
 								sending={isMessageSending(message.id as string)}
 								onOpenChart={!isPhone ? handleOpenChart : undefined}
+								contextualPrompt={Boolean(promptId && message.id === promptId)}
+								contextualActions={promptId && message.id === promptId
+									? contextualActions?.render('inline') : undefined}
+								hideContextualActions={showStickyActions && message.id === promptId}
 							/>
 						))}
 						{messages.length > 0 ? (
@@ -276,6 +299,9 @@ export const Chat = React.memo(
 							/>
 						) : null}
 					</div>
+					{showStickyActions && <div className={classes.stickyActionsAnchor}>
+						<div className={classes.stickyActions}>{contextualActions?.render('sticky')}</div>
+					</div>}
 					<ChatInput
 						size="sm"
 						buttonText={t('send') || ''}

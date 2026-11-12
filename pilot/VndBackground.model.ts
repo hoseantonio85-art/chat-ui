@@ -5,10 +5,15 @@ export const vndFolders = [
 ] as const;
 
 export type VndFolder = (typeof vndFolders)[number];
+export type VndStage = 'start' | 'chooseStandard' | 'reviewing' | 'reviewed' | 'confirmSave' | 'saveDeferred' | 'complete';
+
+export const vndSaveQuestion = 'Сохранить актуальный ВНД в базе знаний, в папке «Операционные риски»?';
 
 export type VndSaveIntent =
   | { kind: 'save'; folder: VndFolder }
   | { kind: 'decline' }
+  | { kind: 'chooseFolder' }
+  | { kind: 'resume' }
   | { kind: 'unknown' };
 
 export interface VndBackgroundMessage {
@@ -25,6 +30,7 @@ export interface VndBackgroundThreadState {
   id: string;
   updatedAt: number;
   messages: VndBackgroundMessage[];
+  vndStage?: VndStage;
   agentState?: 'running' | 'ready';
   agentUnread?: boolean;
   jobState?: 'running' | 'ready' | 'saved';
@@ -36,7 +42,7 @@ export interface VndBackgroundThreadState {
 
 type VndBackgroundEvent =
   | { type: 'start'; documentIds: string; documentName: string; message?: VndBackgroundMessage; at: number }
-  | { type: 'complete'; unread: boolean; message?: VndBackgroundMessage; at: number }
+  | { type: 'complete'; unread: boolean; messages?: VndBackgroundMessage[]; at: number }
   | { type: 'markRead' }
   | { type: 'save'; folder: VndFolder; at: number };
 
@@ -47,22 +53,33 @@ const normalize = (text: string) => text
   .replace(/\s+/gu, ' ')
   .trim();
 
+export function canSaveVnd(thread: Pick<VndBackgroundThreadState, 'jobState' | 'vndStage'>): boolean {
+  return thread.jobState !== 'saved'
+    && (thread.jobState === 'ready' || thread.vndStage === 'confirmSave' || thread.vndStage === 'saveDeferred');
+}
+
 export function parseVndSaveIntent(text: string): VndSaveIntent {
   const input = normalize(text);
   if (!input) return { kind: 'unknown' };
 
   const words = input.split(' ');
   const saveIndex = words.findIndex(word => /^(?:сохранить|сохрани|сохраняй|сохранять)$/u.test(word));
-  const hasRefusalMarker = words.some(word => word === 'не' || word === 'нет' || word === 'отмена');
-  const decline = /^(?:нет|не надо|не нужно|отмена)(?:\s|$)|(?:^|\s)(?:пока\s+)?не\s+(?:надо|нужно)(?:\s|$)/u;
+  const hasRefusalMarker = (saveIndex >= 0 || /^(?:да|давай|ок|окей|хорошо)\s/u.test(input))
+    && words.some(word => word === 'не' || word === 'нет' || word === 'отмена');
+  const decline = /^(?:нет|не сейчас|не надо|не нужно|отмена)(?:\s|$)/u;
   if (decline.test(input) || hasRefusalMarker) return { kind: 'decline' };
 
-  const folder = vndFolders.find(item => input.includes(normalize(item)));
-  const saveVerb = saveIndex >= 0;
-  const affirmative = /^(?:да|давай|подтверждаю|ок|окей|хорошо)(?:\s|$)/u.test(input);
-  const folderOnly = folder && new RegExp(`^(?:папка\\s+)?${normalize(folder)}$`, 'u').test(input);
+  if (/^(?:вернуться к сохранению|покажи варианты сохранения)$/u.test(input)) return { kind: 'resume' };
+  if (/^(?:выбрать|выбери|давай выберем) другую папку$/u.test(input)) return { kind: 'chooseFolder' };
+  if (text.trimEnd().endsWith('?')) return { kind: 'unknown' };
 
-  if (folder && (saveVerb || affirmative || folderOnly)) return { kind: 'save', folder };
+  const folder = vndFolders.find(item => input.includes(normalize(item)));
+  const saveVerb = /^(?:(?:да|давай|хорошо|ок|окей|пожалуйста)\s+)?(?:сохранить|сохрани|сохраняй)(?:\s|$)/u.test(input);
+  const affirmative = /^(?:да|давай|подтверждаю|ок|окей|хорошо)(?:\s+пожалуйста)?$/u.test(input);
+  const folderOnly = folder && new RegExp(`^(?:да\\s+)?(?:папка\\s+|в папку\\s+)?${normalize(folder)}$`, 'u').test(input);
+
+  if (folder && (saveVerb || folderOnly)) return { kind: 'save', folder };
+  if (saveVerb && /(?:^|\s)(?:в|папку)(?:\s|$)/u.test(input)) return { kind: 'unknown' };
   if (saveVerb || affirmative) return { kind: 'save', folder: vndFolders[0] };
   return { kind: 'unknown' };
 }
@@ -109,9 +126,7 @@ export function applyVndBackgroundEvent<T extends VndBackgroundThreadState>(
       break;
     case 'complete': {
       if (current.jobState !== 'running') return threads;
-      const messages = event.message && !current.messages.some(message => message.id === event.message?.id)
-        ? [...current.messages, event.message]
-        : current.messages;
+      const messages = event.messages?.filter(message => !current.messages.some(existing => existing.id === message.id));
       next = {
         ...current,
         agentState: 'ready',
@@ -119,7 +134,7 @@ export function applyVndBackgroundEvent<T extends VndBackgroundThreadState>(
         jobState: 'ready',
         unread: event.unread,
         updatedAt: event.at,
-        messages,
+        messages: messages?.length ? [...current.messages, ...messages] : current.messages,
       };
       break;
     }
@@ -128,7 +143,7 @@ export function applyVndBackgroundEvent<T extends VndBackgroundThreadState>(
       next = { ...current, unread: false, agentUnread: false };
       break;
     case 'save':
-      if (current.jobState !== 'ready') return threads;
+      if (!canSaveVnd(current)) return threads;
       next = {
         ...current,
         jobState: 'saved',

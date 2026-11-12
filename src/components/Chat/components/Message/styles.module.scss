@@ -97,14 +97,34 @@
     width: min(620px, 100%);
     margin-top: 12px;
 
-    &:has(:global(.vnd-to-be-card)) {
-      width: 100%;
-    }
   }
 }
 
 .messageAfter {
   align-self: start;
+}
+
+.contextualPrompt {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  gap: 8px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+
+  > .message {
+    max-width: 100%;
+  }
+}
+
+.contextualActions {
+  // The message bubble alone determines the width of the group.
+  contain: inline-size;
+}
+
+.contextualActionsHidden {
+  // Preserve the prompt's position in the scroll history during the move.
+  visibility: hidden;
 }
 
 .attributes {

@@ -42,6 +42,9 @@ export const Message = React.memo((props: IMessageProps) => {
 		message = {},
 		sending,
 		onOpenChart,
+		contextualPrompt,
+		contextualActions,
+		hideContextualActions,
 	} = props;
 	const { reaction, role, skill, text } = message;
 	const agentRun = useAgentRun(id as string);
@@ -145,6 +148,66 @@ export const Message = React.memo((props: IMessageProps) => {
 		}
 	}, [fileIds]);
 
+	const bubble = (loader || text || fileIds.length > 0 || !!graphsData || !!messageAddon) && (
+		<div
+			data-contextual-prompt={contextualPrompt || undefined}
+			className={cn(classes.message, {
+				[classes.messageBot]: role === ERoles.bot || loader,
+				[classes.messageLoader]: loader,
+				[classes.messageSending]: sending,
+				[classes.messageUser]: role === ERoles.user,
+				[classes.messageWithFiles]: files.length > 0,
+			})}
+		>
+			<Title
+				size="H400"
+				thin
+				className={classes.messageTitle}
+				ref={messageRef}
+			>
+				{loader ? (
+					'...'
+				) : (
+					<MarkdownViewer
+						markdown={text}
+						customOptions={{ overrides: { table: { component: Table } } }}
+					/>
+				)}
+			</Title>
+			{messageAddon && <div className={classes.messageAddon}>{messageAddon}</div>}
+			{fileIds.length > 0 &&
+				files.length === 0 &&
+				Config.filesUploadEnabled && (
+					<Row justify="end" gutter={8} wrap>
+						{fileIds.map((id) => (
+							<div key={id} className={classes.skeleton} />
+						))}
+					</Row>
+				)}
+			{files.length > 0 && Config.filesUploadEnabled && (
+				<Row className={classes.fileList} justify="end" wrap noFlex>
+					{files.map((file) => (
+						<FileItem
+							className={classes.file}
+							key={file.fileId}
+							file={file as IFileProps}
+							progress={file.progress}
+							chat
+						>
+							{file.fileName}
+						</FileItem>
+					))}
+				</Row>
+			)}
+			{!!graphsData && accessControl$.userHasAccess('Chat.Graphs') && (
+				<Graphs
+					onFullScreen={onOpenChart ? handleOpenChart : undefined}
+					data={graphsData as IChartData}
+				/>
+			)}
+		</div>
+	);
+
 	return (
 		<Row
 			id={id as string}
@@ -155,62 +218,15 @@ export const Message = React.memo((props: IMessageProps) => {
 			onMouseOver={onMouseOver}
 		>
 			{(hasAgentTrace || isAgentPending) && <AgentActivity run={agentRun} />}
-			{(loader || text || fileIds.length > 0 || !!graphsData || !!messageAddon) && <div
-				className={cn(classes.message, {
-					[classes.messageBot]: role === ERoles.bot || loader,
-					[classes.messageLoader]: loader,
-					[classes.messageSending]: sending,
-					[classes.messageUser]: role === ERoles.user,
-					[classes.messageWithFiles]: files.length > 0,
-				})}
-			>
-				<Title
-					size="H400"
-					thin
-					className={classes.messageTitle}
-					ref={messageRef}
-				>
-					{loader ? (
-						'...'
-					) : (
-						<MarkdownViewer
-							markdown={text}
-							customOptions={{ overrides: { table: { component: Table } } }}
-						/>
-					)}
-				</Title>
-				{messageAddon && <div className={classes.messageAddon}>{messageAddon}</div>}
-				{fileIds.length > 0 &&
-					files.length === 0 &&
-					Config.filesUploadEnabled && (
-						<Row justify="end" gutter={8} wrap>
-							{fileIds.map((id) => (
-								<div key={id} className={classes.skeleton} />
-							))}
-						</Row>
-					)}
-				{files.length > 0 && Config.filesUploadEnabled && (
-					<Row className={classes.fileList} justify="end" wrap noFlex>
-						{files.map((file) => (
-							<FileItem
-								className={classes.file}
-								key={file.fileId}
-								file={file as IFileProps}
-								progress={file.progress}
-								chat
-							>
-								{file.fileName}
-							</FileItem>
-						))}
-					</Row>
-				)}
-				{!!graphsData && accessControl$.userHasAccess('Chat.Graphs') && (
-					<Graphs
-						onFullScreen={onOpenChart ? handleOpenChart : undefined}
-						data={graphsData as IChartData}
-					/>
-				)}
-			</div>}
+			{contextualPrompt ? (
+				<div className={classes.contextualPrompt}>
+					{bubble}
+					{contextualActions && <div
+						className={cn(classes.contextualActions, { [classes.contextualActionsHidden]: hideContextualActions })}
+						aria-hidden={hideContextualActions || undefined}
+					>{contextualActions}</div>}
+				</div>
+			) : bubble}
 			{messageAfter && <div className={classes.messageAfter}>{messageAfter}</div>}
 			{(isReactionsVisible || skill) && (
 				<Row
