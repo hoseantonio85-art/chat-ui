@@ -39,6 +39,7 @@
 
 .context-actions-list .context-action {
   width: 100%;
+  padding: 8px;
   border-radius: 14px;
 }
 
@@ -110,7 +111,10 @@
 
 .context-actions-sticky .context-actions-list .context-action:focus-visible { outline-offset: -2px; }
 .context-actions-label { font-weight: 600; }
-.context-actions-sticky .context-action { min-height: 34px; padding: 5px 12px; }
+.context-actions-sticky .context-actions:not(.context-actions-list) .context-action {
+  min-height: 34px;
+  padding: 5px 12px;
+}
 
 @keyframes context-actions-enter {
   from { opacity: 0; transform: translateY(10px); }
