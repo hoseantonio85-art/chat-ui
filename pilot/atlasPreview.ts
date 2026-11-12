@@ -27,6 +27,7 @@ export type AtlasStepId =
   | 'vnd.result'
   | 'vnd.saved'
   | 'reply-ready.switch'
+  | 'reply-ready.running'
   | 'reply-ready.menu'
   | 'reply-ready.unread'
   | 'reply-ready.read'
@@ -275,7 +276,7 @@ function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${strin
 
 const knownSteps = new Set<AtlasStepId>([
   'vnd.start', 'vnd.running', 'vnd.history-running', 'vnd.unread', 'vnd.result', 'vnd.saved',
-  'reply-ready.switch', 'reply-ready.menu', 'reply-ready.unread', 'reply-ready.read',
+  'reply-ready.switch', 'reply-ready.running', 'reply-ready.menu', 'reply-ready.unread', 'reply-ready.read',
   'settings.history', 'settings.overview', 'settings.confirm', 'settings.updated',
   'settings-clear.overview', 'settings-clear.confirm', 'settings-clear.empty',
   'csi.prompt', 'csi.low', 'csi.neutral', 'csi.high', 'csi.skipped', 'csi.saved', 'csi.error', 'csi.declined',
@@ -314,7 +315,8 @@ export function createAtlasPreview(
   const switchChat = stepId === 'reply-ready.switch';
   const closedHistory = stepId === 'reply-ready.menu';
   const unread = closedHistory || stepId === 'vnd.unread' || stepId === 'reply-ready.unread';
-  const running = stepId === 'vnd.running' || stepId === 'vnd.history-running';
+  const runningInOtherChat = stepId === 'reply-ready.running';
+  const running = stepId === 'vnd.running' || stepId === 'vnd.history-running' || runningInOtherChat;
   const ready = unread || stepId === 'vnd.result' || stepId === 'reply-ready.read';
   const saved = stepId === 'vnd.saved';
   const vndMessages = stepId === 'vnd.start'
@@ -361,7 +363,7 @@ export function createAtlasPreview(
   return {
     stepId,
     threads,
-    activeThreadId: unread ? 'risk' : 'vnd',
+    activeThreadId: unread || runningInOtherChat ? 'risk' : 'vnd',
     scenario: stepId.startsWith('vnd.') || replyReadyStep ? 'vndBackground' : 'vnd',
     agentMemory: emptyMemory ? [] : stepId === 'settings.updated' ? initialMemory.slice(1) : [...initialMemory],
     drawer,

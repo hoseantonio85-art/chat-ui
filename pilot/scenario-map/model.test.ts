@@ -16,7 +16,7 @@ describe('scenario map model', () => {
 
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(screens).size).toBe(screens.length);
-    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 4, 6, 8, 4, 5, 4]);
+    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 5, 6, 8, 4, 5, 4]);
     expect(scenarios.every(scenario => scenario.steps.every(step => step.screen.endsWith('.png')))).toBe(true);
   });
 
@@ -32,7 +32,8 @@ describe('scenario map model', () => {
     expect(getInitialLocation('?scenario=reply-ready&step=reply-ready.unread&view=screens')).toEqual({
       scenarioId: 'reply-ready', stepId: 'reply-ready.unread', view: 'screens',
     });
-    expect(getAdjacentStep('reply-ready', 'reply-ready.switch', 1)?.id).toBe('reply-ready.menu');
+    expect(getAdjacentStep('reply-ready', 'reply-ready.switch', 1)?.id).toBe('reply-ready.running');
+    expect(getAdjacentStep('reply-ready', 'reply-ready.running', 1)?.id).toBe('reply-ready.menu');
     expect(getAdjacentStep('reply-ready', 'reply-ready.menu', 1)?.id).toBe('reply-ready.unread');
     expect(getAdjacentStep('reply-ready', 'reply-ready.unread', 1)?.id).toBe('reply-ready.read');
   });

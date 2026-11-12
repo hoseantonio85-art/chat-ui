@@ -127,13 +127,14 @@ export function App() {
     { x: 0, y: row / 2 }, { x: column, y: row / 2 },
     { x: column * 2, y: 0 }, { x: column * 3, y: 0 },
     { x: column * 2, y: row }, { x: column * 3, y: row },
-  ] : isReplyReady
-    ? scenario.steps.map((_, index) => ({ x: column * index, y: 0 }))
-    : isStory ? STORY_POSITIONS : SCREEN_POSITIONS;
+  ] : isReplyReady ? [
+    { x: 0, y: 0 }, { x: column, y: 0 }, { x: column * 2, y: 0 },
+    { x: column * 2, y: row }, { x: column, y: row },
+  ] : isStory ? STORY_POSITIONS : SCREEN_POSITIONS;
   const boardSize = isSettings
     ? { width: column * 3 + cardSize.width, height: row + cardSize.height }
     : isReplyReady
-      ? { width: column * (scenario.steps.length - 1) + cardSize.width, height: cardSize.height }
+      ? { width: column * 2 + cardSize.width, height: row + cardSize.height }
       : isStory ? { width: 1640, height: 790 } : { width: 2160, height: 1090 };
   const selectedBranches = isSettings ? getSettingsNextSteps(selectedStep.id) : [];
   const liveBranches = isSettings && fullScreenStep ? getSettingsNextSteps(fullScreenStep.id) : [];

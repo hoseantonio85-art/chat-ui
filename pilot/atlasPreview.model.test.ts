@@ -58,6 +58,7 @@ describe('atlas live preview states', () => {
 
   it('seeds switching chats, an unread reply, and the same reply after it is read', () => {
     const start = createAtlasPreview('reply-ready.switch', baseThreads(), memory);
+    const running = createAtlasPreview('reply-ready.running', baseThreads(), memory);
     const menu = createAtlasPreview('reply-ready.menu', baseThreads(), memory);
     const unread = createAtlasPreview('reply-ready.unread', baseThreads(), memory);
     const read = createAtlasPreview('reply-ready.read', baseThreads(), memory);
@@ -65,6 +66,8 @@ describe('atlas live preview states', () => {
     expect(start).toMatchObject({ activeThreadId: 'vnd', drawer: 'history' });
     expect(vnd(start)).toMatchObject({ vndStage: 'reviewing', documentName: expect.any(String), agentUnread: false });
     expect(vnd(start)?.jobState).toBeUndefined();
+    expect(running).toMatchObject({ activeThreadId: 'risk', drawer: 'history' });
+    expect(vnd(running)).toMatchObject({ jobState: 'running', agentState: 'running', agentUnread: false });
     expect(menu?.activeThreadId).toBe('risk');
     expect(menu?.drawer).toBeUndefined();
     expect(vnd(menu)?.agentUnread).toBe(true);
