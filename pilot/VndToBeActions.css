@@ -6,12 +6,6 @@
   max-width: 100%;
 }
 
-.context-actions-long {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
-  width: min(100%, 670px);
-}
-
 .context-action {
   display: flex;
   align-items: center;
@@ -31,6 +25,11 @@
   border: 1px solid transparent;
   border-radius: 22px;
   cursor: pointer;
+}
+
+.context-actions .context-action {
+  flex: 0 0 auto;
+  width: max-content;
 }
 
 .context-actions-long .context-action {

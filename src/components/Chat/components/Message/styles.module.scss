@@ -104,6 +104,24 @@
   align-self: start;
 }
 
+.contextualPrompt {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  gap: 8px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+
+  > .message {
+    max-width: 100%;
+  }
+}
+
+.contextualActions {
+  // The message bubble alone determines the width of the group.
+  contain: inline-size;
+}
+
 .attributes {
   @extend .row;
 
