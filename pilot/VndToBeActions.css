@@ -54,29 +54,42 @@
   flex-shrink: 0;
   min-width: 0;
   margin: 0 0 8px;
-  padding: 8px 10px;
+  padding: 16px;
   color: var(--textBaseDefault);
   background: var(--backgroundBasicDefault);
   border: 1px solid var(--borderDefault);
   border-radius: 16px;
   box-shadow: 0 3px 12px #2a244116;
   font-size: 13px;
+  animation: context-actions-enter 260ms cubic-bezier(.22, 1, .36, 1);
 }
 
 .context-actions-sticky summary {
   cursor: pointer;
-  padding: 4px;
   font-weight: 600;
+}
+
+.context-actions-sticky .context-actions {
+  margin-top: 16px;
 }
 
 .context-actions-sticky .context-actions-long {
   max-height: min(35dvh, 244px);
   overflow-y: auto;
-  padding: 4px;
 }
 
-.context-actions-label { margin: 0 4px 5px; font-weight: 600; }
+.context-actions-sticky .context-actions-long .context-action:focus-visible { outline-offset: -2px; }
+.context-actions-label { font-weight: 600; }
 .context-actions-sticky .context-action { min-height: 34px; padding: 5px 12px; }
+
+@keyframes context-actions-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .context-actions-sticky { animation: none; }
+}
 
 .vnd-folder-dialog {
   width: min(400px, calc(100% - 32px));
