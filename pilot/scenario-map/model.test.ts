@@ -4,6 +4,7 @@ import {
   getAdjacentStep,
   getInitialLocation,
   getScenarioStep,
+  getSettingsNextSteps,
   toLivePreviewUrl,
   toSearch,
 } from './model';
@@ -15,7 +16,7 @@ describe('scenario map model', () => {
 
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(screens).size).toBe(screens.length);
-    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 4, 3, 8, 4, 5, 4]);
+    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 6, 8, 4, 5, 4]);
     expect(scenarios.every(scenario => scenario.steps.every(step => step.screen.endsWith('.png')))).toBe(true);
   });
 
@@ -29,11 +30,20 @@ describe('scenario map model', () => {
 
   it('restores the empty memory branch and navigates to its confirmation', () => {
     expect(getInitialLocation('?scenario=settings-clear&step=settings-clear.empty&view=screens')).toEqual({
-      scenarioId: 'settings-clear',
+      scenarioId: 'settings',
       stepId: 'settings-clear.empty',
       view: 'screens',
     });
-    expect(getAdjacentStep('settings-clear', 'settings-clear.empty', -1)?.id).toBe('settings-clear.confirm');
+    expect(getInitialLocation('?scenario=settings-clear&step=settings-clear.overview').stepId).toBe('settings.overview');
+    expect(getAdjacentStep('settings', 'settings-clear.empty', -1)?.id).toBe('settings-clear.confirm');
+  });
+
+  it('offers both paths at the common overview and stops at the end of each path', () => {
+    expect(getSettingsNextSteps('settings.overview').map(step => step.id)).toEqual(['settings.confirm', 'settings-clear.confirm']);
+    expect(getAdjacentStep('settings', 'settings.confirm', -1)?.id).toBe('settings.overview');
+    expect(getAdjacentStep('settings', 'settings-clear.confirm', -1)?.id).toBe('settings.overview');
+    expect(getAdjacentStep('settings', 'settings.updated', 1)?.id).toBe('settings.updated');
+    expect(getAdjacentStep('settings', 'settings-clear.empty', 1)?.id).toBe('settings-clear.empty');
   });
 
   it('falls back safely when a deep link is inconsistent', () => {
@@ -66,7 +76,7 @@ describe('scenario map model', () => {
   });
 
   it('returns only a step that belongs to the selected scenario', () => {
-    expect(getScenarioStep('settings', 'settings.confirm')?.title).toContain('Подтверждение');
+    expect(getScenarioStep('settings', 'settings.confirm')?.title).toBe('Удалить один факт');
     expect(getScenarioStep('settings', 'vnd.result')).toBeUndefined();
   });
 

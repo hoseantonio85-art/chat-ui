@@ -5,7 +5,9 @@ import {
   getInitialLocation,
   getScenario,
   getScenarioStep,
+  getSettingsNextSteps,
   scenarios,
+  settingsTransitions,
   toLivePreviewUrl,
   toSearch,
   type MapLocation,
@@ -24,7 +26,7 @@ const SCREEN_POSITIONS = [
 ];
 const SCREEN_BASE = `${import.meta.env.BASE_URL}scenario-map/`;
 const SCENARIO_LABELS: Record<ScenarioId, string> = {
-  vnd:'Проверка ВНД', settings:'Настройки', 'settings-clear':'Очистка памяти', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
+  vnd:'Проверка ВНД', settings:'Настройки', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
   'feedback-complaint':'Жалоба / помощь', 'feedback-positive':'Идея / похвала',
 };
 
@@ -115,9 +117,20 @@ export function App() {
   const scenario = getScenario(location.scenarioId) ?? scenarios[0];
   const selectedStep = getScenarioStep(scenario.id, location.stepId) ?? scenario.steps[0];
   const isStory = location.view === 'story';
-  const positions = isStory ? STORY_POSITIONS : SCREEN_POSITIONS;
+  const isSettings = scenario.id === 'settings';
   const cardSize = isStory ? { width: 330, height: 250 } : { width: 510, height: 405 };
-  const boardSize = isStory ? { width: 1640, height: 790 } : { width: 2160, height: 1090 };
+  const column = cardSize.width + 64;
+  const row = cardSize.height + 56;
+  const positions = isSettings ? [
+    { x: 0, y: row / 2 }, { x: column, y: row / 2 },
+    { x: column * 2, y: 0 }, { x: column * 3, y: 0 },
+    { x: column * 2, y: row }, { x: column * 3, y: row },
+  ] : isStory ? STORY_POSITIONS : SCREEN_POSITIONS;
+  const boardSize = isSettings
+    ? { width: column * 3 + cardSize.width, height: row + cardSize.height }
+    : isStory ? { width: 1640, height: 790 } : { width: 2160, height: 1090 };
+  const selectedBranches = isSettings ? getSettingsNextSteps(selectedStep.id) : [];
+  const liveBranches = isSettings && fullScreenStep ? getSettingsNextSteps(fullScreenStep.id) : [];
 
   const updateLocation = useCallback((change: Partial<MapLocation>) => {
     setLocation(current => {
@@ -132,18 +145,18 @@ export function App() {
   const fitBoard = useCallback(() => {
     const workspace = workspaceRef.current;
     if (!workspace) return;
-    const padding = 56;
+    const padding = isSettings ? 24 : 56;
     const fitZoom = Math.min(
       1,
       Math.min((workspace.clientWidth - padding * 2) / boardSize.width, (workspace.clientHeight - padding * 2) / boardSize.height),
     );
-    const zoom = Math.max(isStory ? .86 : .22, fitZoom);
+    const zoom = Math.max(isSettings ? .14 : isStory ? .86 : .22, fitZoom);
     setTransform({
       zoom,
-      x: isStory ? 24 : Math.max(24, (workspace.clientWidth - boardSize.width * zoom) / 2),
+      x: isStory && !isSettings ? 24 : Math.max(12, (workspace.clientWidth - boardSize.width * zoom) / 2),
       y: Math.max(24, (workspace.clientHeight - boardSize.height * zoom) / 2),
     });
-  }, [boardSize.height, boardSize.width, isStory]);
+  }, [boardSize.height, boardSize.width, isSettings, isStory]);
 
   useEffect(() => {
     fitBoard();
@@ -181,13 +194,15 @@ export function App() {
     setFullScreenStep(undefined);
   };
 
-  const moveFullScreen = (direction: -1 | 1) => {
-    if (!fullScreenStep) return;
-    const step = getAdjacentStep(scenario.id, fullScreenStep.id, direction);
-    if (!step) return;
+  const showFullScreenStep = (step: ScenarioStep) => {
     updateLocation({ stepId: step.id });
     setLiveReadyStepId(undefined);
     setFullScreenStep(step);
+  };
+  const moveFullScreen = (direction: -1 | 1) => {
+    if (!fullScreenStep) return;
+    const step = getAdjacentStep(scenario.id, fullScreenStep.id, direction);
+    if (step && step.id !== fullScreenStep.id) showFullScreenStep(step);
   };
 
   useEffect(() => {
@@ -267,7 +282,7 @@ export function App() {
     const rect = workspace.getBoundingClientRect();
     const pointX = event.clientX - rect.left;
     const pointY = event.clientY - rect.top;
-    const nextZoom = Math.min(1.25, Math.max(.2, transform.zoom * (event.deltaY > 0 ? .9 : 1.1)));
+    const nextZoom = Math.min(1.25, Math.max(isSettings ? .14 : .2, transform.zoom * (event.deltaY > 0 ? .9 : 1.1)));
     const ratio = nextZoom / transform.zoom;
     setTransform({
       zoom: nextZoom,
@@ -294,10 +309,15 @@ export function App() {
     setDragging(false);
   };
 
-  const connectorPoints = [
-    { x: 70, y: isStory ? 275 : 425, width: isStory ? 300 : 285, height: isStory ? 180 : 200 },
-    ...scenario.steps.map((_, index) => ({ ...positions[index], ...cardSize })),
-  ];
+  const rootPosition = { x: 70, y: isStory ? 275 : 425, width: isStory ? 300 : 285, height: isStory ? 180 : 200 };
+  const stepPoints = scenario.steps.map((_, index) => ({ ...positions[index], ...cardSize }));
+  const connectorPoints = [rootPosition, ...stepPoints];
+  const settingsPoints = new Map(scenario.steps.map((step, index) => [step.id, stepPoints[index]]));
+  const connections = isSettings
+    ? settingsTransitions.map(([from, to]) => [settingsPoints.get(from)!, settingsPoints.get(to)!])
+    : connectorPoints.slice(0, -1).map((from, index) => [from, connectorPoints[index + 1]]);
+  const isAtBoundary = (step: ScenarioStep, direction: -1 | 1) =>
+    getAdjacentStep(scenario.id, step.id, direction)?.id === step.id;
 
   return (
     <>
@@ -338,10 +358,10 @@ export function App() {
         <div className="workspace-title">
           <div><span>{scenario.eyebrow}</span><h1>{scenario.title}</h1></div>
           <div className="zoom-controls" aria-label="Масштаб карты">
-            <button onClick={() => setTransform(current => ({ ...current, zoom: Math.max(.2, current.zoom - .1) }))} aria-label="Уменьшить масштаб"><Icon name="minus" /></button>
+            <button onClick={() => setTransform(current => ({ ...current, zoom: Math.max(isSettings ? .14 : .2, current.zoom - .1) }))} aria-label="Уменьшить масштаб"><Icon name="minus" /></button>
             <span>{Math.round(transform.zoom * 100)}%</span>
             <button onClick={() => setTransform(current => ({ ...current, zoom: Math.min(1.25, current.zoom + .1) }))} aria-label="Увеличить масштаб"><Icon name="plus" /></button>
-            <button onClick={fitBoard} aria-label={isStory ? 'Установить читаемый масштаб' : 'Вписать карту'}><Icon name="fit" /></button>
+            <button onClick={fitBoard} aria-label={isStory && !isSettings ? 'Установить читаемый масштаб' : 'Вписать карту'}><Icon name="fit" /></button>
           </div>
         </div>
 
@@ -361,8 +381,7 @@ export function App() {
           >
             <svg className="connectors" width={boardSize.width} height={boardSize.height} aria-hidden="true">
               <defs><marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 8 4 0 8Z" /></marker></defs>
-              {connectorPoints.slice(0, -1).map((from, index) => {
-                const to = connectorPoints[index + 1];
+              {connections.map(([from, to]) => {
                 const sameRow = Math.abs(from.y - to.y) < 20;
                 const sameColumn = Math.abs(from.x - to.x) < 20;
                 let x1 = from.x + from.width; let y1 = from.y + from.height / 2;
@@ -370,13 +389,13 @@ export function App() {
                 if (sameRow && to.x < from.x) { x1 = from.x; x2 = to.x + to.width; }
                 if (sameColumn) { x1 = from.x + from.width / 2; x2 = to.x + to.width / 2; y1 = from.y + from.height; y2 = to.y; }
                 const bend = sameRow || sameColumn ? `${x1},${y1} ${x2},${y2}` : `${x1},${y1} ${(x1 + x2) / 2},${y1} ${(x1 + x2) / 2},${y2} ${x2},${y2}`;
-                return <polyline key={`${from.x}-${from.y}`} points={bend} markerEnd="url(#arrowhead)" />;
+                return <polyline key={`${from.x}-${from.y}-${to.x}-${to.y}`} points={bend} markerEnd="url(#arrowhead)" />;
               })}
             </svg>
 
-            <section className="scenario-root" data-accent={scenario.accent} style={{ left: 70, top: isStory ? 275 : 425, width: isStory ? 300 : 285, height: isStory ? 180 : 200 }}>
+            {!isSettings && <section className="scenario-root" data-accent={scenario.accent} style={{ left: rootPosition.x, top: rootPosition.y, width: rootPosition.width, height: rootPosition.height }}>
               <span>{scenario.eyebrow}</span><h2>{scenario.title}</h2><p>{scenario.description}</p>
-            </section>
+            </section>}
 
             {scenario.steps.map((step, index) => (
               <div className="positioned-card" key={step.id} style={{ left: positions[index].x, top: positions[index].y }}>
@@ -417,25 +436,31 @@ export function App() {
           <Icon name={isStory ? 'screens' : 'story'} />
           {isStory ? 'Показать на карте экранов' : 'Показать в сценарии'}
         </button>
+        {selectedBranches.length > 1 && <div className="branch-choices" role="group" aria-label="Действия с памятью">
+          {selectedBranches.map(step => <button key={step.id} onClick={() => updateLocation({ stepId: step.id })}>{step.title}</button>)}
+        </div>}
         <div className="step-navigation">
-          <button onClick={() => moveStep(-1)} disabled={progress === 1} aria-label="Предыдущий шаг"><Icon name="arrow" /></button>
+          <button onClick={() => moveStep(-1)} disabled={isAtBoundary(selectedStep, -1)} aria-label="Предыдущий шаг"><Icon name="arrow" /></button>
           <div>{selectedStep.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
-          <button onClick={() => moveStep(1)} disabled={progress === scenario.steps.length} aria-label="Следующий шаг"><Icon name="arrow" /></button>
+          <button onClick={() => moveStep(1)} disabled={isAtBoundary(selectedStep, 1)} aria-label="Следующий шаг"><Icon name="arrow" /></button>
         </div>
       </aside>
     </div>
 
       {fullScreenStep && (
-        <div ref={modalRef} className="screen-modal" role="dialog" aria-modal="true" aria-label={`${fullScreenStep.title}, живой HTML в масштабе 100%`}>
+        <div ref={modalRef} className="screen-modal" data-branching={liveBranches.length > 1} role="dialog" aria-modal="true" aria-label={`${fullScreenStep.title}, живой HTML в масштабе 100%`}>
           <header>
             <div><span>{fullScreenStep.number} · LIVE · 100%</span><strong>{fullScreenStep.title}</strong></div>
             <div className="modal-actions">
-              <button ref={modalPreviousRef} onClick={() => moveFullScreen(-1)} disabled={scenario.steps[0].id === fullScreenStep.id} aria-label="Предыдущий экран"><Icon name="arrow" /></button>
+              <button ref={modalPreviousRef} onClick={() => moveFullScreen(-1)} disabled={isAtBoundary(fullScreenStep, -1)} aria-label="Предыдущий экран"><Icon name="arrow" /></button>
               <span>{scenario.steps.findIndex(step => step.id === fullScreenStep.id) + 1} / {scenario.steps.length}</span>
-              <button ref={modalNextRef} onClick={() => moveFullScreen(1)} disabled={scenario.steps.at(-1)?.id === fullScreenStep.id} aria-label="Следующий экран"><Icon name="arrow" /></button>
+              <button ref={modalNextRef} onClick={() => moveFullScreen(1)} disabled={isAtBoundary(fullScreenStep, 1)} aria-label="Следующий экран"><Icon name="arrow" /></button>
               <button ref={modalCloseRef} onClick={closeFullScreen} aria-label="Закрыть просмотр"><Icon name="close" /></button>
             </div>
           </header>
+          {liveBranches.length > 1 && <div className="branch-choices modal-branches" role="group" aria-label="Действия с памятью">
+            {liveBranches.map(step => <button key={step.id} onClick={() => showFullScreenStep(step)}>{step.title}</button>)}
+          </div>}
           <div className="full-screen-stage">
             {liveReadyStepId !== fullScreenStep.id && <div className="live-loading" role="status">Загружаем живой экран…</div>}
             <iframe ref={liveFrameRef} key={fullScreenStep.id} src={toLivePreviewUrl(import.meta.env.BASE_URL, fullScreenStep.id)} title={`Живой экран: ${fullScreenStep.title}`} width="1416" height="812" sandbox="allow-scripts allow-same-origin allow-forms" />

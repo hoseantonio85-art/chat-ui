@@ -1,4 +1,4 @@
-export type ScenarioId = 'vnd' | 'settings' | 'settings-clear' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
+export type ScenarioId = 'vnd' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
 export type MapView = 'story' | 'screens';
 export type StepKind = 'entry' | 'action' | 'system' | 'state' | 'result';
 
@@ -84,9 +84,9 @@ export const scenarios: Scenario[] = [
   },
   {
     id: 'settings',
-    eyebrow: 'Настройки агента',
-    title: 'Удаление факта памяти',
-    description: 'Переход из истории во второй слой drawer и безопасное удаление одного факта.',
+    eyebrow: 'История чатов',
+    title: 'Настройки агента',
+    description: 'Из настроек можно удалить один факт или очистить память целиком.',
     accent: 'blue',
     steps: [
       {
@@ -98,13 +98,13 @@ export const scenarios: Scenario[] = [
       },
       {
         id: 'settings.overview', number: '02', title: 'Обзор настроек', actor: 'Пользователь', kind: 'state',
-        summary: 'Второй слой содержит историю чатов и память агента.',
-        detail: 'История расположена выше, потому что её секция стабильна по высоте. Память растёт вниз и прокручивается.',
-        screen: 'screens/settings-02-overview.png', screenAlt: 'Drawer настроек с историей и памятью агента',
+        summary: 'В разделе «Память агента» можно удалить один факт или очистить весь список.',
+        detail: 'Нажмите на корзину рядом с фактом или на «Очистить память» под списком. Оба действия требуют подтверждения.',
+        screen: 'screens/settings-clear-01-overview.png', screenAlt: 'Настройки с историей, списком фактов и кнопкой очистки памяти',
         tags: ['settings', 'memory'],
       },
       {
-        id: 'settings.confirm', number: '03', title: 'Подтверждение удаления', actor: 'Система', kind: 'action',
+        id: 'settings.confirm', number: '03', title: 'Удалить один факт', actor: 'Система', kind: 'action',
         summary: 'Удаление одного факта проходит через контролируемый UI-kit Popover.',
         detail: 'Popover привязан к кнопке записи, фокус получает «Отмена», Escape закрывает верхний слой и возвращает фокус.',
         screen: 'screens/settings-03-confirm.png', screenAlt: 'Popover подтверждения удаления факта памяти',
@@ -117,31 +117,15 @@ export const scenarios: Scenario[] = [
         screen: 'screens/settings-04-updated.png', screenAlt: 'Настройки после удаления одного факта памяти',
         tags: ['focus', 'updated'],
       },
-    ],
-  },
-  {
-    id: 'settings-clear',
-    eyebrow: 'Настройки агента',
-    title: 'Очистка памяти агента',
-    description: 'Удаление всех сохранённых фактов из настроек.',
-    accent: 'blue',
-    steps: [
       {
-        id: 'settings-clear.overview', number: '01', title: 'В памяти есть записи', actor: 'Пользователь', kind: 'entry',
-        summary: 'В настройках под списком фактов доступна кнопка «Очистить память».',
-        detail: 'Откройте живой экран и нажмите «Очистить память», чтобы перейти к подтверждению.',
-        screen: 'screens/settings-clear-01-overview.png', screenAlt: 'Настройки со списком фактов и кнопкой очистки памяти',
-        tags: ['настройки', 'память'],
-      },
-      {
-        id: 'settings-clear.confirm', number: '02', title: 'Подтверждение очистки', actor: 'Пользователь', kind: 'action',
+        id: 'settings-clear.confirm', number: '05', title: 'Очистить всю память', actor: 'Пользователь', kind: 'action',
         summary: 'Настройки запрашивают подтверждение удаления всех фактов.',
         detail: 'Нажмите «Очистить» в живом экране. Если выбрать «Отмена» или нажать Escape, факты сохранятся.',
         screen: 'screens/settings-clear-02-confirm.png', screenAlt: 'Окно подтверждения очистки памяти агента',
         tags: ['подтверждение', 'очистка'],
       },
       {
-        id: 'settings-clear.empty', number: '03', title: 'Память пуста', actor: 'Система', kind: 'result',
+        id: 'settings-clear.empty', number: '06', title: 'Память пуста', actor: 'Система', kind: 'result',
         summary: 'После очистки список исчезает, а кнопка «Очистить память» становится недоступной.',
         detail: 'Фокус переходит на заголовок «Память агента». Сохранённые чаты по-прежнему доступны в истории.',
         screen: 'screens/settings-clear-03-empty.png', screenAlt: 'Пустая память агента после очистки',
@@ -200,6 +184,7 @@ export const getScenario = (scenarioId: string | null): Scenario | undefined =>
   scenarios.find(scenario => scenario.id === scenarioId);
 
 const legacyStepRedirects: Record<string, string> = {
+  'settings-clear.overview': 'settings.overview',
   'csi.rating': 'csi.high',
   'csi.review': 'csi.saved',
   'csi.edited': 'csi.saved',
@@ -211,8 +196,11 @@ export const getScenarioStep = (scenarioId: string, stepId: string | null): Scen
 
 export function getInitialLocation(search: string): MapLocation {
   const params = new URLSearchParams(search);
-  const scenario = getScenario(params.get('scenario')) ?? scenarios[0];
-  const step = getScenarioStep(scenario.id, params.get('step')) ?? scenario.steps[0];
+  const requestedScenario = params.get('scenario');
+  const scenario = getScenario(requestedScenario === 'settings-clear' ? 'settings' : requestedScenario) ?? scenarios[0];
+  const step = getScenarioStep(scenario.id, params.get('step'))
+    ?? (requestedScenario === 'settings-clear' ? getScenarioStep(scenario.id, 'settings.overview') : undefined)
+    ?? scenario.steps[0];
   const view = params.get('view') === 'screens' ? 'screens' : 'story';
   return { scenarioId: scenario.id, stepId: step.id, view };
 }
@@ -227,9 +215,33 @@ export const toLivePreviewUrl = (baseUrl: string, stepId: string): string => {
   return `${baseUrl}?${params.toString()}`;
 };
 
+export const settingsTransitions = [
+  ['settings.history', 'settings.overview'],
+  ['settings.overview', 'settings.confirm'],
+  ['settings.confirm', 'settings.updated'],
+  ['settings.overview', 'settings-clear.confirm'],
+  ['settings-clear.confirm', 'settings-clear.empty'],
+] as const;
+
+export function getSettingsNextSteps(stepId: string): ScenarioStep[] {
+  return settingsTransitions.flatMap(([from, to]) => {
+    const step = from === stepId ? getScenarioStep('settings', to) : undefined;
+    return step ? [step] : [];
+  });
+}
+
 export function getAdjacentStep(scenarioId: ScenarioId, stepId: string, direction: -1 | 1): ScenarioStep | undefined {
   const scenario = getScenario(scenarioId);
   if (!scenario) return undefined;
+  if (scenarioId === 'settings') {
+    const step = getScenarioStep(scenarioId, stepId) ?? scenario.steps[0];
+    if (direction === 1) {
+      const next = getSettingsNextSteps(step.id);
+      return next.length === 1 ? next[0] : step;
+    }
+    const previousId = settingsTransitions.find(([, to]) => to === step.id)?.[0];
+    return getScenarioStep(scenarioId, previousId ?? null) ?? step;
+  }
   const index = Math.max(0, scenario.steps.findIndex(step => step.id === stepId));
   const nextIndex = Math.min(scenario.steps.length - 1, Math.max(0, index + direction));
   return scenario.steps[nextIndex];

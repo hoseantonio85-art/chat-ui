@@ -108,7 +108,12 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .step-navigation>button:first-child svg{transform:rotate(180deg)}
 .step-navigation>button:disabled{opacity:.35;cursor:not-allowed}
 .step-navigation>div{display:flex;justify-content:center;gap:5px;flex-wrap:wrap}
+.branch-choices{display:flex;flex-wrap:wrap;gap:8px}
+.branch-choices button{padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:14px;cursor:pointer}
+.branch-choices button:hover{background:var(--blue-soft)}
 .screen-modal{position:fixed;inset:0;z-index:100;display:grid;grid-template-rows:64px minmax(0,1fr);background:#dfe4e8}
+.screen-modal[data-branching=true]{grid-template-rows:64px auto minmax(0,1fr)}
+.modal-branches{padding:8px 20px;border-bottom:1px solid var(--border);background:#fff}
 .screen-modal>header{padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid var(--border);background:#fff}
 .screen-modal>header>div{min-width:0;display:flex;align-items:center;gap:12px}
 .screen-modal header span{padding:5px 8px;border-radius:8px;background:var(--mint-soft);color:#087a65;font-size:12px;font-weight:700}
