@@ -44,9 +44,13 @@
 
 .context-action-number {
   flex: 0 0 22px;
-  text-align: center;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  line-height: 1;
   border-radius: 50%;
-  background: #e2dbf1;
+  background: #fcfbfe;
 }
 
 .context-action:hover:not(:disabled) { background: #e5def5; }
