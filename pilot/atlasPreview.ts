@@ -4,6 +4,8 @@ import { appendEvent, createRun, type AgentRun } from '../src/components/AgentAc
 import type { ThreadDrawerInitialState } from '../src/components/ThreadDrawer/context';
 import { appendExplanation, explainedReply, feedbackRuns, vndBackgroundExplanation } from './scenarioExplanations';
 import type { BackgroundThread } from './VndBackground';
+import type { ResponseFormatsDraft } from './ResponseFormats';
+import type { VndContextualQuestion } from './VndBackground.model';
 import { type ScenarioId, vndStandardPrompt } from './scenarios';
 import {
   addCsiComment,
@@ -65,6 +67,8 @@ export interface AtlasPreviewThread extends BackgroundThread {
   messages: IMessage[];
   runs: Record<string, AgentRun>;
   feedbackDraft?: FeedbackDraft;
+  responseFormats?: ResponseFormatsDraft;
+  skippedVndQuestion?: VndContextualQuestion;
 }
 
 export interface AtlasPreview {

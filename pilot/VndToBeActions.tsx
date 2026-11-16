@@ -1,65 +1,31 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
-import { EIconName, Icon } from '@sber-orm/ui-kit';
+import { ContextualButtons, ContextualChoices, type ContextualPlacement } from './ContextualActions';
 import { vndFolders, type VndFolder } from './VndBackground.model';
 import { vndStandards } from './scenarios';
-import './VndToBeActions.css';
 
-type Action = { label: string; onSelect: () => void };
-type Placement = 'inline' | 'sticky';
-
-function ContextualActions({ label, actions, placement, layout }: {
-  label: string;
-  actions: Action[];
-  placement: Placement;
-  layout: 'list' | 'row';
-}) {
-  const isList = layout === 'list';
-  const buttons = <div className={isList ? 'context-actions context-actions-list' : 'context-actions'} role="group" aria-label={label}>
-    {actions.map(({ label: text, onSelect }, index) => (
-      <button type="button" className="context-action" key={text} onClick={onSelect}>
-        {isList && <span className="context-action-number">{index + 1}</span>}
-        <span>{text}</span>
-      </button>
-    ))}
-  </div>;
-
-  if (placement === 'inline') return buttons;
-  return <div className="context-actions-sticky">
-    {isList ? <details>
-      <summary>
-        <span className="context-actions-chevron" aria-hidden="true">
-          <Icon name={EIconName.chevronFillRight} width={16} height={16} />
-        </span>
-        {label}
-      </summary>
-      {buttons}
-    </details> : <>
-      <div className="context-actions-label">{label}</div>
-      {buttons}
-    </>}
-  </div>;
-}
-
-export function VndStandardActions({ placement, onSelect }: {
-  placement: Placement;
+export function VndStandardActions({ placement, onSelect, onSkip }: {
+  placement: ContextualPlacement;
   onSelect: (standard: string) => void;
+  onSkip: () => void;
 }) {
-  return <ContextualActions
+  return <ContextualChoices
     label="Выберите групповой стандарт"
     placement={placement}
-    layout="list"
-    actions={vndStandards.map(standard => ({ label: standard, onSelect: () => onSelect(standard) }))}
+    options={vndStandards}
+    onSkip={onSkip}
+    mode={{ onSelect, numbered: true }}
   />;
 }
 
-export function VndSaveActions({ placement, onReply }: {
-  placement: Placement;
+export function VndSaveActions({ placement, onReply, onSkip }: {
+  placement: ContextualPlacement;
   onReply: (reply: string) => void;
+  onSkip: () => void;
 }) {
-  return <ContextualActions
+  return <ContextualButtons
     label="Сохранить ВНД в «Операционные риски»?"
     placement={placement}
-    layout="row"
+    onSkip={onSkip}
     actions={['Да, сохранить', 'Выбрать другую папку', 'Не сейчас'].map(label => ({
       label,
       onSelect: () => onReply(label),

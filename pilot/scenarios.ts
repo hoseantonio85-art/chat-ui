@@ -25,6 +25,7 @@ export const scenarios = [
   {id: 'empty', title: 'Источник без данных', question: 'Есть ли в реестре риски для нового направления компании?'},
   {id: 'error', title: 'Источник недоступен', question: 'Проверь риски компании, даже если один из источников не отвечает.'},
   {id: 'rich', title: 'Файл, таблица и график', question: 'Покажи потери по месяцам: таблицу, график и краткий отчёт.'},
+  {id: 'responseFormats', title: 'Варианты выбора и действия', question: 'Подготовь сводку по операционным рискам.'},
   {id: 'registration', title: 'Регистрация события', question: 'Помоги зарегистрировать событие операционного риска.'},
   {id: 'ordinary', title: 'Обычный чат без формы', question: 'Кратко объясни, что такое операционный риск.'},
   {id: 'finalOnly', title: 'Ответ без потока', question: 'Объясни, что такое операционный риск, без промежуточных событий.'},
@@ -38,7 +39,7 @@ export const scenarioGroups = [
   {id:'csi', title:'CSI', scenarioIds:['csiProactive', 'csiDirect', 'csiDirectUnknown', 'csiError']},
   {id:'feedback', title:'Обратная связь', scenarioIds:['feedbackComplaint', 'feedbackComplaintClarify', 'feedbackHelp', 'feedbackIdea', 'feedbackIdeaClarify', 'feedbackPraise', 'feedbackError']},
   {id:'agent', title:'Работа агента', scenarioIds:['normal', 'noReasoning', 'parallel', 'subagent', 'empty', 'error', 'backendCallback']},
-  {id:'answers', title:'Форматы ответа', scenarioIds:['rich', 'ordinary', 'finalOnly']},
+  {id:'answers', title:'Формат ответа', scenarioIds:['responseFormats', 'rich', 'ordinary', 'finalOnly']},
 ] as const satisfies ReadonlyArray<{id:string; title:string; scenarioIds:readonly ScenarioId[]}>;
 
 export const ungroupedScenarioIds = ['registration'] as const satisfies readonly ScenarioId[];

@@ -31,6 +31,8 @@
     "./Feedback.model.ts",
     "./Feedback.model.test.ts",
     "./FeedbackCard.tsx",
+    "./ResponseFormats.tsx",
+    "./ContextualActions.tsx",
     "./atlasPreview.ts",
     "./atlasPreview.model.test.ts",
     "./scenarios.ts",
