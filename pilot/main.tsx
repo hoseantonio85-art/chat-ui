@@ -22,7 +22,10 @@ import '@/i18n';
 import './vendor/ui-kit/dist/index.css';
 import './styles.css';
 import {useVndBackground} from './VndBackground';
-import { canResolveVndAttachmentLookup, canSaveVnd, parseVndSaveIntent, vndSaveQuestion, type VndStage } from './VndBackground.model';
+import {
+  canResolveVndAttachmentLookup, canResumeVndQuestion, canSaveVnd, parseVndSaveIntent, vndSaveQuestion,
+  type VndContextualQuestion, type VndStage,
+} from './VndBackground.model';
 import {methodologistService} from './mocks/files';
 import {createAtlasPreview, type AtlasPreviewThread} from './atlasPreview';
 import { MessageAddonContext } from '../src/components/Chat/MessageAddonContext';
@@ -56,7 +59,11 @@ import {
 } from './Feedback.model';
 
 type DemoThread = AtlasPreviewThread;
+type DemoRequest = { body: string; extras?: Record<string, string> };
 const responseFormatsThreadId = 'response-formats';
+
+const scrollToLatest = () => document.querySelector(`.${chatClasses.messages}`)?.scrollTo({ top: 0, behavior: 'instant' });
+const focusComposer = () => document.querySelector<HTMLTextAreaElement>(`.${chatClasses.chat} textarea`)?.focus({ preventScroll: true });
 
 function createResponseFormatsThread(): DemoThread {
   const { draft, messages } = startResponseFormats();
@@ -213,9 +220,11 @@ function App() {
     chat$.openChat();
   };
 
-  const setVndStage = (stage: VndStage, id = activeIdRef.current) => {
+  const setVndStage = (stage: VndStage, id = activeIdRef.current, documentIds?: string) => {
     if (activeIdRef.current === id) vndStageRef.current = stage;
-    updateThreads(items => items.map(thread => thread.id === id ? {...thread, vndStage:stage, updatedAt:Date.now()} : thread));
+    updateThreads(items => items.map(thread => thread.id === id
+      ? {...thread, vndStage:stage, documentIds:documentIds ?? thread.documentIds, updatedAt:Date.now()}
+      : thread));
   };
 
   const background = useVndBackground<DemoThread>({
@@ -513,6 +522,30 @@ function App() {
     play(selectedSkillId === 'methodologist' ? 'subagent' : scenario, false, request.body, request.extras);
   }
 
+  function replyInCurrentChat(threadId: string, request: DemoRequest, text: string, vndAddon?: VndContextualQuestion) {
+    const sentAt = Date.now();
+    appendToThread(threadId, {
+      id:crypto.randomUUID(), role:ERoles.user, text:request.body, extras:request.extras,
+      timeCreated:new Date(sentAt).toISOString(),
+    });
+    appendToThread(threadId, {
+      id:crypto.randomUUID(), role:ERoles.bot, text, extras:vndAddon ? {vndAddon} : undefined,
+      timeCreated:new Date(sentAt + 1).toISOString(),
+    });
+    scrollToLatest();
+  }
+
+  function replyToNewRequest(threadId: string, request: DemoRequest) {
+    const body = request.body.toLocaleLowerCase('ru-RU');
+    let answer = 'В этом демо можно попросить составить письмо или объяснить, что такое операционный риск.';
+    if (/письм[оаеу]|черновик письма/u.test(body)) {
+      answer = 'Вот нейтральное начало письма.\n\n**Тема:** Вопрос для обсуждения\n\nЗдравствуйте! Хотелось бы согласовать следующие шаги. Подскажите, пожалуйста, когда вам удобно обсудить детали?';
+    } else if (/операционн\p{L}* риск/u.test(body)) {
+      answer = fixture('ordinary', 'new-request', Date.now()).answer;
+    }
+    replyInCurrentChat(threadId, request, answer);
+  }
+
   function runVndReview(corrected: boolean, instant = false, correctedFileIds?: string) {
     const threadId = activeIdRef.current;
     const threadScenario = threadsRef.current.find(thread => thread.id === threadId)?.scenario ?? scenario;
@@ -576,7 +609,7 @@ function App() {
     background.cancel(activeIdRef.current);
     clearThreadTimers(activeIdRef.current); resetPending(); resetAction(ctx); attachmentsAtom(ctx, []); textAtom(ctx, ''); canLoadHistoryAtom(ctx, false); isLoadingAtom(ctx, false);
     setActionUrl(''); setScenario(entry); setPlaying(false); setRuns({});
-    updateThreads(items => items.map(thread => thread.id === activeIdRef.current ? {...thread, title:'Проверка ВНД', scenario:entry, vndStage:'start', agentState:undefined, agentUnread:false, jobState:undefined, documentIds:undefined, documentName:undefined, folder:undefined, unread:false, pinned:false, updatedAt:Date.now()} : thread));
+    updateThreads(items => items.map(thread => thread.id === activeIdRef.current ? {...thread, title:'Проверка ВНД', scenario:entry, vndStage:'start', skippedVndQuestion:undefined, agentState:undefined, agentUnread:false, jobState:undefined, documentIds:undefined, documentName:undefined, folder:undefined, unread:false, pinned:false, updatedAt:Date.now()} : thread));
     vndStageRef.current = 'start';
     if (!instant) {
       if (entry === 'vndWelcome' || entry === 'vndBackground' || entry === 'vndWelcomeToBe' || entry === 'vndBackgroundToBe') addMessageAction(ctx, {id:crypto.randomUUID(), role:ERoles.bot, text:'Здравствуйте! Я помогу проверить ваш ВНД на соответствие стандартам группы. Прикрепите документ — затем я предложу выбрать групповой стандарт для проверки.', timeCreated:new Date().toISOString()});
@@ -607,11 +640,21 @@ function App() {
     }
   }
 
-  function sendVnd(request: {body: string; extras?: Record<string, string>}) {
+  function sendVnd(request: DemoRequest) {
     const id = activeIdRef.current;
     const active = threadsRef.current.find(item => item.id === id);
     if (!active) return;
     const toBe = isVndToBeScenario(active.scenario);
+    const skippedQuestion = toBe ? active.skippedVndQuestion : undefined;
+    if (skippedQuestion) {
+      if (!request.extras?.fileIds && canResumeVndQuestion(skippedQuestion, request.body)) {
+        updateThreads(items => items.map(thread => thread.id === id ? {...thread, skippedVndQuestion:undefined} : thread));
+        replyInCurrentChat(id, request, skippedQuestion === 'standard-picker' ? vndToBeStandardPrompt : vndSaveQuestion, skippedQuestion);
+      } else {
+        replyToNewRequest(id, request);
+      }
+      return;
+    }
     const canSave = canSaveVnd(active);
     const intent = canSave ? parseVndSaveIntent(request.body) : undefined;
     if (toBe && intent?.kind === 'chooseFolder' && !request.extras?.fileIds) {
@@ -650,7 +693,7 @@ function App() {
     }
     if (vndStageRef.current === 'start') {
       addMessageAction(ctx, {id:`vnd-reply-${crypto.randomUUID()}`, role:ERoles.bot, text:hasFile ? (toBe ? vndToBeStandardPrompt : vndStandardPrompt) : 'Я помогу проверить ВНД на соответствие стандартам группы. Загрузите документ, который хотите проверить.', extras:hasFile && toBe ? {vndAddon:'standard-picker'} : undefined, timeCreated:new Date(sentAt + 1).toISOString()});
-      if (hasFile) setVndStage('chooseStandard');
+      if (hasFile) setVndStage('chooseStandard', id, request.extras?.fileIds);
       return;
     }
     if (vndStageRef.current === 'chooseStandard') {
@@ -662,7 +705,7 @@ function App() {
       if (isVndBackgroundScenario(active.scenario)) {
         if (attachmentLookups.current.has(id)) return;
         const userFiles=ctx.get(messagesAtom).filter(item=>item.role===ERoles.user && item.extras?.fileIds);
-        const fileIds=userFiles[userFiles.length-1]?.extras?.fileIds as string || '[]';
+        const fileIds = active.documentIds ?? (userFiles.at(-1)?.extras?.fileIds as string | undefined) ?? '[]';
         let attachmentIds: string[];
         try {
           const parsed = JSON.parse(fileIds);
@@ -722,16 +765,21 @@ function App() {
     chat$.openChat();
   }
 
-  function replyToResponseFormats(input: ResponseFormatsEvent | string, promptId?: string) {
+  function replyToResponseFormats(input: ResponseFormatsEvent | DemoRequest, promptId?: string) {
     const id = activeIdRef.current;
     const thread = threadsRef.current.find(item => item.id === id);
     const draft = thread?.responseFormats;
     if (thread?.scenario !== 'responseFormats' || !draft) return;
     if (promptId && (draft.stage === 'done' || promptId !== draft.promptId)) return;
-    const event = typeof input === 'string' ? parseResponseFormatsText(draft, input) : input;
+    const event = 'kind' in input ? input : parseResponseFormatsText(draft, input.body);
+    if (draft.stage !== 'done' && draft.skipped && event.kind === 'text') {
+      replyToNewRequest(id, 'body' in input ? input : { body:event.text });
+      return;
+    }
     const next = advanceResponseFormats(draft, event);
     updateThreads(items => items.map(item => item.id === id ? { ...item, responseFormats: next.draft } : item));
     next.messages?.forEach(message => appendToThread(id, message));
+    if (event.kind === 'skip') focusComposer();
   }
 
   const runScenario = (id: ScenarioId, instant = false) => {
@@ -868,7 +916,7 @@ function App() {
   }, [initialState.drawerFocus, initialState.embedded, initialState.previewStepId]);
   useEffect(() => {
     setDemoSender(request => {
-      if (scenario === 'responseFormats') return replyToResponseFormats(request.body);
+      if (scenario === 'responseFormats') return replyToResponseFormats(request);
       if (scenario.startsWith('vnd')) return sendVnd(request);
       if (scenario.startsWith('csi')) return sendCsi(request);
       if (scenario === 'feedbackComplaintClarify' || scenario === 'feedbackIdeaClarify') return sendFeedbackClarification(request);
@@ -898,13 +946,13 @@ function App() {
   const responseFormatsStage = responseFormatsDraft?.stage;
   useLayoutEffect(() => {
     if (!responseFormatsStage) return;
-    document.querySelector(`.${chatClasses.messages}`)?.scrollTo({ top: 0, behavior: 'instant' });
+    scrollToLatest();
   }, [activeFormatPrompt, responseFormatsStage]);
-  const addon = activeThread && isVndToBeScenario(activeThread.scenario)
+  const addon = activeThread && isVndToBeScenario(activeThread.scenario) && !activeThread.skippedVndQuestion
     ? activeThread.vndStage === 'chooseStandard' ? 'standard-picker'
       : canSaveVnd(activeThread) && activeThread.vndStage !== 'saveDeferred' ? 'save-confirmation' : undefined
     : undefined;
-  const contextualActions = responseFormatsDraft && responseFormatsDraft.stage !== 'done' ? {
+  const contextualActions = responseFormatsDraft && responseFormatsDraft.stage !== 'done' && !responseFormatsDraft.skipped ? {
     matches: (message: IMessage) => message.id === responseFormatsDraft.promptId,
     render: (placement: 'inline' | 'sticky') => <ResponseFormatsActions
       draft={responseFormatsDraft}
@@ -917,8 +965,16 @@ function App() {
       const onReply = (body: string) => {
         if (activeIdRef.current === activeThreadId) sendVnd({body});
       };
-      return addon === 'standard-picker' ? <VndStandardActions placement={placement} onSelect={onReply} />
-        : <VndSaveActions placement={placement} onReply={onReply} />;
+      const onSkip = () => {
+        if (activeIdRef.current !== activeThreadId) return;
+        attachmentLookups.current.delete(activeThreadId);
+        updateThreads(items => items.map(thread => thread.id === activeThreadId
+          ? {...thread, skippedVndQuestion:addon}
+          : thread));
+        focusComposer();
+      };
+      return addon === 'standard-picker' ? <VndStandardActions placement={placement} onSelect={onReply} onSkip={onSkip} />
+        : <VndSaveActions placement={placement} onReply={onReply} onSkip={onSkip} />;
     },
   } : undefined;
   const renderMessageAddon = (message: IMessage) => {

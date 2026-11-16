@@ -3,25 +3,29 @@ import { ContextualButtons, ContextualChoices, type ContextualPlacement } from '
 import { vndFolders, type VndFolder } from './VndBackground.model';
 import { vndStandards } from './scenarios';
 
-export function VndStandardActions({ placement, onSelect }: {
+export function VndStandardActions({ placement, onSelect, onSkip }: {
   placement: ContextualPlacement;
   onSelect: (standard: string) => void;
+  onSkip: () => void;
 }) {
   return <ContextualChoices
     label="Выберите групповой стандарт"
     placement={placement}
     options={vndStandards}
+    onSkip={onSkip}
     mode={{ onSelect, numbered: true }}
   />;
 }
 
-export function VndSaveActions({ placement, onReply }: {
+export function VndSaveActions({ placement, onReply, onSkip }: {
   placement: ContextualPlacement;
   onReply: (reply: string) => void;
+  onSkip: () => void;
 }) {
   return <ContextualButtons
     label="Сохранить ВНД в «Операционные риски»?"
     placement={placement}
+    onSkip={onSkip}
     actions={['Да, сохранить', 'Выбрать другую папку', 'Не сейчас'].map(label => ({
       label,
       onSelect: () => onReply(label),

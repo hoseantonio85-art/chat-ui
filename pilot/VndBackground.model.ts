@@ -6,6 +6,7 @@ export const vndFolders = [
 
 export type VndFolder = (typeof vndFolders)[number];
 export type VndStage = 'start' | 'chooseStandard' | 'reviewing' | 'reviewed' | 'confirmSave' | 'saveDeferred' | 'complete';
+export type VndContextualQuestion = 'standard-picker' | 'save-confirmation';
 
 export const vndSaveQuestion = 'Сохранить актуальный ВНД в базе знаний, в папке «Операционные риски»?';
 
@@ -56,6 +57,12 @@ const normalize = (text: string) => text
 export function canSaveVnd(thread: Pick<VndBackgroundThreadState, 'jobState' | 'vndStage'>): boolean {
   return thread.jobState !== 'saved'
     && (thread.jobState === 'ready' || thread.vndStage === 'confirmSave' || thread.vndStage === 'saveDeferred');
+}
+
+export function canResumeVndQuestion(question: VndContextualQuestion, text: string): boolean {
+  const input = normalize(text);
+  const resumeCheck = /^(?:(?:вернуться|вернёмся|вернемся|вернись) к проверке|(?:продолжить|продолжим|продолжи) проверку)(?: внд)?$/u;
+  return resumeCheck.test(input) || (question === 'save-confirmation' && parseVndSaveIntent(text).kind === 'resume');
 }
 
 export function parseVndSaveIntent(text: string): VndSaveIntent {

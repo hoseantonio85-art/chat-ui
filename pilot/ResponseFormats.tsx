@@ -22,8 +22,10 @@ type Section = typeof sections[number];
 type Action = typeof actions[number];
 
 export type ResponseFormatsDraft =
-  | { stage: 'format'; promptId: string }
-  | { stage: 'sections' | 'actions'; promptId: string; format: Format; selected: Section[] }
+  | ({ promptId: string; skipped?: boolean } & (
+    | { stage: 'format' }
+    | { stage: 'sections' | 'actions'; format: Format; selected: Section[] }
+  ))
   | { stage: 'done' };
 
 export type ResponseFormatsEvent =
@@ -32,6 +34,8 @@ export type ResponseFormatsEvent =
   | { kind: 'confirm' }
   | { kind: 'sections'; selected: Section[] }
   | { kind: 'action'; action: Action }
+  | { kind: 'skip' }
+  | { kind: 'resume'; text: string }
   | { kind: 'text'; text: string };
 
 const labels = {
@@ -80,6 +84,10 @@ function findOption<T extends string>(options: readonly T[], text: string) {
 }
 
 export function parseResponseFormatsText(draft: ResponseFormatsDraft, body: string): ResponseFormatsEvent {
+  if (draft.stage !== 'done' && draft.skipped) {
+    const resume = /^(?:(?:вернуться|вернёмся|вернемся|вернись) к сводке|(?:продолжить|продолжим|продолжи) (?:готовить )?сводку)[.!?]?$/iu;
+    return resume.test(body.trim()) ? { kind: 'resume', text: body } : { kind: 'text', text: body };
+  }
   if (draft.stage === 'format') {
     const format = findOption(formats, body);
     if (format) return { kind: 'format', format };
@@ -102,6 +110,14 @@ export function advanceResponseFormats(draft: ResponseFormatsDraft, event: Respo
   messages?: IMessage[];
 } {
   const reply = (answer: string, text: string) => [message(ERoles.user, answer), message(ERoles.bot, text)];
+  if (draft.stage !== 'done') {
+    if (event.kind === 'skip') return { draft: { ...draft, skipped: true } };
+    if (draft.skipped) {
+      if (event.kind !== 'resume') return { draft };
+      const messages = reply(event.text, labels[draft.stage]);
+      return { draft: { ...draft, skipped: false, promptId: messages[1].id }, messages };
+    }
+  }
   if (draft.stage === 'format' && event.kind === 'format') {
     const messages = reply(event.format, `${labels.sections} Можно отметить несколько.`);
     return { draft: { stage: 'sections', promptId: messages[1].id, format: event.format, selected: [] }, messages };
@@ -155,14 +171,16 @@ export function ResponseFormatsActions({ draft, placement, onEvent }: {
   onEvent: (event: ResponseFormatsEvent) => void;
 }) {
   const label = labels[draft.stage];
+  const onSkip = () => onEvent({ kind: 'skip' });
   if (draft.stage === 'format') return <ContextualChoices label={label} placement={placement} options={formats}
-    mode={{ numbered: true, onSelect: format => onEvent({ kind: 'format', format }) }} />;
+    onSkip={onSkip} mode={{ numbered: true, onSelect: format => onEvent({ kind: 'format', format }) }} />;
   if (draft.stage === 'sections') return <ContextualChoices label={label} placement={placement} options={sections}
+    onSkip={onSkip}
     mode={{
       selected: draft.selected,
       onToggle: section => onEvent({ kind: 'toggle', section }),
       onConfirm: () => onEvent({ kind: 'confirm' }),
     }} />;
-  return <ContextualButtons label={label} placement={placement}
+  return <ContextualButtons label={label} placement={placement} onSkip={onSkip}
     actions={actions.map(action => ({ label: action, onSelect: () => onEvent({ kind: 'action', action }) }))} />;
 }
