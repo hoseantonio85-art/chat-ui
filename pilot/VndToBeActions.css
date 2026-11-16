@@ -43,6 +43,28 @@
   border-radius: 14px;
 }
 
+.context-choice-card {
+  padding: 8px;
+  background: #f8f6fc;
+  border-radius: 20px;
+}
+
+.context-choice-option:has(input:checked) {
+  background: #e5def5;
+  border-color: #b1a2d2;
+}
+
+.context-choice-option input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0 2px;
+  accent-color: #6a54a2;
+  cursor: pointer;
+}
+
+.context-choice-confirm { margin-top: 8px; }
+
 .context-action-number {
   flex: 0 0 22px;
   width: 22px;
@@ -99,7 +121,8 @@
 .context-actions-chevron svg { transition: transform 160ms ease-out; }
 .context-actions-sticky details[open] .context-actions-chevron svg { transform: rotate(90deg); }
 
-.context-actions-sticky .context-actions {
+.context-actions-sticky > .context-actions,
+.context-actions-sticky .context-choice-card {
   margin-top: 16px;
 }
 

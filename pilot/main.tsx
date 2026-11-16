@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { reatomContext } from '@reatom/npm-react';
 import { Button } from '@sber-orm/ui-kit';
@@ -31,6 +31,10 @@ import { FeedbackCancelAction, FeedbackCard, type FeedbackAddon } from './Feedba
 import { ScenarioPicker } from './ScenarioPicker';
 import { VndFolderDialog, VndSaveActions, VndStandardActions } from './VndToBeActions';
 import {
+  advanceResponseFormats, parseResponseFormatsText, ResponseFormatsActions, responseFormatsTitle,
+  startResponseFormats, type ResponseFormatsEvent,
+} from './ResponseFormats';
+import {
   addCsiComment,
   addFeedbackClarification,
   addUnresolvedFeedbackClarification,
@@ -52,6 +56,21 @@ import {
 } from './Feedback.model';
 
 type DemoThread = AtlasPreviewThread;
+const responseFormatsThreadId = 'response-formats';
+
+function createResponseFormatsThread(): DemoThread {
+  const { draft, messages } = startResponseFormats();
+  return {
+    id: responseFormatsThreadId,
+    title: responseFormatsTitle,
+    scenario: 'responseFormats',
+    updatedAt: Date.now(),
+    runs: {},
+    messages,
+    responseFormats: draft,
+  };
+}
+
 const assistantSkills: AssistantSkill[] = [
   {id: 'methodologist', title: 'Методолог'}, {id: 'risk-review', title: 'Проверка рисков'}, {id: 'createIncident', title: 'Регистрация события'},
 ];
@@ -97,11 +116,12 @@ function createInitialAppState() {
   const params = new URLSearchParams(window.location.search);
   const baseThreads = initialThreads();
   const preview = createAtlasPreview(params.get('atlas'), baseThreads, initialAgentMemory);
+  const demo = !preview && params.get('demo') === responseFormatsThreadId ? createResponseFormatsThread() : undefined;
   return {
-    threads: preview?.threads ?? baseThreads,
+    threads: preview?.threads ?? (demo ? [demo, ...baseThreads] : baseThreads),
     agentMemory: preview?.agentMemory ?? initialAgentMemory,
-    activeThreadId: preview?.activeThreadId ?? 'vnd',
-    scenario: preview?.scenario ?? 'vnd',
+    activeThreadId: preview?.activeThreadId ?? demo?.id ?? 'vnd',
+    scenario: preview?.scenario ?? demo?.scenario ?? 'vnd',
     drawer: preview?.drawer,
     drawerFocus: preview?.drawerFocus,
     previewStepId: preview?.stepId,
@@ -693,7 +713,29 @@ function App() {
     addMessageAction(ctx, {id:`vnd-complete-${crypto.randomUUID()}`, role:ERoles.bot, text:'Документ уже прошёл повторную проверку и соответствует выбранному стандарту.', timeCreated:new Date(sentAt + 1).toISOString()});
   }
 
+  function replayResponseFormats() {
+    const thread = createResponseFormatsThread();
+    const saved = storeCurrent().filter(item => item.id !== thread.id);
+    updateThreads(() => [thread, ...saved]);
+    setActionUrl('');
+    loadThread(thread);
+    chat$.openChat();
+  }
+
+  function replyToResponseFormats(input: ResponseFormatsEvent | string, promptId?: string) {
+    const id = activeIdRef.current;
+    const thread = threadsRef.current.find(item => item.id === id);
+    const draft = thread?.responseFormats;
+    if (thread?.scenario !== 'responseFormats' || !draft) return;
+    if (promptId && (draft.stage === 'done' || promptId !== draft.promptId)) return;
+    const event = typeof input === 'string' ? parseResponseFormatsText(draft, input) : input;
+    const next = advanceResponseFormats(draft, event);
+    updateThreads(items => items.map(item => item.id === id ? { ...item, responseFormats: next.draft } : item));
+    next.messages?.forEach(message => appendToThread(id, message));
+  }
+
   const runScenario = (id: ScenarioId, instant = false) => {
+    if (id === 'responseFormats') return replayResponseFormats();
     setFolderDialogThread(undefined);
     attachmentLookups.current.delete(activeIdRef.current);
     if (!id.startsWith('vnd')) {
@@ -825,13 +867,13 @@ function App() {
     return () => { cancelled = true; window.clearTimeout(readyTimer); };
   }, [initialState.drawerFocus, initialState.embedded, initialState.previewStepId]);
   useEffect(() => {
-    setDemoSender(request => scenario.startsWith('vnd')
-      ? sendVnd(request)
-      : scenario.startsWith('csi')
-        ? sendCsi(request)
-        : scenario === 'feedbackComplaintClarify' || scenario === 'feedbackIdeaClarify'
-          ? sendFeedbackClarification(request)
-        : sendGeneral(request));
+    setDemoSender(request => {
+      if (scenario === 'responseFormats') return replyToResponseFormats(request.body);
+      if (scenario.startsWith('vnd')) return sendVnd(request);
+      if (scenario.startsWith('csi')) return sendCsi(request);
+      if (scenario === 'feedbackComplaintClarify' || scenario === 'feedbackIdeaClarify') return sendFeedbackClarification(request);
+      return sendGeneral(request);
+    });
   }, [scenario, selectedSkillId]);
   const threadUi = {
     enabled:true,
@@ -851,11 +893,25 @@ function App() {
   };
   const selectedSkill = demoFlags.assistantSkills ? assistantSkills.find(item => item.id === selectedSkillId) : undefined;
   const activeThread = threads.find(thread => thread.id === activeThreadId);
+  const responseFormatsDraft = activeThread?.scenario === 'responseFormats' ? activeThread.responseFormats : undefined;
+  const activeFormatPrompt = responseFormatsDraft?.stage === 'done' ? undefined : responseFormatsDraft?.promptId;
+  const responseFormatsStage = responseFormatsDraft?.stage;
+  useLayoutEffect(() => {
+    if (!responseFormatsStage) return;
+    document.querySelector(`.${chatClasses.messages}`)?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeFormatPrompt, responseFormatsStage]);
   const addon = activeThread && isVndToBeScenario(activeThread.scenario)
     ? activeThread.vndStage === 'chooseStandard' ? 'standard-picker'
       : canSaveVnd(activeThread) && activeThread.vndStage !== 'saveDeferred' ? 'save-confirmation' : undefined
     : undefined;
-  const contextualActions = addon ? {
+  const contextualActions = responseFormatsDraft && responseFormatsDraft.stage !== 'done' ? {
+    matches: (message: IMessage) => message.id === responseFormatsDraft.promptId,
+    render: (placement: 'inline' | 'sticky') => <ResponseFormatsActions
+      draft={responseFormatsDraft}
+      placement={placement}
+      onEvent={event => replyToResponseFormats(event, responseFormatsDraft.promptId)}
+    />,
+  } : addon ? {
     matches: (message: IMessage) => message.extras?.vndAddon === addon,
     render: (placement: 'inline' | 'sticky') => {
       const onReply = (body: string) => {
@@ -880,9 +936,60 @@ function App() {
       afterMessage: draft.stage === 'rating' ? <FeedbackCancelAction onCancel={declineCsi} /> : null,
     } : { afterMessage: draft.stage === 'comment' ? card : null };
   };
+  const isResponseFormats = scenario === 'responseFormats';
+  const isVnd = scenario.startsWith('vnd');
+  const isCsi = scenario.startsWith('csi');
+  const isFeedback = scenario.startsWith('feedback');
+  const canRestart = isResponseFormats || isVnd || isCsi || isFeedback;
+  const demoTitle = isResponseFormats ? 'Формат ответа'
+    : isVnd ? 'Проверка ВНД · диалог в продуктовом чате'
+    : isCsi ? 'CSI · оценка сервиса'
+    : isFeedback ? 'Обратная связь с командой сервиса'
+    : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа'
+    : 'Сценарии универсального агента';
+  const instantLabel = isVndBackgroundScenario(scenario) ? 'Показать проверку'
+    : isCsi ? 'Показать результат'
+    : isFeedback ? 'Показать ветку'
+    : 'Сразу результат';
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><ContextualActionsContext.Provider value={contextualActions}><AgentRunsContext.Provider value={runs}>
     <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
-    {!initialState.embedded && <div className="demo-toolbar"><div className="demo-label"><strong>UI-пилот</strong><span>{scenario.startsWith('vnd') ? 'Проверка ВНД · диалог в продуктовом чате' : scenario.startsWith('csi') ? 'CSI · оценка сервиса' : scenario.startsWith('feedback') ? 'Обратная связь с командой сервиса' : scenario === 'backendCallback' ? 'Шаги из кода · план из теста · пакет после ответа' : 'Сценарии универсального агента'}</span></div><ScenarioPicker value={scenario} onChange={runScenario}/><Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>{scenario.startsWith('vnd') || scenario.startsWith('csi') || scenario.startsWith('feedback') ? 'Начать заново' : 'Воспроизвести'}</Button><Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>{isVndBackgroundScenario(scenario) ? 'Показать проверку' : scenario.startsWith('csi') ? 'Показать результат' : scenario.startsWith('feedback') ? 'Показать ветку' : 'Сразу результат'}</Button><label className="offline-toggle"><input type="checkbox" checked={!online} onChange={event => {const value = !event.target.checked; setOnline(value); setDemoOnline(value);}}/>Офлайн</label>{scenario === 'rich' && !playing && <label className="scenario-picker"><select aria-label="Вид графика" defaultValue="barChart" onChange={event => {const message = ctx.get(messagesAtom).find(item => item.role===ERoles.bot && item.extras?.chart); if (message) addMessageAction(ctx, {...message, extras:{...message.extras,chart:{...chart,metadata:{...chart.metadata,view:event.target.value}}} as IMessage['extras']});}}><option value="barChart">Столбчатый</option><option value="lineChart">Линейный</option><option value="pieChart">Круговой</option></select></label>}<span className="demo-state" role="status">{!online ? 'Отправка в очереди' : threads.some(item=>item.agentState === 'running') ? 'Агент работает' : 'Готово'}</span></div>}
+    {!initialState.embedded && <div className="demo-toolbar">
+      <div className="demo-label">
+        <strong>UI-пилот</strong>
+        <span>{demoTitle}</span>
+      </div>
+      <ScenarioPicker value={scenario} onChange={runScenario} />
+      <Button size="S" variant="secondary" onClick={() => runScenario(scenario)}>
+        {canRestart ? 'Начать заново' : 'Воспроизвести'}
+      </Button>
+      {!isResponseFormats && <Button size="S" variant="secondary" onClick={() => runScenario(scenario, true)}>
+        {instantLabel}
+      </Button>}
+      <label className="offline-toggle">
+        <input type="checkbox" checked={!online} onChange={event => {
+          const value = !event.target.checked;
+          setOnline(value);
+          setDemoOnline(value);
+        }} />
+        Офлайн
+      </label>
+      {scenario === 'rich' && !playing && <label className="scenario-picker">
+        <select aria-label="Вид графика" defaultValue="barChart" onChange={event => {
+          const message = ctx.get(messagesAtom).find(item => item.role === ERoles.bot && item.extras?.chart);
+          if (message) addMessageAction(ctx, {
+            ...message,
+            extras: {...message.extras, chart: {...chart, metadata: {...chart.metadata, view: event.target.value}}} as IMessage['extras'],
+          });
+        }}>
+          <option value="barChart">Столбчатый</option>
+          <option value="lineChart">Линейный</option>
+          <option value="pieChart">Круговой</option>
+        </select>
+      </label>}
+      <span className="demo-state" role="status">
+        {!online ? 'Отправка в очереди' : threads.some(item => item.agentState === 'running') ? 'Агент работает' : 'Готово'}
+      </span>
+    </div>}
     {!initialState.embedded && <main className="product-backdrop"><aside><div className="norm-mark">Н</div></aside><section><p className="product-eyebrow">НОРМ / Компания</p><h1>Обзор компании</h1><p>Работа с рисками и событиями</p><div className="backdrop-cards"><div><small>Риски</small><strong>12</strong></div><div><small>Мероприятия</small><strong>8</strong></div></div><Button onClick={() => chat$.openChat()}>Открыть чат</Button></section></main>}<ModalContainer/>
     {actionUrl && <div className="demo-action" role="dialog" aria-modal="true" aria-label="Переход в НОРМ"><h2>Переход в форму НОРМ</h2><p>Форма регистрации события готова к открытию.</p><code>{actionUrl}</code><Button onClick={() => {setActionUrl('');chat$.openChat();}}>Вернуться в чат</Button></div>}
     {folderDialogThread === activeThreadId && activeThread && canSaveVnd(activeThread) && <VndFolderDialog
