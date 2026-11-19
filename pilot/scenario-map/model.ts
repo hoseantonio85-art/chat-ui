@@ -1,4 +1,4 @@
-export type ScenarioId = 'vnd' | 'reply-ready' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
+export type ScenarioId = 'vnd' | 'reply-ready' | 'chat-rename' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
 export type MapView = 'story' | 'screens';
 export type StepKind = 'entry' | 'action' | 'system' | 'state' | 'result';
 
@@ -220,6 +220,43 @@ export const scenarios: Scenario[] = [
       { id:'feedback.idea-clarify', number:'02', title:'Контекст идеи неясен', actor:'Агент', kind:'action', summary:'Один ненавязчивый вопрос помогает определить сервис.', detail:'Уточнение необязательно, исходная идея не переписывается.', screen:'screens/feedback-positive-02-idea-clarify.png', screenAlt:'Уточнение сервиса для идеи', tags:['идея','уточнение'] },
       { id:'feedback.idea-clarified', number:'03', title:'Идея уточнена', actor:'Агент', kind:'result', summary:'Ответ добавлен к той же записи, завершение остаётся коротким.', detail:'Предложение сохраняется и передаётся команде выбранного сервиса.', screen:'screens/feedback-positive-03-idea-clarified.png', screenAlt:'Идея после одного уточнения', tags:['одна запись','маршрутизация'] },
       { id:'feedback.praise', number:'04', title:'Благодарность принята', actor:'Агент', kind:'result', summary:'Похвала принимается без автоматического запроса CSI.', detail:'Короткий живой ответ не обещает внешнюю передачу.', screen:'screens/feedback-positive-04-praise.png', screenAlt:'Ответ на благодарность без CSI', tags:['похвала','коротко'] },
+    ],
+  },
+  {
+    id:'chat-rename',
+    eyebrow:'История чатов',
+    title:'Переименование диалога',
+    description:'Новое название сохраняется галочкой или Enter. Крестик и Escape отменяют правку.',
+    accent:'blue',
+    steps:[
+      {
+        id:'chat-rename.history', number:'01', title:'Выбрать переименование', actor:'Пользователь', kind:'entry',
+        summary:'В истории пользователь открывает действия чата «Анализ рисков компании».',
+        detail:'Нажмите троеточие у названия и выберите «Переименовать».',
+        screen:'screens/chat-rename-01-history.png', screenAlt:'История с выбранным чатом перед переименованием',
+        tags:['история', 'меню действий'],
+      },
+      {
+        id:'chat-rename.editing', number:'02', title:'Изменить название', actor:'Пользователь', kind:'action',
+        summary:'Поле занимает строку, галочка стоит на месте троеточия, слева от неё — крестик отмены.',
+        detail:'В живом экране отредактируйте название. Галочка и Enter сохраняют его, крестик и Escape отменяют правку. Пустое название сохранить нельзя.',
+        screen:'screens/chat-rename-02-editing.png', screenAlt:'Поле названия с кнопками отмены и сохранения',
+        tags:['поле ввода', 'галочка', 'крестик'],
+      },
+      {
+        id:'chat-rename.saved', number:'03', title:'Название сохранено', actor:'Система', kind:'result',
+        summary:'В истории отображается «Риски компании за квартал».',
+        detail:'Откройте другой чат и вернитесь в историю — новое название сохранится. При желании можно переименовать чат ещё раз.',
+        screen:'screens/chat-rename-03-saved.png', screenAlt:'Новое название чата в истории',
+        tags:['сохранение', 'переключение чатов'],
+      },
+      {
+        id:'chat-rename.cancelled', number:'04', title:'Правка отменена', actor:'Пользователь', kind:'result',
+        summary:'При отмене остаётся прежнее название «Анализ рисков компании».',
+        detail:'Это альтернативный исход шага редактирования. Живой экран позволяет снова открыть меню и продолжить работу.',
+        screen:'screens/chat-rename-04-cancelled.png', screenAlt:'Исходное название чата после отмены правки',
+        tags:['отмена', 'Escape'],
+      },
     ],
   },
 ];

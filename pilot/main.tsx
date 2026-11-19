@@ -131,6 +131,7 @@ function createInitialAppState() {
     scenario: preview?.scenario ?? demo?.scenario ?? 'vnd',
     drawer: preview?.drawer,
     drawerFocus: preview?.drawerFocus,
+    rename: preview?.rename,
     previewStepId: preview?.stepId,
     embedded: params.get('embed') === '1',
   };
@@ -930,6 +931,7 @@ function App() {
     activeThreadId,
     initialDrawerState:initialState.drawer,
     initialDrawerFocus:initialState.drawerFocus,
+    initialRename:initialState.rename,
     onSelect:selectThread,
     onNew:newThread,
     onRename:(id:string,title:string) => updateThreads(items => items.map(item => item.id === id ? {...item,title,updatedAt:Date.now()} : item)),

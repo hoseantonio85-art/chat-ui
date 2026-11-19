@@ -22,6 +22,10 @@ import {
 } from './Feedback.model';
 
 export type AtlasStepId =
+  | 'chat-rename.history'
+  | 'chat-rename.editing'
+  | 'chat-rename.saved'
+  | 'chat-rename.cancelled'
   | 'vnd.start'
   | 'vnd.running'
   | 'vnd.history-running'
@@ -79,6 +83,7 @@ export interface AtlasPreview {
   agentMemory: string[];
   drawer?: ThreadDrawerInitialState;
   drawerFocus?: 'memory-heading';
+  rename?: { threadId: string; draft: string };
 }
 
 const previewTime = Date.parse('2026-11-08T06:00:00.000Z');
@@ -279,6 +284,7 @@ function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${strin
 }
 
 const knownSteps = new Set<AtlasStepId>([
+  'chat-rename.history', 'chat-rename.editing', 'chat-rename.saved', 'chat-rename.cancelled',
   'vnd.start', 'vnd.running', 'vnd.history-running', 'vnd.unread', 'vnd.result', 'vnd.saved',
   'reply-ready.switch', 'reply-ready.running', 'reply-ready.menu', 'reply-ready.unread', 'reply-ready.read',
   'settings.history', 'settings.overview', 'settings.confirm', 'settings.updated',
@@ -305,6 +311,20 @@ export function createAtlasPreview(
   const resolvedStep = legacySteps[requestedStep] ?? requestedStep;
   if (!knownSteps.has(resolvedStep as AtlasStepId)) return undefined;
   const stepId = resolvedStep as AtlasStepId;
+  if (stepId.startsWith('chat-rename.')) {
+    const threads = baseThreads.map(thread => thread.id === 'risk'
+      ? {...thread, title:stepId === 'chat-rename.saved' ? 'Риски компании за квартал' : thread.title}
+      : {...thread});
+    return {
+      stepId,
+      threads,
+      activeThreadId:'risk',
+      scenario:'normal',
+      agentMemory:[...initialMemory],
+      drawer:'history',
+      rename:stepId === 'chat-rename.editing' ? {threadId:'risk', draft:'Риски компании за квартал'} : undefined,
+    };
+  }
   if (stepId.startsWith('csi.')) {
     return createCsiPreview(stepId as Extract<AtlasStepId, `csi.${string}`>, baseThreads, initialMemory);
   }

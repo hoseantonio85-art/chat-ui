@@ -28,6 +28,24 @@ const baseThreads = (): AtlasPreviewThread[] => [
 const memory = ['Первый факт', 'Второй факт', 'Третий факт'];
 
 describe('atlas live preview states', () => {
+  it('seeds rename screens without changing the source threads', () => {
+    const original = baseThreads();
+    const before = structuredClone(original);
+    const editing = createAtlasPreview('chat-rename.editing', original, memory);
+    const saved = createAtlasPreview('chat-rename.saved', original, memory);
+    const cancelled = createAtlasPreview('chat-rename.cancelled', original, memory);
+    expect(editing).toMatchObject({
+      activeThreadId:'risk', drawer:'history',
+      rename:{threadId:'risk', draft:'Риски компании за квартал'},
+    });
+    expect(saved?.threads.find(thread => thread.id === 'risk')?.title).toBe('Риски компании за квартал');
+    expect(cancelled?.threads.find(thread => thread.id === 'risk')?.title).toBe('Анализ рисков компании');
+    expect(saved?.rename).toBeUndefined();
+    expect(cancelled?.rename).toBeUndefined();
+    expect(original).toEqual(before);
+    expect(createAtlasPreview(null, original, memory)).toBeUndefined();
+  });
+
   it('builds a running VND state with a pending activity run', () => {
     const preview = createAtlasPreview('vnd.running', baseThreads(), memory);
     const vnd = preview?.threads.find(thread => thread.id === 'vnd');

@@ -22,8 +22,8 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 	const pendingFocusRef = useRef<FocusTarget>();
 	const [view, setView] = useState<DrawerView>(ui.initialDrawerState && ui.initialDrawerState !== 'history' ? 'settings' : 'history');
 	const [deletion, setDeletion] = useState<ActiveDeletion>();
-	const [renaming, setRenaming] = useState<string>();
-	const [draft, setDraft] = useState('');
+	const [renaming, setRenaming] = useState<string | undefined>(ui.initialRename?.threadId);
+	const [draft, setDraft] = useState(ui.initialRename?.draft ?? '');
 	const [menu, setMenu] = useState<{ threadId: string; anchor: HTMLElement }>();
 	const threads = useMemo(
 		() => [...ui.threads].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt),
@@ -50,7 +50,7 @@ export function ThreadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 	useEffect(() => {
 		if (!open || menu) return;
 		const closeOnEscape = (event: KeyboardEvent) => {
-			if (event.key !== 'Escape') return;
+			if (event.key !== 'Escape' || event.defaultPrevented) return;
 			event.preventDefault();
 			if (deletion) return;
 			if (view === 'settings') returnToHistory();
@@ -213,21 +213,50 @@ type HistoryViewProps = {
 
 function HistoryView({ ui, threads, menu, menuRef, renaming, draft, onClose, setDraft, setMenu, setRenaming, settingsEntryRef, onOpenSettings }: HistoryViewProps) {
 	const groups = groupThreadsForHistory(threads);
+	const renameTriggerRef = useRef<HTMLButtonElement>();
+	const renameThreadRef = useRef<string | undefined>(renaming);
+	const finishRenaming = () => {
+		setRenaming(undefined);
+		requestAnimationFrame(() => renameTriggerRef.current?.focus());
+	};
 	return <>
 		<header><div><strong>Диалоги</strong></div></header>
 		<Button className={classes.newButton} icon={EIconName.message} variant="secondary" onClick={() => { ui.onNew(); onClose(); }}>Новый чат</Button>
 		<div className={classes.groups}>{groups.map(group => <section key={group.title} aria-label={group.title}>
 			<h3 className={classes.groupTitle}>{group.title}</h3>
-			<ul className={classes.list}>{group.items.map(thread => <li key={thread.id} data-active={thread.id === ui.activeThreadId} data-menu-open={menu?.threadId === thread.id}>
-				{renaming === thread.id ? <form onSubmit={event => { event.preventDefault(); if (draft.trim()) ui.onRename(thread.id, draft.trim()); setRenaming(undefined); }}><input autoFocus value={draft} onChange={event => setDraft(event.target.value)} aria-label="Название диалога"/><Tooltip content="Сохранить название" placement="top" showOnChildFocus><Button size="S" icon={EIconName.check} iconOnly aria-label="Сохранить"/></Tooltip></form> : <button className={classes.thread} type="button" onClick={() => { ui.onSelect(thread.id); onClose(); }}><span className={classes.threadLabel}><span className={`${classes.threadTitle} ${thread.agentState === 'running' ? classes.threadRunning : ''}`}>{thread.title}</span>{thread.agentUnread && thread.agentState === 'ready' && <i className={classes.readySparkle} aria-label="Новый результат работы агента"/>}</span></button>}
-				{renaming !== thread.id && <Tooltip content="Действия с чатом" placement="left" showOnChildFocus><button className={classes.more} type="button" aria-label={`Действия: ${thread.title}`} aria-haspopup="menu" aria-expanded={menu?.threadId === thread.id} onClick={event => { event.stopPropagation(); const anchor = event.currentTarget; setMenu(current => current?.threadId === thread.id ? undefined : {threadId:thread.id, anchor}); }}><Icon name={EIconName.kebabMenu} width={18} height={18}/></button></Tooltip>}
+			<ul className={classes.list}>{group.items.map(thread => <li key={thread.id} data-active={thread.id === ui.activeThreadId} data-menu-open={menu?.threadId === thread.id} data-renaming={renaming === thread.id}>
+				{renaming === thread.id ? <form className={classes.renameForm} onSubmit={event => {
+					event.preventDefault();
+					const title = draft.trim();
+					if (!title) return;
+					ui.onRename(thread.id, title);
+					finishRenaming();
+				}} onKeyDown={event => {
+					if (event.key !== 'Escape') return;
+					event.preventDefault();
+					event.stopPropagation();
+					finishRenaming();
+				}}>
+					<input autoFocus value={draft} onChange={event => setDraft(event.target.value)} aria-label="Название диалога" />
+					<Tooltip content="Отменить переименование" placement="top" showOnChildFocus>
+						<button className={classes.renameControl} type="button" aria-label="Отменить переименование" onClick={finishRenaming}>
+							<Icon name={EIconName.cross} width={18} height={18} />
+						</button>
+					</Tooltip>
+					<Tooltip content="Сохранить название" placement="top" showOnChildFocus>
+						<button className={classes.renameControl} type="submit" aria-label="Сохранить название" disabled={!draft.trim()}>
+							<Icon name={EIconName.check} width={18} height={18} />
+						</button>
+					</Tooltip>
+				</form> : <button className={classes.thread} type="button" onClick={() => { ui.onSelect(thread.id); onClose(); }}><span className={classes.threadLabel}><span className={`${classes.threadTitle} ${thread.agentState === 'running' ? classes.threadRunning : ''}`}>{thread.title}</span>{thread.agentUnread && thread.agentState === 'ready' && <i className={classes.readySparkle} aria-label="Новый результат работы агента"/>}</span></button>}
+				{renaming !== thread.id && <Tooltip content="Действия с чатом" placement="left" showOnChildFocus><button ref={element => { if (element && renameThreadRef.current === thread.id) renameTriggerRef.current = element; }} className={classes.more} type="button" aria-label={`Действия: ${thread.title}`} aria-haspopup="menu" aria-expanded={menu?.threadId === thread.id} onClick={event => { event.stopPropagation(); const anchor = event.currentTarget; setMenu(current => current?.threadId === thread.id ? undefined : {threadId:thread.id, anchor}); }}><Icon name={EIconName.kebabMenu} width={18} height={18}/></button></Tooltip>}
 				{menu?.threadId === thread.id && <div ref={menuRef} className={classes.menu} role="menu" aria-label="Действия с диалогом" onKeyDown={event => {
 					const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button'));
 					const index = items.indexOf(document.activeElement as HTMLButtonElement);
 					if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); items[(index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); }
 				}}>
 					<button type="button" role="menuitem" onClick={() => { ui.onTogglePin(menu.threadId); setMenu(undefined); }}><Icon name={ui.threads.find(item => item.id === menu.threadId)?.pinned ? EIconName.pinOff : EIconName.pin} width={18} height={18}/><span>{ui.threads.find(item => item.id === menu.threadId)?.pinned ? 'Открепить' : 'Закрепить'}</span></button>
-					<button type="button" role="menuitem" onClick={() => { const thread = ui.threads.find(item => item.id === menu.threadId); if (thread) { setDraft(thread.title); setRenaming(thread.id); } setMenu(undefined); }}><Icon name={EIconName.edit} width={18} height={18}/><span>Переименовать</span></button>
+					<button type="button" role="menuitem" onClick={() => { const thread = ui.threads.find(item => item.id === menu.threadId); if (thread) { renameThreadRef.current = thread.id; setDraft(thread.title); setRenaming(thread.id); } setMenu(undefined); }}><Icon name={EIconName.edit} width={18} height={18}/><span>Переименовать</span></button>
 					<button className={classes.danger} type="button" role="menuitem" onClick={() => { ui.onDelete(menu.threadId); setMenu(undefined); }}><Icon name={EIconName.trash} width={18} height={18}/><span>Удалить</span></button>
 				</div>}
 			</li>)}</ul>
