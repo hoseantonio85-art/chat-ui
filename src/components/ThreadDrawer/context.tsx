@@ -21,6 +21,7 @@ interface ThreadUiValue {
 	activeThreadId?: string;
 	initialDrawerState?: ThreadDrawerInitialState;
 	initialDrawerFocus?: 'memory-heading';
+	initialRename?: { threadId: string; draft: string };
 	onSelect: (id: string) => void;
 	onNew: () => void;
 	onRename: (id: string, title: string) => void;

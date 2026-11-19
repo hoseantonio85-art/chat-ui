@@ -16,8 +16,16 @@
 .more { position: absolute; right: 5px; width: 32px; height: 32px; padding: 0; display: grid; place-items: center; color: var(--iconBaseDefault); border: 0; border-radius: 10px; background: transparent; opacity: 0; cursor: pointer; transition: opacity .16s ease, background-color .16s ease; }
 .list li:hover .more, .list li:focus-within .more, .list li[data-menu-open='true'] .more { opacity: 1; }
 .more:hover, .more:focus-visible, .more[aria-expanded='true'] { background: rgba(9, 32, 55, .08); }
-.list form { display: flex; gap: 4px; }
-.list input { min-width: 0; width: 100%; padding: 8px; border: 1px solid var(--borderFocus); border-radius: 10px; font: inherit; }
+.list li[data-renaming='true'] { padding-right: 5px; }
+.renameForm { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; }
+.renameForm input { flex: 1 1 0; min-width: 0; width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid var(--borderFocus); border-radius: 10px; font: inherit; }
+.renameControl {
+  flex: 0 0 32px; width: 32px; height: 32px; padding: 0; display: grid; place-items: center;
+  color: var(--iconBaseDefault); border: 0; border-radius: 10px; background: transparent; cursor: pointer;
+}
+.renameControl:hover:not(:disabled) { background: rgba(9, 32, 55, .08); }
+.renameControl:disabled { opacity: .4; cursor: default; }
+.renameControl:focus-visible { outline: 2px solid var(--borderFocus); outline-offset: 2px; }
 .menu { min-width: 190px; padding: 6px; display: grid; gap: 2px; }
 .menu button { width: 100%; padding: 10px 12px; display: flex; align-items: center; gap: 10px; color: var(--textBaseDefault); border: 0; border-radius: 10px; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .menu button:hover, .menu button:focus-visible { background: var(--backgroundSecondaryDefault); outline: none; }

@@ -3,6 +3,10 @@ import { join } from 'node:path';
 
 export const DEPLOY_SOURCE_BRANCH = 'universal-agent-ui-pilot';
 export const PAGES_SCREEN_ASSETS = [
+  'chat-rename-01-history.png',
+  'chat-rename-02-editing.png',
+  'chat-rename-03-saved.png',
+  'chat-rename-04-cancelled.png',
   'csi-01-prompt.png',
   'csi-02-low.png',
   'csi-03-neutral.png',
