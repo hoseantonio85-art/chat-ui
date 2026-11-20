@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, EIconName, Icon, Popover, Row, Text, Title, Tooltip } from '@sber-orm/ui-kit';
+import { Button, EIconName, Icon, Input, Popover, Row, Text, Title, Tooltip } from '@sber-orm/ui-kit';
 import { useThreadUi } from './context';
 import { groupThreadsForHistory } from './history';
 import { getDeletionCopy, type SettingsDeletionTarget } from './settings';
@@ -231,13 +231,14 @@ function HistoryView({ ui, threads, menu, menuRef, renaming, draft, onClose, set
 					if (!title) return;
 					ui.onRename(thread.id, title);
 					finishRenaming();
-				}} onKeyDown={event => {
+				}} onKeyDownCapture={event => {
 					if (event.key !== 'Escape') return;
 					event.preventDefault();
 					event.stopPropagation();
 					finishRenaming();
 				}}>
-					<input autoFocus value={draft} onChange={event => setDraft(event.target.value)} aria-label="Название диалога" />
+					<Input className={classes.renameInput} size="S" fullWidth value={draft} onChange={setDraft}
+						inputProps={{autoFocus:true, 'aria-label':'Название диалога'}} />
 					<Tooltip content="Отменить переименование" placement="top" showOnChildFocus>
 						<button className={classes.renameControl} type="button" aria-label="Отменить переименование" onClick={finishRenaming}>
 							<Icon name={EIconName.cross} width={18} height={18} />
