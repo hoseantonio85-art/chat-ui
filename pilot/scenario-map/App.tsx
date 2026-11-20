@@ -26,6 +26,7 @@ const SCREEN_POSITIONS = [
 ];
 const SCREEN_BASE = `${import.meta.env.BASE_URL}scenario-map/`;
 const SCENARIO_LABELS: Record<ScenarioId, string> = {
+  reasoning:'Ответ с рассуждениями',
   'chat-rename':'Переименование диалога',
   vnd:'Проверка ВНД', 'reply-ready':'Ответ готов в другом чате', settings:'Настройки', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
   'feedback-complaint':'Жалоба / помощь', 'feedback-positive':'Идея / похвала',

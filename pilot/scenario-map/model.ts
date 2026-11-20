@@ -1,4 +1,4 @@
-export type ScenarioId = 'vnd' | 'reply-ready' | 'chat-rename' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
+export type ScenarioId = 'vnd' | 'reply-ready' | 'chat-rename' | 'reasoning' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
 export type MapView = 'story' | 'screens';
 export type StepKind = 'entry' | 'action' | 'system' | 'state' | 'result';
 
@@ -220,6 +220,35 @@ export const scenarios: Scenario[] = [
       { id:'feedback.idea-clarify', number:'02', title:'Контекст идеи неясен', actor:'Агент', kind:'action', summary:'Один ненавязчивый вопрос помогает определить сервис.', detail:'Уточнение необязательно, исходная идея не переписывается.', screen:'screens/feedback-positive-02-idea-clarify.png', screenAlt:'Уточнение сервиса для идеи', tags:['идея','уточнение'] },
       { id:'feedback.idea-clarified', number:'03', title:'Идея уточнена', actor:'Агент', kind:'result', summary:'Ответ добавлен к той же записи, завершение остаётся коротким.', detail:'Предложение сохраняется и передаётся команде выбранного сервиса.', screen:'screens/feedback-positive-03-idea-clarified.png', screenAlt:'Идея после одного уточнения', tags:['одна запись','маршрутизация'] },
       { id:'feedback.praise', number:'04', title:'Благодарность принята', actor:'Агент', kind:'result', summary:'Похвала принимается без автоматического запроса CSI.', detail:'Короткий живой ответ не обещает внешнюю передачу.', screen:'screens/feedback-positive-04-praise.png', screenAlt:'Ответ на благодарность без CSI', tags:['похвала','коротко'] },
+    ],
+  },
+  {
+    id:'reasoning',
+    eyebrow:'Работа агента',
+    title:'Ответ с рассуждениями',
+    description:'Проверка операционных рисков с объяснениями шагов, обращением к источникам и итоговым ответом.',
+    accent:'mint',
+    steps:[
+      {id:'reasoning.request', number:'01', title:'Запрос отправлен', actor:'Пользователь', kind:'entry',
+        summary:'Пользователь просит проверить операционные риски компании.',
+        detail:'В живом экране агент начинает работать. Можно раскрыть индикатор, дождаться ответа или переключиться в другой чат.',
+        screen:'screens/reasoning-01-request.png', screenAlt:'Начало проверки рисков', tags:['запрос', 'живой запуск']},
+      {id:'reasoning.thinking', number:'02', title:'Агент обдумывает задачу', actor:'Агент', kind:'system',
+        summary:'Над будущим ответом появляется компактный индикатор «Думаю».',
+        detail:'Раскройте индикатор и пункт «Думаю», чтобы прочитать пояснение следующего шага. Работа продолжается.',
+        screen:'screens/reasoning-02-thinking.png', screenAlt:'Компактный индикатор рассуждения', tags:['рассуждение', 'раскрытие']},
+      {id:'reasoning.sources', number:'03', title:'Ход работы и источники', actor:'Агент', kind:'state',
+        summary:'Профиль компании получен, агент обращается к методологу. Пояснение шага можно прочитать под его названием.',
+        detail:'Экран открывается с раскрытым ходом работы и пояснением профайлера. Можно свернуть их и раскрыть заново. Затем агент проверит реестр рисков и требования.',
+        screen:'screens/reasoning-03-sources.png', screenAlt:'Раскрытый ход работы с пояснением профайлера', tags:['источники', 'подробности']},
+      {id:'reasoning.answer', number:'04', title:'Итоговый ответ', actor:'Агент', kind:'result',
+        summary:'В чате появился ответ с найденными рисками и рекомендациями. Ход работы свёрнут.',
+        detail:'Нажмите «Ответ готов», чтобы вернуться к выполненным шагам. Ввод нового сообщения остаётся доступным.',
+        screen:'screens/reasoning-04-answer.png', screenAlt:'Итог проверки рисков и свёрнутый ход работы', tags:['ответ', 'завершение']},
+      {id:'reasoning.trace', number:'05', title:'Проверить выполненные шаги', actor:'Пользователь', kind:'action',
+        summary:'После ответа пользователь раскрывает ход работы и пояснение обращения к профайлеру.',
+        detail:'Каждый пункт можно раскрыть независимо. Переключение между чатом и картой сохраняет независимость их состояний.',
+        screen:'screens/reasoning-05-trace.png', screenAlt:'Ход работы после завершения ответа', tags:['история работы', 'рассуждения']},
     ],
   },
   {
