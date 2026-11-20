@@ -3,6 +3,13 @@ import { join } from 'node:path';
 
 export const DEPLOY_SOURCE_BRANCH = 'universal-agent-ui-pilot';
 export const PAGES_SCREEN_ASSETS = [
+  'vnd-to-be-01-start.png',
+  'vnd-to-be-02-standard.png',
+  'vnd-to-be-03-result.png',
+  'vnd-to-be-04-save.png',
+  'vnd-to-be-05-folder.png',
+  'vnd-to-be-06-deferred.png',
+  'vnd-to-be-07-saved.png',
   'reasoning-01-request.png',
   'reasoning-02-thinking.png',
   'reasoning-03-sources.png',

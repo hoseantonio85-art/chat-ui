@@ -16,7 +16,7 @@ describe('scenario map model', () => {
 
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(screens).size).toBe(screens.length);
-    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 5, 6, 8, 4, 5, 4, 5, 4]);
+    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 5, 6, 8, 4, 5, 4, 7, 5, 4]);
     expect(scenarios.every(scenario => scenario.steps.every(step => step.screen.endsWith('.png')))).toBe(true);
   });
 

@@ -28,6 +28,24 @@ const baseThreads = (): AtlasPreviewThread[] => [
 const memory = ['Первый факт', 'Второй факт', 'Третий факт'];
 
 describe('atlas live preview states', () => {
+  it('seeds button-based VND questions with the active stage and current file', () => {
+    const base = baseThreads();
+    const before = structuredClone(base);
+    const standard = createAtlasPreview('vnd-to-be.standard', base, memory)!;
+    const save = createAtlasPreview('vnd-to-be.save', base, memory)!;
+    const deferred = createAtlasPreview('vnd-to-be.deferred', base, memory)!;
+    const saved = createAtlasPreview('vnd-to-be.saved', base, memory)!;
+    const vnd = (preview:typeof save) => preview.threads.find(thread => thread.id === 'vnd')!;
+    expect(vnd(standard)).toMatchObject({scenario:'vndWelcomeToBe', vndStage:'chooseStandard'});
+    expect(vnd(standard).messages.at(-1)?.extras?.vndAddon).toBe('standard-picker');
+    expect(vnd(save)).toMatchObject({vndStage:'confirmSave', documentIds:'["vnd-corrected"]'});
+    expect(vnd(save).messages.at(-1)?.extras?.vndAddon).toBe('save-confirmation');
+    expect(vnd(deferred).vndStage).toBe('saveDeferred');
+    expect(vnd(saved)).toMatchObject({jobState:'saved', folder:'Операционные риски'});
+    expect(createAtlasPreview('vnd-to-be.folder', base, memory)?.openVndFolder).toBe(true);
+    expect(base).toEqual(before);
+  });
+
   it('uses the normal reasoning flow and preserves independent preview states', () => {
     const base = baseThreads();
     const before = structuredClone(base);

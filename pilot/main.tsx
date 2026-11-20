@@ -134,6 +134,7 @@ function createInitialAppState() {
     drawerFocus: preview?.drawerFocus,
     rename: preview?.rename,
     activityPreview: preview?.activityPreview,
+    openVndFolder: preview?.openVndFolder,
     previewStepId: preview?.stepId,
     embedded: params.get('embed') === '1',
   };
@@ -891,6 +892,7 @@ function App() {
     const bootstrap = setTimeout(() => {
       const thread = threadsRef.current.find(item => item.id === initialState.activeThreadId) ?? threadsRef.current[0];
       loadThread(thread);
+      if (initialState.openVndFolder) setFolderDialogThread(thread.id);
       if (initialState.embedded || window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen);
       chat$.openChat();
       if (initialState.previewStepId === 'reply-ready.switch' && thread.documentIds && thread.documentName) {
