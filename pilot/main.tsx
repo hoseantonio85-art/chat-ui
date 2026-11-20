@@ -6,7 +6,8 @@ import { ModalContainer } from '@/components/ModalContainer';
 import { ctx } from '@/stores/ctx';
 import { addMessageAction, attachmentsAtom, canLoadHistoryAtom, contextChatAtom, isLoadingAtom, messagesAtom, resetAction, textAtom } from '@/stores';
 import { ERoles, type IMessage } from '@/types';
-import { AgentRunsContext } from '../src/components/AgentActivity/context';
+import { AgentPreviewContext, AgentRunsContext } from '../src/components/AgentActivity/context';
+import { reasoningRunId, remainingReasoningEvents } from './reasoningPreview';
 import { appendEvent, createRun, type AgentRun } from '../src/components/AgentActivity/model';
 import { AssistantSkillsContext, type AssistantSkill } from '../src/components/AssistantSkills/context';
 import { ThreadUiContext, type ChatThread } from '../src/components/ThreadDrawer/context';
@@ -132,6 +133,7 @@ function createInitialAppState() {
     drawer: preview?.drawer,
     drawerFocus: preview?.drawerFocus,
     rename: preview?.rename,
+    activityPreview: preview?.activityPreview,
     previewStepId: preview?.stepId,
     embedded: params.get('embed') === '1',
   };
@@ -861,6 +863,28 @@ function App() {
     }
     chat$.openChat();
   }
+  function resumeReasoning(threadId:string, initialRun:AgentRun) {
+    let run = initialRun;
+    const events = remainingReasoningEvents(run);
+    const origin = run.events.at(-1)?.at ?? run.startedAt;
+    setPlaying(true);
+    events.forEach(event => later(threadId, () => {
+      run = appendEvent(run, event);
+      publishRun(threadId, run);
+    }, event.at - origin));
+    later(threadId, () => {
+      run = appendEvent(run, {id:run.runId+'-finish', runId:run.runId, kind:'finish', at:Date.now()});
+      publishRun(threadId, run);
+      appendToThread(threadId, {
+        id:run.runId, requestId:run.requestId, role:ERoles.bot,
+        text:fixture('normal', run.runId, run.startedAt).answer,
+        timeCreated:new Date().toISOString(),
+      });
+      if (activeIdRef.current === threadId) setPlaying(false);
+      completeActivity(threadId);
+    }, (events.at(-1)?.at ?? origin) - origin + 700);
+  }
+
   useEffect(() => {
     const listener = (event: Event) => setActionUrl((event as CustomEvent<string>).detail);
     window.addEventListener('pilot:navigate', listener);
@@ -871,6 +895,10 @@ function App() {
       chat$.openChat();
       if (initialState.previewStepId === 'reply-ready.switch' && thread.documentIds && thread.documentName) {
         background.start(thread.id, thread.documentIds, thread.documentName);
+      }
+      if (initialState.previewStepId?.startsWith('reasoning.')) {
+        const initialRun = thread.runs[reasoningRunId];
+        if (initialRun?.status === 'running') resumeReasoning(thread.id, initialRun);
       }
     }, 50);
     return () => {
@@ -1009,7 +1037,7 @@ function App() {
     : isCsi ? 'Показать результат'
     : isFeedback ? 'Показать ветку'
     : 'Сразу результат';
-  return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><ContextualActionsContext.Provider value={contextualActions}><AgentRunsContext.Provider value={runs}>
+  return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><ContextualActionsContext.Provider value={contextualActions}><AgentRunsContext.Provider value={runs}><AgentPreviewContext.Provider value={initialState.activityPreview ?? {}}>
     <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
     {!initialState.embedded && <div className="demo-toolbar">
       <div className="demo-label">
@@ -1058,6 +1086,6 @@ function App() {
         setFolderDialogThread(undefined);
       }}
     />}
-  </AgentRunsContext.Provider></ContextualActionsContext.Provider></MessageAddonContext.Provider></AssistantSkillsContext.Provider></ThreadUiContext.Provider></reatomContext.Provider>;
+  </AgentPreviewContext.Provider></AgentRunsContext.Provider></ContextualActionsContext.Provider></MessageAddonContext.Provider></AssistantSkillsContext.Provider></ThreadUiContext.Provider></reatomContext.Provider>;
 }
 createRoot(document.getElementById('root')!).render(<App/>);

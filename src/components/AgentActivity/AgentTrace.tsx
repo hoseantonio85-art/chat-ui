@@ -1,7 +1,8 @@
-import { type ReactNode, useEffect, useId, useState } from 'react';
+import { type ReactNode, useContext, useEffect, useId, useState } from 'react';
 import { EIconName, Icon } from '@sber-orm/ui-kit';
 import { type AgentEvent, type AgentRun, callDuration, callTitle, openCalls, runSummary, traceSteps } from './model';
 import classes from './styles.module.scss';
+import { AgentPreviewContext } from './context';
 const names: Record<AgentEvent['kind'], string> = {
   thinking: 'Думаю', message: 'Промежуточная реплика', plan: 'План', toolCall: 'Вызов источника', toolResult: 'Результат', delegation: 'Делегирование', handback: 'Возврат эксперта', error: 'Ошибка источника', empty: 'Ничего не найдено', finish: 'Завершено',
 };
@@ -10,8 +11,9 @@ const iconByKind: Record<AgentEvent['kind'], EIconName> = {
   thinking: EIconName.clock, message: EIconName.fill, plan: EIconName.taskList, toolCall: EIconName.taskSearch, toolResult: EIconName.success, delegation: EIconName.users, handback: EIconName.userSwap, error: EIconName.errorRounded, empty: EIconName.warningRounded, finish: EIconName.check,
 };
 
-function StepDetail({ title, children, header }: { title: string; children: ReactNode; header: ReactNode }) {
-  const [expanded, setExpanded] = useState(false);
+function StepDetail({ title, children, header, runId }: { title: string; children: ReactNode; header: ReactNode; runId:string }) {
+  const preview = useContext(AgentPreviewContext);
+  const [expanded, setExpanded] = useState(() => preview[runId]?.detailTitle === title);
   const detailId = useId();
   return <>
     <button type="button" className={`${classes.stepHeader} ${classes.detailToggle}`} aria-expanded={expanded}
@@ -48,7 +50,7 @@ function TraceSteps({ run, activeIds, now, parent }: { run: AgentRun; activeIds:
         {duration && <small className={classes.duration}>{duration}</small>}
       </>;
       return <li key={detail?.event.id ?? event.id} className={classes.step} data-kind={displayKind} data-active={active} tabIndex={expandable ? undefined : 0}>
-      {expandable ? <StepDetail title={title} header={header}>
+      {expandable ? <StepDetail title={title} header={header} runId={run.runId}>
           {detail && <p>{detail.text}</p>}
           {hasNested && <TraceSteps run={run} activeIds={activeIds} now={now} parent={expertCallId}/>}
           {outcomeText && <p>{outcomeText}</p>}

@@ -1,12 +1,14 @@
-import { useId, useState } from 'react';
+import { useContext, useId, useState } from 'react';
 import { EIconName, Icon } from '@sber-orm/ui-kit';
 import { ChatLogoSVG } from '@/components/ChatLogoSVG';
 import { type AgentRun, activityLabel, hasTrace } from './model';
 import { AgentTrace } from './AgentTrace';
+import { AgentPreviewContext } from './context';
 import classes from './styles.module.scss';
 
 export function AgentActivity({ run }: { run?: AgentRun }) {
-  const [expanded, setExpanded] = useState(false);
+  const preview = useContext(AgentPreviewContext);
+  const [expanded, setExpanded] = useState(() => Boolean(run && preview[run.runId]?.expanded));
   const traceId = useId();
 
   const canExpand = hasTrace(run);

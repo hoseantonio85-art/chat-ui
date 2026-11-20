@@ -28,6 +28,21 @@ const baseThreads = (): AtlasPreviewThread[] => [
 const memory = ['Первый факт', 'Второй факт', 'Третий факт'];
 
 describe('atlas live preview states', () => {
+  it('uses the normal reasoning flow and preserves independent preview states', () => {
+    const base = baseThreads();
+    const before = structuredClone(base);
+    const sources = createAtlasPreview('reasoning.sources', base, memory)!;
+    const answer = createAtlasPreview('reasoning.answer', base, memory)!;
+    const run = sources.threads.find(thread => thread.id === 'risk')!.runs['atlas-reasoning-answer'];
+    expect(run.status).toBe('running');
+    expect(run.events.some(event => event.tool === 'get_company_profile' && event.kind === 'toolResult')).toBe(true);
+    expect(run.events.at(-1)?.tool).toBe('ask_methodologist');
+    expect(sources.activityPreview?.[run.runId]).toEqual({expanded:true, detailTitle:'Профайлер'});
+    expect(answer.threads.find(thread => thread.id === 'risk')!.runs[run.runId].status).toBe('done');
+    expect(base).toEqual(before);
+    expect(createAtlasPreview(null, base, memory)).toBeUndefined();
+  });
+
   it('seeds rename screens without changing the source threads', () => {
     const original = baseThreads();
     const before = structuredClone(original);
