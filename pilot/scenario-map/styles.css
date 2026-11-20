@@ -77,7 +77,7 @@ svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .card-link:hover{background:var(--blue-soft)}
 .card-link svg{width:14px;height:14px}
 .screen-card{position:relative;width:510px;height:405px;overflow:hidden;border:1px solid #cfd8df;border-radius:18px;background:#fff;box-shadow:0 10px 26px rgba(33,48,60,.09);transition:border-color .16s,box-shadow .16s,transform .16s}
-.scope-note{width:fit-content;padding:5px 8px;border:1px solid #efd198;border-radius:8px;background:#fff6df;color:#805315;font-size:12px;line-height:16px;font-weight:500}
+.scope-note{width:fit-content;padding:5px 8px;border:1px solid #fda29b;border-radius:8px;background:#fef3f2;color:#b42318;font-size:12px;line-height:16px;font-weight:500}
 .screen-scope-note{position:absolute;top:12px;left:12px;z-index:1;pointer-events:none}
 .story-card .scope-note{position:absolute;top:-12px;left:20px}
 .screen-modal>header .scope-note{flex-shrink:0}
