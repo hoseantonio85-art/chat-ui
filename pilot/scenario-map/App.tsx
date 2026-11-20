@@ -63,6 +63,7 @@ function StoryCard({ step, selected, onSelect, onOpenScreen }: {
     <article className="story-card" data-selected={selected} data-kind={step.kind}>
       <button className="card-hit" onClick={onSelect} aria-pressed={selected} aria-label={`Шаг ${step.number}: ${step.title}`} />
       <div className="card-kicker"><span>{step.number}</span><span>{step.actor}</span></div>
+      {step.scopeNote && <div className="scope-note">{step.scopeNote}</div>}
       <h3>{step.title}</h3>
       <p>{step.summary}</p>
       <div className="tag-row">{step.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
@@ -81,6 +82,7 @@ function ScreenCard({ step, selected, onSelect, onOpen }: {
 }) {
   return (
     <article className="screen-card" data-selected={selected}>
+      {step.scopeNote && <div className="scope-note screen-scope-note">{step.scopeNote}</div>}
       <button className="screen-preview" onClick={onSelect} aria-pressed={selected} aria-label={`Выбрать экран ${step.number}: ${step.title}`}>
         <img src={`${SCREEN_BASE}${step.screen}`} alt={step.screenAlt} />
       </button>
@@ -434,6 +436,7 @@ export function App() {
       <aside className="inspector" aria-label="Выбранный шаг">
         <div className="inspector-count"><span>{selectedStep.number}</span><small>{progress} / {scenario.steps.length}</small></div>
         <div className="inspector-copy">
+          {selectedStep.scopeNote && <div className="scope-note">{selectedStep.scopeNote}</div>}
           <span>{selectedStep.actor} · {selectedStep.kind}</span>
           <h2>{selectedStep.title}</h2>
           <p>{selectedStep.detail}</p>
@@ -460,7 +463,9 @@ export function App() {
       {fullScreenStep && (
         <div ref={modalRef} className="screen-modal" data-branching={liveBranches.length > 1} role="dialog" aria-modal="true" aria-label={`${fullScreenStep.title}, живой HTML в масштабе 100%`}>
           <header>
-            <div><span>{fullScreenStep.number} · LIVE · 100%</span><strong>{fullScreenStep.title}</strong></div>
+            <div><span>{fullScreenStep.number} · LIVE · 100%</span><strong>{fullScreenStep.title}</strong>
+              {fullScreenStep.scopeNote && <div className="scope-note">{fullScreenStep.scopeNote}</div>}
+            </div>
             <div className="modal-actions">
               <button ref={modalPreviousRef} onClick={() => moveFullScreen(-1)} disabled={isAtBoundary(fullScreenStep, -1)} aria-label="Предыдущий экран"><Icon name="arrow" /></button>
               <span>{scenario.steps.findIndex(step => step.id === fullScreenStep.id) + 1} / {scenario.steps.length}</span>
