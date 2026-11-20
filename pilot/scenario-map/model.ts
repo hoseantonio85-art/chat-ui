@@ -1,4 +1,4 @@
-export type ScenarioId = 'vnd' | 'reply-ready' | 'chat-rename' | 'reasoning' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
+export type ScenarioId = 'vnd' | 'vnd-to-be' | 'reply-ready' | 'chat-rename' | 'reasoning' | 'settings' | 'csi' | 'csi-direct' | 'feedback-complaint' | 'feedback-positive';
 export type MapView = 'story' | 'screens';
 export type StepKind = 'entry' | 'action' | 'system' | 'state' | 'result';
 
@@ -220,6 +220,43 @@ export const scenarios: Scenario[] = [
       { id:'feedback.idea-clarify', number:'02', title:'Контекст идеи неясен', actor:'Агент', kind:'action', summary:'Один ненавязчивый вопрос помогает определить сервис.', detail:'Уточнение необязательно, исходная идея не переписывается.', screen:'screens/feedback-positive-02-idea-clarify.png', screenAlt:'Уточнение сервиса для идеи', tags:['идея','уточнение'] },
       { id:'feedback.idea-clarified', number:'03', title:'Идея уточнена', actor:'Агент', kind:'result', summary:'Ответ добавлен к той же записи, завершение остаётся коротким.', detail:'Предложение сохраняется и передаётся команде выбранного сервиса.', screen:'screens/feedback-positive-03-idea-clarified.png', screenAlt:'Идея после одного уточнения', tags:['одна запись','маршрутизация'] },
       { id:'feedback.praise', number:'04', title:'Благодарность принята', actor:'Агент', kind:'result', summary:'Похвала принимается без автоматического запроса CSI.', detail:'Короткий живой ответ не обещает внешнюю передачу.', screen:'screens/feedback-positive-04-praise.png', screenAlt:'Ответ на благодарность без CSI', tags:['похвала','коротко'] },
+    ],
+  },
+  {
+    id:'vnd-to-be',
+    eyebrow:'ВНД · ответы кнопками',
+    title:'Проверка ВНД с выбором ответов',
+    description:'Загрузка, выбор стандарта, исправление замечаний и сохранение через кнопки в диалоге.',
+    accent:'mint',
+    steps:[
+      {id:'vnd-to-be.start', number:'01', title:'Прикрепить ВНД', actor:'Пользователь', kind:'entry',
+        summary:'Агент предлагает загрузить документ для проверки.',
+        detail:'В живом экране прикрепите документ и отправьте его. Агент предложит четыре групповых стандарта.',
+        screen:'screens/vnd-to-be-01-start.png', screenAlt:'Приглашение загрузить ВНД', tags:['загрузка', 'ВНД']},
+      {id:'vnd-to-be.standard', number:'02', title:'Выбрать стандарт кнопкой', actor:'Пользователь', kind:'action',
+        summary:'Под вопросом — четыре длинных наименования в светлом блоке выбора.',
+        detail:'Нажмите любой пункт. Проверка начнётся сразу. Если прокрутить вопрос за пределы экрана, варианты будут доступны в виджете над полем ввода.',
+        screen:'screens/vnd-to-be-02-standard.png', screenAlt:'Четыре стандарта для выбора нажатием', tags:['карточки выбора', 'один ответ']},
+      {id:'vnd-to-be.result', number:'03', title:'Исправить замечания', actor:'Агент', kind:'result',
+        summary:'Агент показывает расхождения и предлагает прикрепить исправленный документ.',
+        detail:'Загрузите исправленный файл в живом экране. Повторная проверка использует уже выбранный стандарт.',
+        screen:'screens/vnd-to-be-03-result.png', screenAlt:'Результат проверки с рекомендациями по исправлению', tags:['замечания', 'повторная проверка']},
+      {id:'vnd-to-be.save', number:'04', title:'Ответить на предложение сохранить', actor:'Пользователь', kind:'action',
+        summary:'Повторная проверка завершена. Под предложением сохранить — три фиолетовые кнопки.',
+        detail:'«Да, сохранить» сразу сохраняет исправленный файл в «Операционные риски». «Выбрать другую папку» открывает выбор папки. «Не сейчас» откладывает сохранение.',
+        screen:'screens/vnd-to-be-04-save.png', screenAlt:'Вопрос о сохранении с тремя кнопками', tags:['действия', 'сохранение']},
+      {id:'vnd-to-be.folder', number:'05', title:'Выбрать другую папку', actor:'Пользователь', kind:'action',
+        summary:'Небольшая модалка позволяет выбрать папку и подтвердить сохранение.',
+        detail:'Это вариант ответа «Выбрать другую папку». Выберите папку и нажмите «Сохранить» либо отмените выбор.',
+        screen:'screens/vnd-to-be-05-folder.png', screenAlt:'Модалка выбора папки', tags:['другая папка', 'подтверждение']},
+      {id:'vnd-to-be.deferred', number:'06', title:'Отложить сохранение', actor:'Пользователь', kind:'state',
+        summary:'После «Не сейчас» кнопки закрываются. В чате остаётся способ вернуться.',
+        detail:'Это альтернативный ответ на предложение сохранить. Напишите «Вернуться к сохранению», чтобы снова получить три кнопки.',
+        screen:'screens/vnd-to-be-06-deferred.png', screenAlt:'Сохранение отложено, показана команда возврата', tags:['не сейчас', 'возврат']},
+      {id:'vnd-to-be.saved', number:'07', title:'Файл сохранён', actor:'Агент', kind:'result',
+        summary:'Агент подтверждает исправленную версию документа и папку сохранения.',
+        detail:'Это результат нажатия «Да, сохранить». Вопрос закрыт, а свободный ввод остаётся доступным.',
+        screen:'screens/vnd-to-be-07-saved.png', screenAlt:'Подтверждение сохранения исправленного ВНД', tags:['результат', 'база знаний']},
     ],
   },
   {

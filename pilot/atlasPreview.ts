@@ -7,6 +7,7 @@ import type { BackgroundThread } from './VndBackground';
 import type { ResponseFormatsDraft } from './ResponseFormats';
 import type { VndContextualQuestion } from './VndBackground.model';
 import { createReasoningPreview, reasoningSteps, type ReasoningStepId } from './reasoningPreview';
+import { createVndToBePreview, vndToBeSteps, type VndToBeStepId } from './vndToBePreview';
 import { type ScenarioId, vndStandardPrompt } from './scenarios';
 import {
   addCsiComment,
@@ -23,6 +24,7 @@ import {
 } from './Feedback.model';
 
 export type AtlasStepId =
+  | VndToBeStepId
   | ReasoningStepId
   | 'chat-rename.history'
   | 'chat-rename.editing'
@@ -87,6 +89,7 @@ export interface AtlasPreview {
   drawerFocus?: 'memory-heading';
   rename?: { threadId: string; draft: string };
   activityPreview?: Record<string, {expanded?:boolean; detailTitle?:string}>;
+  openVndFolder?: boolean;
 }
 
 const previewTime = Date.parse('2026-11-08T06:00:00.000Z');
@@ -287,6 +290,7 @@ function createQualitativePreview(stepId: Extract<AtlasStepId, `feedback.${strin
 }
 
 const knownSteps = new Set<AtlasStepId>([
+  ...vndToBeSteps,
   ...reasoningSteps,
   'chat-rename.history', 'chat-rename.editing', 'chat-rename.saved', 'chat-rename.cancelled',
   'vnd.start', 'vnd.running', 'vnd.history-running', 'vnd.unread', 'vnd.result', 'vnd.saved',
@@ -315,6 +319,7 @@ export function createAtlasPreview(
   const resolvedStep = legacySteps[requestedStep] ?? requestedStep;
   if (!knownSteps.has(resolvedStep as AtlasStepId)) return undefined;
   const stepId = resolvedStep as AtlasStepId;
+  if (stepId.startsWith('vnd-to-be.')) return createVndToBePreview(stepId as VndToBeStepId, baseThreads, initialMemory);
   if (stepId.startsWith('reasoning.')) return createReasoningPreview(stepId as ReasoningStepId, baseThreads, initialMemory);
   if (stepId.startsWith('chat-rename.')) {
     const threads = baseThreads.map(thread => thread.id === 'risk'

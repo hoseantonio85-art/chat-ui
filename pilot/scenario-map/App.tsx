@@ -26,6 +26,7 @@ const SCREEN_POSITIONS = [
 ];
 const SCREEN_BASE = `${import.meta.env.BASE_URL}scenario-map/`;
 const SCENARIO_LABELS: Record<ScenarioId, string> = {
+  'vnd-to-be':'ВНД · ответы кнопками',
   reasoning:'Ответ с рассуждениями',
   'chat-rename':'Переименование диалога',
   vnd:'Проверка ВНД', 'reply-ready':'Ответ готов в другом чате', settings:'Настройки', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
