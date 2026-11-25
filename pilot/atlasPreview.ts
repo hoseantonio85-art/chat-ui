@@ -138,7 +138,7 @@ const pendingMessage: IMessage = {
 const resultMessage: IMessage = {
   id: 'atlas-vnd-result',
   role: ERoles.bot,
-  text: '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено.\n\nПредлагаю сохранить актуальный ВНД в базу знаний, в папку «Операционные риски». **Напишите «Да»**, чтобы подтвердить, или укажите другую папку: «Внутренние нормативные документы» или «Методология».',
+  text: '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено.\n\nПредлагаю сохранить актуальный ВНД в базу знаний, в папку «Стандарты». **Напишите «Да»**, чтобы подтвердить, или укажите другую папку: «Внутренние нормативные документы» или «Методология».',
   timeCreated: at(10),
 };
 const saveRequestMessage: IMessage = {
@@ -150,7 +150,7 @@ const saveRequestMessage: IMessage = {
 const savedMessage: IMessage = {
   id: 'atlas-vnd-saved',
   role: ERoles.bot,
-  text: 'Сохранил «Регламент управления операционными рисками.docx» в базу знаний, в папку «Операционные риски».',
+  text: 'Сохранил «Регламент управления операционными рисками.docx» в базу знаний, в папку «Стандарты».',
   timeCreated: at(12),
 };
 
@@ -200,7 +200,7 @@ function createCsiPreview(stepId: Extract<AtlasStepId, `csi.${string}`>, baseThr
   const outcome = stepId === 'csi.error' ? 'error' : 'success';
   let draft = createCsiDraft('proactive', at(20), { mockOutcome: outcome });
   const messages: IMessage[] = [
-    { id:'atlas-csi-context', role:ERoles.bot, text:'Готово, «Регламент управления операционными рисками.docx» сохранён в базе знаний в папке «Операционные риски».', timeCreated:at(19) },
+    { id:'atlas-csi-context', role:ERoles.bot, text:'Готово, «Регламент управления операционными рисками.docx» сохранён в базе знаний в папке «Стандарты».', timeCreated:at(19) },
     { id:'atlas-csi-prompt', role:ERoles.bot, text:'Можно ещё один короткий вопрос?', extras:{type:'system', feedbackAddon:'csi-rating'}, timeCreated:at(20) },
   ];
   if (stepId === 'csi.declined') {

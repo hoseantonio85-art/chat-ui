@@ -23,7 +23,7 @@ export function VndSaveActions({ placement, onReply, onSkip }: {
   onSkip: () => void;
 }) {
   return <ContextualButtons
-    label="Сохранить ВНД в «Операционные риски»?"
+    label="Сохранить ВНД в «Стандарты»?"
     placement={placement}
     onSkip={onSkip}
     actions={['Да, сохранить', 'Выбрать другую папку', 'Не сейчас'].map(label => ({

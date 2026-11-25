@@ -41,7 +41,7 @@ describe('atlas live preview states', () => {
     expect(vnd(save)).toMatchObject({vndStage:'confirmSave', documentIds:'["vnd-corrected"]'});
     expect(vnd(save).messages.at(-1)?.extras?.vndAddon).toBe('save-confirmation');
     expect(vnd(deferred).vndStage).toBe('saveDeferred');
-    expect(vnd(saved)).toMatchObject({jobState:'saved', folder:'Операционные риски'});
+    expect(vnd(saved)).toMatchObject({jobState:'saved', folder:'Стандарты'});
     expect(createAtlasPreview('vnd-to-be.folder', base, memory)?.openVndFolder).toBe(true);
     expect(base).toEqual(before);
   });
@@ -189,7 +189,7 @@ describe('atlas live preview states', () => {
     expect(prompt?.scenario).toBe('csiProactive');
     expect(prompt?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.stage).toBe('rating');
     expect(prompt?.threads.find(thread => thread.id === 'vnd')?.messages.slice(-2).map(message => message.text)).toEqual([
-      'Готово, «Регламент управления операционными рисками.docx» сохранён в базе знаний в папке «Операционные риски».',
+      'Готово, «Регламент управления операционными рисками.docx» сохранён в базе знаний в папке «Стандарты».',
       'Можно ещё один короткий вопрос?',
     ]);
     expect(low?.threads.find(thread => thread.id === 'vnd')?.feedbackDraft?.rating?.value).toBe(1);

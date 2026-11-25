@@ -149,11 +149,7 @@ export const Chat = React.memo(
 			}
 		};
 
-		useEffect(() => {
-			if (chat$.value.state !== EChatState.small) {
-				chat$.changeChatState(EChatState.small);
-			}
-		}, [isPhone]);
+
 
 		useEffect(() => {
 			const observer = chat$.observer$.subscribe({

@@ -1,7 +1,9 @@
 import React, {useEffect, useRef, useState} from 'react';
 import './vnd.css';
-export function VndEntry({onOpen}: {onOpen: (welcome: boolean, query?: string) => void}) {
+import { VndUploadDialog } from './VndUploadDialog';
+export function VndEntry({onOpen}: {onOpen: (welcome: boolean, query?: string, file?: File) => void | Promise<void>}) {
   const [page, setPage] = useState(location.hash === '#knowledge' ? 'knowledge' : 'home');
+  const [upload, setUpload] = useState(false);
   const [news, setNews] = useState(false);
   const [query, setQuery] = useState('');
   const bell = useRef<HTMLButtonElement>(null);
@@ -28,11 +30,13 @@ export function VndEntry({onOpen}: {onOpen: (welcome: boolean, query?: string) =
         </form>
       </> : <>
         {hotspot('Главная', [48,368,80,80], () => go('home'))}
+        {hotspot('Добавить документы в Стандарты', [2118,668,74,74], () => setUpload(true))}
         {hotspot('Поехали!', [2760,296,248,80], () => onOpen(true))}
         {hotspot('Проверить ВНД', [1768,1840,488,80], () => onOpen(true))}
         {hotspot('Открыть чат Норма', [2270,1820,130,125], () => onOpen(false))}
       </>}
     </div>
+    {upload && <VndUploadDialog onClose={() => setUpload(false)} onChat={() => {setUpload(false); onOpen(true);}} onSubmit={async file => {await onOpen(false, undefined, file); setUpload(false);}}/>}
     {news && <div className="vnd-news-overlay" onMouseDown={e => {if(e.target === e.currentTarget) {setNews(false); bell.current?.focus();}}}>
       <section className="vnd-news" role="dialog" aria-modal="true" aria-label="Новости">
         <img src={`${import.meta.env.BASE_URL}vnd/news.png`} alt="Новости: появилась проверка ВНД на соответствие стандартам группы"/>

@@ -21,13 +21,13 @@ const thread = (overrides: Partial<TestThread> = {}): TestThread => ({
 
 describe('parseVndSaveIntent', () => {
   it.each([
-    ['Да', 'Операционные риски'],
-    ['Да, сохраняй', 'Операционные риски'],
-    ['Да, сохранить', 'Операционные риски'],
-    ['Да пожалуйста', 'Операционные риски'],
-    ['Хорошо, сохраняй', 'Операционные риски'],
-    ['Ок, сохраняй', 'Операционные риски'],
-    ['Сохрани', 'Операционные риски'],
+    ['Да', 'Стандарты'],
+    ['Да, сохраняй', 'Стандарты'],
+    ['Да, сохранить', 'Стандарты'],
+    ['Да пожалуйста', 'Стандарты'],
+    ['Хорошо, сохраняй', 'Стандарты'],
+    ['Ок, сохраняй', 'Стандарты'],
+    ['Сохрани', 'Стандарты'],
     ['Методология', 'Методология'],
     ['В папку «Методология»', 'Методология'],
     ['  «Внутренние нормативные документы»  ', 'Внутренние нормативные документы'],
@@ -80,7 +80,7 @@ it('saves a deferred foreground review once and keeps the checked document attac
   const event = { type: 'save', folder: 'Методология', at: 2 } as const;
   const saved = applyVndBackgroundEvent(source, 'vnd', event);
   expect(saved[0]).toMatchObject({ jobState: 'saved', documentIds: '["corrected"]', folder: 'Методология' });
-  expect(applyVndBackgroundEvent(saved, 'vnd', { ...event, folder: 'Операционные риски' })).toBe(saved);
+  expect(applyVndBackgroundEvent(saved, 'vnd', { ...event, folder: 'Стандарты' })).toBe(saved);
 });
 
 describe('canResolveVndAttachmentLookup', () => {

@@ -63,6 +63,7 @@
     "../src/components/Chat/MessageAddonContext.tsx",
     "./scenario-map/**/*.ts",
     "./scenario-map/**/*.tsx",
-    "./VndEntry.tsx"
+    "./VndEntry.tsx",
+    "./VndUploadDialog.tsx"
   ]
 }

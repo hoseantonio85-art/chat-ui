@@ -35,7 +35,7 @@ describe('pilot explanations', () => {
 
   it('keeps future VND flows separate from the current MVP flows', () => {
     const futureGroup = scenarioGroups.find(group => group.id === 'vnd-to-be');
-    expect(futureGroup?.scenarioIds).toEqual(['vndBackgroundToBe', 'vndToBe', 'vndWelcomeToBe']);
+    expect(futureGroup?.scenarioIds).toEqual(['vndCleanToBe', 'vndBackgroundToBe', 'vndToBe', 'vndWelcomeToBe']);
     expect(futureGroup?.scenarioIds.every(isVndToBeScenario)).toBe(true);
     expect(isVndBackgroundScenario('vndBackground')).toBe(true);
     expect(isVndBackgroundScenario('vndBackgroundToBe')).toBe(true);

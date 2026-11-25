@@ -1,5 +1,5 @@
 export const vndFolders = [
-  'Операционные риски',
+  'Стандарты',
   'Внутренние нормативные документы',
   'Методология',
 ] as const;
@@ -8,7 +8,7 @@ export type VndFolder = (typeof vndFolders)[number];
 export type VndStage = 'start' | 'chooseStandard' | 'reviewing' | 'reviewed' | 'confirmSave' | 'saveDeferred' | 'complete';
 export type VndContextualQuestion = 'standard-picker' | 'save-confirmation';
 
-export const vndSaveQuestion = 'Сохранить актуальный ВНД в базе знаний, в папке «Операционные риски»?';
+export const vndSaveQuestion = 'Сохранить актуальный ВНД в базе знаний, в папке «Стандарты»?';
 
 export type VndSaveIntent =
   | { kind: 'save'; folder: VndFolder }

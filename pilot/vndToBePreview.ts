@@ -46,7 +46,7 @@ export function createVndToBePreview(stepId:VndToBeStepId, baseThreads:AtlasPrev
   }
   if (stepId === 'vnd-to-be.saved') {
     add('confirm', ERoles.user, 'Да, сохранить');
-    add('saved', ERoles.bot, 'Сохранил «Регламент управления операционными рисками — исправленный.docx» в базу знаний, в папку «Операционные риски».');
+    add('saved', ERoles.bot, 'Сохранил «Регламент управления операционными рисками — исправленный.docx» в базу знаний, в папку «Стандарты».');
     stage = 'complete';
   }
   return {
@@ -57,7 +57,7 @@ export function createVndToBePreview(stepId:VndToBeStepId, baseThreads:AtlasPrev
       ...thread, scenario:'vndWelcomeToBe', title:'Проверка ВНД · варианты ответа', messages, runs, vndStage:stage,
       documentIds:index >= 3 ? '["vnd-corrected"]' : index >= 1 ? '["vnd-draft"]' : undefined,
       jobState:stepId === 'vnd-to-be.saved' ? 'saved' : undefined,
-      folder:stepId === 'vnd-to-be.saved' ? 'Операционные риски' : undefined,
+      folder:stepId === 'vnd-to-be.saved' ? 'Стандарты' : undefined,
       agentState:undefined, agentUnread:false,
     } : {...thread}),
   };

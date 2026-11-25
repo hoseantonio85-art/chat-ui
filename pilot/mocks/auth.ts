@@ -7,7 +7,7 @@ function observable<T>(initial: T) {
 }
 export const chat$ = Object.assign(observable<IChatState>({isPortalOpen: true, state: EChatState.fullScreen, showResizeButton: false}), {
   changeChatState(state: EChatState) { chat$.update({state}); },
-  openChat() { chat$.update({isPortalOpen: true}); },
+  openChat() { chat$.update({isPortalOpen: true, state: EChatState.fullScreen}); },
   closeChat() { chat$.update({isPortalOpen: false}); },
   clearMessageQueue() { chat$.update({messageQueue: undefined}); },
 });

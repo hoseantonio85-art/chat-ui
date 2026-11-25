@@ -1,6 +1,7 @@
 import type { AgentEvent } from '../src/components/AgentActivity/model';
 import type { IChartData } from '../src/components/UniversalChart/types';
 export const scenarios = [
+  {id: 'vndCleanToBe', title: 'ВНД to be · без отклонений', question: 'Проверь ВНД на соответствие стандартам группы.'},
   {id: 'vndBackground', title: 'ВНД · проверка в фоне', question: 'Проверь ВНД на соответствие стандартам группы.'},
   {id: 'vnd', title: 'ВНД · сам пишу в чат', question: 'Проверь ВНД на соответствие стандартам группы.'},
   {id: 'vndWelcome', title: 'ВНД · пришёл по кнопке', question: 'Проверь ВНД на соответствие стандартам группы.'},
@@ -35,7 +36,7 @@ export type ScenarioId = typeof scenarios[number]['id'];
 
 export const scenarioGroups = [
   {id:'vnd', title:'ВНД', scenarioIds:['vndBackground', 'vnd', 'vndWelcome']},
-  {id:'vnd-to-be', title:'ВНД · to be (на будущее)', scenarioIds:['vndBackgroundToBe', 'vndToBe', 'vndWelcomeToBe']},
+  {id:'vnd-to-be', title:'ВНД · to be (на будущее)', scenarioIds:['vndCleanToBe', 'vndBackgroundToBe', 'vndToBe', 'vndWelcomeToBe']},
   {id:'csi', title:'CSI', scenarioIds:['csiProactive', 'csiDirect', 'csiDirectUnknown', 'csiError']},
   {id:'feedback', title:'Обратная связь', scenarioIds:['feedbackComplaint', 'feedbackComplaintClarify', 'feedbackHelp', 'feedbackIdea', 'feedbackIdeaClarify', 'feedbackPraise', 'feedbackError']},
   {id:'agent', title:'Работа агента', scenarioIds:['normal', 'noReasoning', 'parallel', 'subagent', 'empty', 'error', 'backendCallback']},
@@ -58,7 +59,7 @@ export const vndStandardPrompt = `Документ загружен. С каки
 
 export const vndToBeStandardPrompt = 'Документ загружен. Выберите групповой документ для сверки. Можно выбрать вариант ниже или отправить его номер сообщением.';
 
-export const isVndToBeScenario = (id: ScenarioId): boolean => id === 'vndBackgroundToBe' || id === 'vndToBe' || id === 'vndWelcomeToBe';
+export const isVndToBeScenario = (id: ScenarioId): boolean => id === 'vndCleanToBe' || id === 'vndBackgroundToBe' || id === 'vndToBe' || id === 'vndWelcomeToBe';
 export const isVndBackgroundScenario = (id: ScenarioId): boolean => id === 'vndBackground' || id === 'vndBackgroundToBe';
 
 export const vndResultAnswer = `**Проверка завершена.** В документе выявлены отклонения от групповых требований.
@@ -70,6 +71,8 @@ export const vndResultAnswer = `**Проверка завершена.** В до
 | Не описаны функции коллегиального органа | Закрепить функции за ответственными органами |
 
 Внесите правки и загрузите исправленный документ повторно.`;
+
+export const vndCleanAnswer = '**Проверка завершена.** Отклонений от выбранного группового стандарта не найдено. Документ соответствует требованиям.';
 
 export const vndCorrectedAnswer = `**Повторная проверка завершена.** Все ранее выявленные отклонения устранены.
 
@@ -87,6 +90,7 @@ export const chart: IChartData = {
 export function fixture(scenario: ScenarioId, runId: string, start: number) {
   const events: AgentEvent[] = [];
   const backendSteps: string[] = [];
+  if (scenario === 'vndCleanToBe') return {events, backendSteps, answer: vndCleanAnswer};
   if (scenario === 'vnd') return {events, backendSteps, answer: vndResultAnswer};
   if (scenario === 'finalOnly') return {events, backendSteps, answer: '**Операционный риск** — вероятность потерь из-за ошибок процессов, людей, систем или внешних событий. Для первичной оценки определите причину, последствия, вероятность и действующие меры контроля.'};
   if (scenario === 'backendCallback') {

@@ -16,7 +16,7 @@ import { completeThreadActivity, markThreadActivityRead, startThreadActivity } f
 import { clearMemoryFacts, forgetMemoryFact, resetThreads } from '../src/components/ThreadDrawer/settings';
 import { chat$, EChatState } from './mocks/auth';
 import { resetPending, setDemoOnline, setDemoSender } from './mocks/useChat';
-import { chart, fixture, isVndBackgroundScenario, isVndToBeScenario, scenarios, type ScenarioId, usesReferenceFlow, vndCorrectedAnswer, vndResultAnswer, vndStandardPrompt, vndStandards, vndToBeStandardPrompt } from './scenarios';
+import { chart, fixture, isVndBackgroundScenario, isVndToBeScenario, scenarios, type ScenarioId, usesReferenceFlow, vndCleanAnswer, vndCorrectedAnswer, vndResultAnswer, vndStandardPrompt, vndStandards, vndToBeStandardPrompt } from './scenarios';
 import { appendExplanation, csiComment, csiServiceResolved, explainedReply, feedbackRuns, feedbackSaveExplanation } from './scenarioExplanations';
 import modalClasses from '@/components/ModalContainer/styles.module.scss';
 import chatClasses from '@/components/Chat/styles.module.scss';
@@ -315,7 +315,7 @@ function App() {
     });
     const messages: IMessage[] = !direct
       ? [
-          {id:'csi-context-save', role:ERoles.bot, text:'Готово, «Регламент управления операционными рисками.docx» сохранён в базе знаний в папке «Операционные риски».', timeCreated:startedAt},
+          {id:'csi-context-save', role:ERoles.bot, text:'Готово, «Регламент управления операционными рисками.docx» сохранён в базе знаний в папке «Стандарты».', timeCreated:startedAt},
           {id:'csi-prompt', role:ERoles.bot, text:'Можно ещё один короткий вопрос?', extras:feedbackExtras('csi-rating'), timeCreated:startedAt},
         ]
       : entry === 'csiDirectUnknown' ? [
@@ -557,7 +557,8 @@ function App() {
   function runVndReview(corrected: boolean, instant = false, correctedFileIds?: string) {
     const threadId = activeIdRef.current;
     const threadScenario = threadsRef.current.find(thread => thread.id === threadId)?.scenario ?? scenario;
-    const showToBeSave = corrected && isVndToBeScenario(threadScenario);
+    const noFindings = corrected || threadScenario === 'vndCleanToBe' || new URLSearchParams(location.search).get('review') === 'clean';
+    const showToBeSave = noFindings;
     clearThreadTimers(threadId);
     if (showToBeSave && correctedFileIds) {
       updateThreads(items => items.map(item => item.id === threadId ? {...item, documentIds:correctedFileIds} : item));
@@ -574,13 +575,13 @@ function App() {
       const completeStep = `${responseId}-complete`;
       run = appendExplanation(run, completeStep, corrected
         ? 'Сверка подтвердила, что замечания из предыдущего отчёта устранены. Подготовлю итог по каждому пункту.'
-        : 'Сведу найденные расхождения в таблицу. Для каждого отмечу, что изменить в документе.', completedAt);
+        : noFindings ? 'Отклонений не найдено. Предложу сохранить проверенный документ в папку «Стандарты».' : 'Сведу найденные расхождения в таблицу. Для каждого отмечу, что изменить в документе.', completedAt);
       run = appendEvent(run, {id:completeStep, runId:responseId, at:completedAt, kind:'message', label:'Готовлю итог проверки'});
       run = appendEvent(run, {id:`${responseId}-finish`, runId:responseId, at:Date.now() + 1, kind:'finish'});
       updateRun();
       appendToThread(threadId, {
         ...base,
-        text: corrected ? vndCorrectedAnswer : vndResultAnswer,
+        text: corrected ? vndCorrectedAnswer : noFindings ? vndCleanAnswer : vndResultAnswer,
       });
       if (showToBeSave) appendToThread(threadId, {
         id: crypto.randomUUID(),
@@ -691,7 +692,7 @@ function App() {
       const text = deferred
         ? 'ВНД пока не сохранён. Напишите «Вернуться к сохранению», чтобы снова открыть варианты, или укажите название папки.'
         : resume && toBe ? vndSaveQuestion
-          : 'Для сохранения актуального ВНД напишите «Да» или название папки: «Операционные риски», «Внутренние нормативные документы» или «Методология».';
+          : 'Для сохранения актуального ВНД напишите «Да» или название папки: «Стандарты», «Внутренние нормативные документы» или «Методология».';
       appendToThread(id, {id:crypto.randomUUID(), role:ERoles.bot, text, extras:resume && toBe ? {vndAddon:'save-confirmation'} : undefined, timeCreated:new Date(sentAt + 1).toISOString()});
       return;
     }
@@ -1045,9 +1046,13 @@ function App() {
     : 'Сразу результат';
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><ContextualActionsContext.Provider value={contextualActions}><AgentRunsContext.Provider value={runs}><AgentPreviewContext.Provider value={initialState.activityPreview ?? {}}>
     <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
-    {vndEntryMode && <VndEntry onOpen={(welcome, query) => {
+    {vndEntryMode && <VndEntry onOpen={async (welcome, query, file) => {
       runScenario(welcome ? 'vndWelcomeToBe' : 'vndToBe');
-      if (query) sendVnd({body:query});
+      if (file) {
+        const fileId = crypto.randomUUID();
+        await methodologistService.uploadDocument(fileId, file, () => {});
+        sendVnd({body:query || 'Проверь ВНД на соответствие стандартам группы.',extras:{fileIds:JSON.stringify([fileId])}});
+      } else if (query) sendVnd({body:query});
       chat$.openChat();
       setTimeout(focusComposer, 0);
     }}/>}

@@ -68,6 +68,14 @@ export const ModalContainer = React.memo(() => {
 		};
 	}, []);
 
+	useEffect(() => {
+    if (!isPortalOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape' && !document.querySelector('dialog[open]')) chat$.closeChat(); };
+    window.addEventListener('keydown', close);
+    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', close); };
+  }, [isPortalOpen]);
 	return (
 		<ClickStreamProvider
 			clickStreamUrl={Config.clickStreamUrl}
@@ -79,7 +87,9 @@ export const ModalContainer = React.memo(() => {
 		>
 			<Portal id="modal-chat-container" visible={isPortalOpen}>
 				<div
-					className={cn(classes.wrapper, {
+					role="dialog" aria-modal="true" aria-label="Чат Норма"
+          onMouseDown={event => {if (event.target === event.currentTarget) chat$.closeChat();}}
+          className={cn(classes.wrapper, {
 						[classes.wrapperChatRight]:
 							chatState === EChatState.small && !isChartOpen,
 						[classes.wrapperWithBackground]:
