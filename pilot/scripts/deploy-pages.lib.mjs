@@ -73,6 +73,9 @@ export function assertPagesBuild(distDir) {
   if (!existsSync(join(distDir, 'scenario-map', 'index.html'))) {
     throw new Error('Scenario map artifact is missing: dist/scenario-map/index.html.');
   }
+  for (const file of ['vnd/index.html', 'vnd/home.jpg', 'vnd/knowledge.jpg', 'vnd/news.png']) {
+    if (!existsSync(join(distDir, file))) throw new Error(`VND artifact is missing: ${file}`);
+  }
   const screensDir = join(distDir, 'scenario-map', 'screens');
   const screens = existsSync(screensDir) ? new Set(readdirSync(screensDir)) : new Set();
   if (!PAGES_SCREEN_ASSETS.every(file => screens.has(file))) {

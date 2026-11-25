@@ -29,6 +29,7 @@ export default defineConfig({
       input: {
         pilot: path('./index.html'),
         scenarioMap: path('./scenario-map/index.html'),
+        vnd: path('./vnd/index.html'),
       },
     },
   },

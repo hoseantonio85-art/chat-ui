@@ -1,3 +1,4 @@
+import { VndEntry } from './VndEntry';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { reatomContext } from '@reatom/npm-react';
@@ -136,9 +137,12 @@ function createInitialAppState() {
     activityPreview: preview?.activityPreview,
     openVndFolder: preview?.openVndFolder,
     previewStepId: preview?.stepId,
-    embedded: params.get('embed') === '1',
+    embedded: params.get('embed') === '1' || vndEntryMode,
   };
 }
+
+const vndEntryMode = /\/vnd\/?$/.test(window.location.pathname);
+if (vndEntryMode) { chat$.closeChat(); document.body.classList.add('vnd-mode'); }
 
 function App() {
   const [initialState] = useState(createInitialAppState);
@@ -894,7 +898,7 @@ function App() {
       loadThread(thread);
       if (initialState.openVndFolder) setFolderDialogThread(thread.id);
       if (initialState.embedded || window.innerWidth >= 600) chat$.changeChatState(EChatState.fullScreen);
-      chat$.openChat();
+      if (!vndEntryMode) chat$.openChat();
       if (initialState.previewStepId === 'reply-ready.switch' && thread.documentIds && thread.documentName) {
         background.start(thread.id, thread.documentIds, thread.documentName);
       }
@@ -1041,6 +1045,12 @@ function App() {
     : 'Сразу результат';
   return <reatomContext.Provider value={ctx}><ThreadUiContext.Provider value={threadUi}><AssistantSkillsContext.Provider value={{skills:demoFlags.assistantSkills ? assistantSkills : [], selectedSkill, onSelect:setSelectedSkillId}}><MessageAddonContext.Provider value={renderMessageAddon}><ContextualActionsContext.Provider value={contextualActions}><AgentRunsContext.Provider value={runs}><AgentPreviewContext.Provider value={initialState.activityPreview ?? {}}>
     <style>{initialState.embedded ? `.${modalClasses.wrapper}{top:0;height:100dvh}` : `.${modalClasses.wrapper}{top:64px;height:calc(100dvh - 64px)} @media(max-width:599px){.${modalClasses.wrapper}{top:112px;height:calc(100dvh - 112px);padding:0;width:100%}.${modalClasses.content},.${modalClasses.contentChatRight}{margin:8px;width:calc(100% - 16px);max-width:calc(100% - 16px);height:calc(100% - 16px)}.${chatClasses.chat}{min-width:0;width:100%;padding:20px 16px 16px}.${chatClasses.content}{margin-right:-16px;padding-right:16px}.${chatClasses.messages}{margin-right:-16px;padding-right:8px}.${chatClasses.titleLogo}{margin-right:0;width:32px;height:32px}.${chatClasses.titleText}{font-size:20px}.${chatClasses.title}{min-width:150px}.${chatClasses.header}>:last-child{gap:6px}.${chatClasses.header}>:last-child button:not(:first-child):not(:last-child){display:none}}`}</style>
+    {vndEntryMode && <VndEntry onOpen={(welcome, query) => {
+      runScenario(welcome ? 'vndWelcomeToBe' : 'vndToBe');
+      if (query) sendVnd({body:query});
+      chat$.openChat();
+      setTimeout(focusComposer, 0);
+    }}/>}
     {!initialState.embedded && <div className="demo-toolbar">
       <div className="demo-label">
         <strong>UI-пилот</strong>

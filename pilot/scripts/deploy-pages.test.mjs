@@ -17,7 +17,7 @@ test('accepts only the universal agent source branch', () => {
   );
 });
 
-test('requires both the chat and scenario map artifacts', () => {
+test('requires chat, scenario map and VND artifacts', () => {
   const root = mkdtempSync(join(tmpdir(), 'chat-ui-pages-test-'));
   try {
     writeFileSync(join(root, 'index.html'), '<!doctype html>');
@@ -25,6 +25,9 @@ test('requires both the chat and scenario map artifacts', () => {
 
     mkdirSync(join(root, 'scenario-map', 'screens'), { recursive: true });
     writeFileSync(join(root, 'scenario-map', 'index.html'), '<!doctype html>');
+    mkdirSync(join(root, 'vnd'));
+    assert.throws(() => assertPagesBuild(root), /VND artifact/);
+    for (const file of ['index.html','home.jpg','knowledge.jpg','news.png']) writeFileSync(join(root,'vnd',file),'fixture');
     writeFileSync(join(root, 'scenario-map', 'screens', 'screen.png'), 'image');
     assert.throws(() => assertPagesBuild(root), /scenario map screenshots/);
 

@@ -1,0 +1,40 @@
+const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const output = path.join(process.env.RUNNER_TEMP || process.cwd(), 'qa-vnd');
+require('node:fs').mkdirSync(output, {recursive:true});
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({viewport:{width:1728,height:1100}});
+  const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  const open = name => page.getByRole('button',{name,exact:true}).click();
+  const closeChat = async () => {await open('Закрыть чат'); await page.getByRole('button',{name:'Закрыть чат',exact:true}).waitFor({state:'hidden'});};
+  const welcome = async name => {await open(name); await page.getByText('Здравствуйте! Я помогу проверить ваш ВНД', {exact:false}).waitFor(); await closeChat();};
+  try {
+    await page.goto('http://127.0.0.1:4410/vnd/');
+    await page.getByRole('button',{name:'Новости',exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Закрыть чат',exact:true}).count(),0);
+    await page.getByRole('textbox',{name:'Запрос помощнику'}).fill('Проверь мой регламент');
+    await page.getByRole('textbox',{name:'Запрос помощнику'}).press('Enter');
+    await page.getByText('Проверь мой регламент',{exact:true}).waitFor();
+    await closeChat();
+    await welcome('Проверить стандарты');
+    await open('Новости'); await page.getByRole('dialog',{name:'Новости'}).waitFor();
+    await page.keyboard.press('Escape'); await page.getByRole('dialog',{name:'Новости'}).waitFor({state:'hidden'});
+    await open('Новости'); await open('Закрыть новости');
+    await open('Новости'); await open('Проверка ВНД — перейти в базу знаний');
+    await welcome('Поехали!'); await welcome('Проверить ВНД');
+    await open('Открыть чат Норма');
+    assert.equal(await page.getByText('Здравствуйте! Я помогу проверить ваш ВНД',{exact:false}).count(),0);
+    await closeChat(); await open('Главная'); await open('База знаний');
+    await page.screenshot({path:path.join(output,'knowledge.png'),fullPage:true});
+    await open('Главная'); await page.screenshot({path:path.join(output,'home.png'),fullPage:true});
+    await page.goto('http://127.0.0.1:4410/');
+    await page.getByRole('button',{name:'Закрыть чат',exact:true}).waitFor();
+    await page.goto('http://127.0.0.1:4410/scenario-map/');
+    await page.locator('#root').filter({hasText:/ВНД/}).waitFor();
+    await page.screenshot({path:path.join(output,'scenario-map.png'),fullPage:true});
+    assert.deepEqual(errors,[]);
+    console.log('VND entries, dismissal, supplied query, root and scenario map passed.');
+  } finally {await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

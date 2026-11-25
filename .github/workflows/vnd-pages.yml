@@ -1,0 +1,49 @@
+name: Publish VND prototype
+on:
+  push:
+    branches: [universal-agent-ui-pilot]
+    paths: ['pilot/vnd/**', 'pilot/VndEntry.tsx', 'pilot/vnd.css', '.github/workflows/vnd-pages.yml']
+permissions:
+  contents: write
+concurrency:
+  group: chat-ui-pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: universal-agent-ui-pilot
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pilot/package-lock.json
+      - run: npm ci
+        working-directory: pilot
+      - run: npm run typecheck && npm test && npm run build:pages
+        working-directory: pilot
+      - name: Install browser for entry-point checks
+        run: |
+          npm install --prefix "$RUNNER_TEMP/vnd-qa" playwright
+          "$RUNNER_TEMP/vnd-qa/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Check all entry points and existing pages
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/vnd-qa/node_modules/playwright
+        run: |
+          npm run dev -- --port 4410 > /tmp/vnd-preview.log 2>&1 &
+          node scripts/vnd-browser-check.cjs
+        working-directory: pilot
+      - name: Publish from source with the repository deploy script
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          npm run deploy:pages
+        working-directory: pilot
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vnd-browser-check
+          path: ${{ runner.temp }}/qa-vnd/

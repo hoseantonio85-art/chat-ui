@@ -1,16 +1,40 @@
 {
   "compilerOptions": {
-    "target": "ES2022", "lib": ["ES2022", "DOM"], "module": "ESNext", "moduleResolution": "Bundler",
-    "jsx": "react-jsx", "strict": true, "noEmit": true, "skipLibCheck": true,
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    "baseUrl": ".", "types": ["vite/client"],
+    "baseUrl": ".",
+    "types": [
+      "vite/client"
+    ],
     "paths": {
-      "@/*": ["../src/*"],
-      "@sber-orm/ui-kit": ["vendor/ui-kit/dist/index.d.ts"],
-      "@sber-orm/components": ["mocks/components.tsx"],
-      "react": ["node_modules/@types/react"],
-      "react/*": ["node_modules/@types/react/*"],
-      "vitest": ["node_modules/vitest"]
+      "@/*": [
+        "../src/*"
+      ],
+      "@sber-orm/ui-kit": [
+        "vendor/ui-kit/dist/index.d.ts"
+      ],
+      "@sber-orm/components": [
+        "mocks/components.tsx"
+      ],
+      "react": [
+        "node_modules/@types/react"
+      ],
+      "react/*": [
+        "node_modules/@types/react/*"
+      ],
+      "vitest": [
+        "node_modules/vitest"
+      ]
     }
   },
   "include": [
@@ -38,6 +62,7 @@
     "./scenarios.ts",
     "../src/components/Chat/MessageAddonContext.tsx",
     "./scenario-map/**/*.ts",
-    "./scenario-map/**/*.tsx"
+    "./scenario-map/**/*.tsx",
+    "./VndEntry.tsx"
   ]
 }
