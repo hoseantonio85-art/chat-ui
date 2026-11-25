@@ -225,9 +225,9 @@ export const scenarios: Scenario[] = [
   },
   {
     id:'vnd-to-be',
-    eyebrow:'ВНД · ответы кнопками',
-    title:'Проверка ВНД с выбором ответов',
-    description:'Загрузка, выбор стандарта, исправление замечаний и сохранение через кнопки в диалоге.',
+    eyebrow:'ВНД TO-BE · все варианты проверки',
+    title:'Проверка ВНД: с отклонениями и без',
+    description:'Одна карта: выбор стандарта, два исхода проверки, повторная проверка и все варианты сохранения.',
     accent:'mint',
     steps:[
       {id:'vnd-to-be.start', number:'01', title:'Прикрепить ВНД', actor:'Пользователь', kind:'entry',
@@ -238,14 +238,14 @@ export const scenarios: Scenario[] = [
         summary:'Под вопросом — четыре длинных наименования в светлом блоке выбора.',
         detail:'Нажмите любой пункт. Проверка начнётся сразу. Если прокрутить вопрос за пределы экрана, варианты будут доступны в виджете над полем ввода.',
         screen:'screens/vnd-to-be-02-standard.png', screenAlt:'Четыре стандарта для выбора нажатием', tags:['карточки выбора', 'один ответ']},
-      {id:'vnd-to-be.result', number:'03', title:'Исправить замечания', actor:'Агент', kind:'result',
+      {id:'vnd-to-be.result', number:'03', title:'Есть отклонения', actor:'Агент', kind:'result',
         summary:'Агент показывает расхождения и предлагает прикрепить исправленный документ.',
         detail:'Загрузите исправленный файл в живом экране. Повторная проверка использует уже выбранный стандарт.',
         screen:'screens/vnd-to-be-03-result.png', screenAlt:'Результат проверки с рекомендациями по исправлению', tags:['замечания', 'повторная проверка']},
-      {id:'vnd-to-be.save', number:'04', title:'Ответить на предложение сохранить', actor:'Пользователь', kind:'action',
+      {id:'vnd-to-be.save', number:'04', title:'После исправлений: сохранить', actor:'Пользователь', kind:'action',
         scopeNote:'Не входит в текущую задачу',
         summary:'Повторная проверка завершена. Под предложением сохранить — три фиолетовые кнопки.',
-        detail:'«Да, сохранить» сразу сохраняет исправленный файл в «Операционные риски». «Выбрать другую папку» открывает выбор папки. «Не сейчас» откладывает сохранение.',
+        detail:'«Да, сохранить» сразу сохраняет исправленный файл в «Стандарты». «Выбрать другую папку» открывает выбор папки. «Не сейчас» откладывает сохранение.',
         screen:'screens/vnd-to-be-04-save.png', screenAlt:'Вопрос о сохранении с тремя кнопками', tags:['действия', 'сохранение']},
       {id:'vnd-to-be.folder', number:'05', title:'Выбрать другую папку', actor:'Пользователь', kind:'action',
         scopeNote:'Не входит в текущую задачу',
@@ -262,6 +262,10 @@ export const scenarios: Scenario[] = [
         summary:'Агент подтверждает исправленную версию документа и папку сохранения.',
         detail:'Это результат нажатия «Да, сохранить». Вопрос закрыт, а свободный ввод остаётся доступным.',
         screen:'screens/vnd-to-be-07-saved.png', screenAlt:'Подтверждение сохранения исправленного ВНД', tags:['результат', 'база знаний']},
+      {id:'vnd-to-be.clean',number:'08',title:"Отклонений нет",actor:"Агент",kind:'result',summary:"Первая проверка успешна. Можно сразу сохранить исходный документ в «Стандарты».",detail:"Выберите «Да, сохранить», другую папку или «Не сейчас». Исправленная версия не нужна.",screen:'screens/vnd-to-be-08-clean.png',screenAlt:"Положительный результат первой проверки и предложение сохранить",tags:['без отклонений','сохранение']},
+      {id:'vnd-to-be.clean-folder',number:'09',title:"Без отклонений: другая папка",actor:"Пользователь",kind:'action',summary:"Выбор папки для исходного проверенного документа.",detail:"Подтвердите выбранную папку или отмените выбор. По умолчанию предложены «Стандарты».",screen:'screens/vnd-to-be-09-clean-folder.png',screenAlt:"Выбор папки после успешной первой проверки",tags:['без отклонений','сохранение']},
+      {id:'vnd-to-be.clean-deferred',number:'10',title:"Без отклонений: не сейчас",actor:"Пользователь",kind:'state',summary:"Проверка завершена, сохранение отложено.",detail:"Напишите «Вернуться к сохранению», чтобы вновь открыть варианты. Исходный документ сохранён в контексте чата.",screen:'screens/vnd-to-be-10-clean-deferred.png',screenAlt:"Отложенное сохранение документа без отклонений",tags:['без отклонений','сохранение']},
+      {id:'vnd-to-be.clean-saved',number:'11',title:"Исходный файл сохранён",actor:"Агент",kind:'result',summary:"Ассистент подтверждает сохранение исходного файла в «Стандарты».",detail:"Сохраняется тот же документ, который прошёл первую проверку. Повторная загрузка не требуется.",screen:'screens/vnd-to-be-11-clean-saved.png',screenAlt:"Подтверждение сохранения исходного ВНД в Стандарты",tags:['без отклонений','сохранение']},
     ],
   },
   {
@@ -367,6 +371,11 @@ export const toLivePreviewUrl = (baseUrl: string, stepId: string): string => {
   return `${baseUrl}?${params.toString()}`;
 };
 
+export const vndToBeTransitions = [["vnd-to-be.start","vnd-to-be.standard"],["vnd-to-be.standard","vnd-to-be.result"],["vnd-to-be.standard","vnd-to-be.clean"],["vnd-to-be.result","vnd-to-be.save"],["vnd-to-be.save","vnd-to-be.folder"],["vnd-to-be.save","vnd-to-be.deferred"],["vnd-to-be.save","vnd-to-be.saved"],["vnd-to-be.folder","vnd-to-be.saved"],["vnd-to-be.deferred","vnd-to-be.save"],["vnd-to-be.clean","vnd-to-be.clean-folder"],["vnd-to-be.clean","vnd-to-be.clean-deferred"],["vnd-to-be.clean","vnd-to-be.clean-saved"],["vnd-to-be.clean-folder","vnd-to-be.clean-saved"],["vnd-to-be.clean-deferred","vnd-to-be.clean"]] as const;
+export function getVndToBeNextSteps(stepId: string): ScenarioStep[] {
+  return vndToBeTransitions.flatMap(([from,to]) => { const step=from===stepId?getScenarioStep('vnd-to-be',to):undefined; return step?[step]:[]; });
+}
+
 export const settingsTransitions = [
   ['settings.history', 'settings.overview'],
   ['settings.overview', 'settings.confirm'],
@@ -385,13 +394,13 @@ export function getSettingsNextSteps(stepId: string): ScenarioStep[] {
 export function getAdjacentStep(scenarioId: ScenarioId, stepId: string, direction: -1 | 1): ScenarioStep | undefined {
   const scenario = getScenario(scenarioId);
   if (!scenario) return undefined;
-  if (scenarioId === 'settings') {
+  if (scenarioId === 'settings' || scenarioId === 'vnd-to-be') {
     const step = getScenarioStep(scenarioId, stepId) ?? scenario.steps[0];
     if (direction === 1) {
-      const next = getSettingsNextSteps(step.id);
+      const next = scenarioId === 'settings' ? getSettingsNextSteps(step.id) : getVndToBeNextSteps(step.id);
       return next.length === 1 ? next[0] : step;
     }
-    const previousId = settingsTransitions.find(([, to]) => to === step.id)?.[0];
+    const previousId = (scenarioId === 'settings' ? settingsTransitions : vndToBeTransitions).find(([, to]) => to === step.id)?.[0];
     return getScenarioStep(scenarioId, previousId ?? null) ?? step;
   }
   const index = Math.max(0, scenario.steps.findIndex(step => step.id === stepId));

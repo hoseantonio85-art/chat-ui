@@ -5,6 +5,7 @@ import {
   getInitialLocation,
   getScenarioStep,
   getSettingsNextSteps,
+  getVndToBeNextSteps,
   toLivePreviewUrl,
   toSearch,
 } from './model';
@@ -16,7 +17,7 @@ describe('scenario map model', () => {
 
     expect(new Set(ids).size).toBe(ids.length);
     expect(new Set(screens).size).toBe(screens.length);
-    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 5, 6, 8, 4, 5, 4, 7, 5, 4]);
+    expect(scenarios.map(scenario => scenario.steps.length)).toEqual([6, 5, 6, 8, 4, 5, 4, 11, 5, 4]);
     expect(scenarios.every(scenario => scenario.steps.every(step => step.screen.endsWith('.png')))).toBe(true);
   });
 
@@ -104,4 +105,13 @@ describe('scenario map model', () => {
     expect(getInitialLocation('?scenario=feedback-complaint&step=feedback.help&view=screens').stepId).toBe('feedback.help');
     expect(getInitialLocation('?scenario=feedback-positive&step=feedback.praise&view=story').stepId).toBe('feedback.praise');
   });
+});
+
+it('keeps both VND outcomes and save choices on one graph',()=>{
+  expect(getVndToBeNextSteps('vnd-to-be.standard').map(s=>s.id)).toEqual(['vnd-to-be.result','vnd-to-be.clean']);
+  expect(getVndToBeNextSteps('vnd-to-be.clean').map(s=>s.id)).toEqual(['vnd-to-be.clean-folder','vnd-to-be.clean-deferred','vnd-to-be.clean-saved']);
+  expect(getAdjacentStep('vnd-to-be','vnd-to-be.clean',-1)?.id).toBe('vnd-to-be.standard');
+  expect(getAdjacentStep('vnd-to-be','vnd-to-be.saved',1)?.id).toBe('vnd-to-be.saved');
+  expect(getAdjacentStep('vnd-to-be','vnd-to-be.clean-saved',1)?.id).toBe('vnd-to-be.clean-saved');
+  expect(getAdjacentStep('vnd-to-be','vnd-to-be.clean-deferred',1)?.id).toBe('vnd-to-be.clean');
 });

@@ -261,3 +261,17 @@ describe('atlas live preview states', () => {
     }
   });
 });
+
+it('previews a clean first check without inventing corrections',()=>{
+  const base=baseThreads();const before=structuredClone(base);
+  for(const id of ['vnd-to-be.clean','vnd-to-be.clean-folder','vnd-to-be.clean-deferred','vnd-to-be.clean-saved']){
+    const preview=createAtlasPreview(id,base,memory)!;const thread=preview.threads.find(t=>t.id==='vnd')!;
+    expect(thread.documentIds).toBe('["vnd-draft"]');expect(thread.scenario).toBe('vndCleanToBe');
+    expect(thread.messages.some(m=>m.text?.includes('В документе выявлены отклонения'))).toBe(false);
+    expect(thread.messages.some(m=>m.text?.includes('Загрузил исправленную версию'))).toBe(false);
+    expect(thread.messages.some(m=>m.text?.includes('Стандарты'))).toBe(true);
+  }
+  expect(createAtlasPreview('vnd-to-be.clean-folder',base,memory)?.openVndFolder).toBe(true);
+  expect(createAtlasPreview('vnd-to-be.clean-saved',base,memory)?.threads.find(t=>t.id==='vnd')).toMatchObject({folder:'Стандарты',jobState:'saved'});
+  expect(base).toEqual(before);
+});

@@ -1,10 +1,10 @@
 import { ERoles, type IMessage } from '@/types';
 import type { AtlasPreview, AtlasPreviewThread } from './atlasPreview';
 import { explainedReply } from './scenarioExplanations';
-import { vndCorrectedAnswer, vndResultAnswer, vndStandards, vndToBeStandardPrompt } from './scenarios';
+import { vndCleanAnswer, vndCorrectedAnswer, vndResultAnswer, vndStandards, vndToBeStandardPrompt } from './scenarios';
 import { vndSaveQuestion, type VndStage } from './VndBackground.model';
 
-export const vndToBeSteps = ['vnd-to-be.start', 'vnd-to-be.standard', 'vnd-to-be.result', 'vnd-to-be.save', 'vnd-to-be.folder', 'vnd-to-be.deferred', 'vnd-to-be.saved'] as const;
+export const vndToBeSteps = ['vnd-to-be.start', 'vnd-to-be.standard', 'vnd-to-be.result', 'vnd-to-be.save', 'vnd-to-be.folder', 'vnd-to-be.deferred', 'vnd-to-be.saved','vnd-to-be.clean','vnd-to-be.clean-folder','vnd-to-be.clean-deferred','vnd-to-be.clean-saved'] as const;
 export type VndToBeStepId = typeof vndToBeSteps[number];
 
 export function createVndToBePreview(stepId:VndToBeStepId, baseThreads:AtlasPreviewThread[], memory:string[]):AtlasPreview {
@@ -21,6 +21,9 @@ export function createVndToBePreview(stepId:VndToBeStepId, baseThreads:AtlasPrev
     runs[run.runId] = run;
   };
   const index = vndToBeSteps.indexOf(stepId);
+  const clean = stepId.startsWith('vnd-to-be.clean');
+  const saved = stepId === 'vnd-to-be.saved' || stepId === 'vnd-to-be.clean-saved';
+  const scenario = clean ? 'vndCleanToBe' as const : 'vndWelcomeToBe' as const;
   let stage:VndStage = 'start';
   add('welcome', ERoles.bot, 'Здравствуйте! Я помогу проверить ваш ВНД на соответствие стандартам группы. Прикрепите документ — затем я предложу выбрать групповой стандарт для проверки.');
   if (index >= 1) {
@@ -30,34 +33,35 @@ export function createVndToBePreview(stepId:VndToBeStepId, baseThreads:AtlasPrev
   }
   if (index >= 2) {
     add('choice', ERoles.user, vndStandards[1]);
-    result('result', vndResultAnswer, 'Сверяю документ с требованиями');
+    result('result', clean ? vndCleanAnswer : vndResultAnswer, 'Сверяю документ с требованиями');
     stage = 'reviewed';
   }
-  if (index >= 3) {
+  if (index >= 3 && !clean) {
     add('corrected-upload', ERoles.user, 'Загрузил исправленную версию. Проверь повторно.', {fileIds:'["vnd-corrected"]'});
     result('corrected', vndCorrectedAnswer, 'Проверяю внесённые изменения');
     add('save', ERoles.bot, vndSaveQuestion, {vndAddon:'save-confirmation'});
     stage = 'confirmSave';
   }
-  if (stepId === 'vnd-to-be.deferred') {
+  if (clean) { add('save', ERoles.bot, vndSaveQuestion, {vndAddon:'save-confirmation'}); stage = 'confirmSave'; }
+  if (stepId === 'vnd-to-be.deferred' || stepId === 'vnd-to-be.clean-deferred') {
     add('decline', ERoles.user, 'Не сейчас');
     add('deferred', ERoles.bot, 'ВНД пока не сохранён. Напишите «Вернуться к сохранению», чтобы снова открыть варианты, или укажите название папки.');
     stage = 'saveDeferred';
   }
-  if (stepId === 'vnd-to-be.saved') {
+  if (saved) {
     add('confirm', ERoles.user, 'Да, сохранить');
-    add('saved', ERoles.bot, 'Сохранил «Регламент управления операционными рисками — исправленный.docx» в базу знаний, в папку «Стандарты».');
+    add('saved', ERoles.bot, clean ? 'Сохранил «Регламент управления операционными рисками.docx» в базу знаний, в папку «Стандарты».' : 'Сохранил «Регламент управления операционными рисками — исправленный.docx» в базу знаний, в папку «Стандарты».');
     stage = 'complete';
   }
   return {
     stepId,
-    activeThreadId:'vnd', scenario:'vndWelcomeToBe', agentMemory:[...memory],
-    openVndFolder:stepId === 'vnd-to-be.folder',
+    activeThreadId:'vnd', scenario, agentMemory:[...memory],
+    openVndFolder:stepId === 'vnd-to-be.folder' || stepId === 'vnd-to-be.clean-folder',
     threads:baseThreads.map(thread => thread.id === 'vnd' ? {
-      ...thread, scenario:'vndWelcomeToBe', title:'Проверка ВНД · варианты ответа', messages, runs, vndStage:stage,
-      documentIds:index >= 3 ? '["vnd-corrected"]' : index >= 1 ? '["vnd-draft"]' : undefined,
-      jobState:stepId === 'vnd-to-be.saved' ? 'saved' : undefined,
-      folder:stepId === 'vnd-to-be.saved' ? 'Стандарты' : undefined,
+      ...thread, scenario, title:'Проверка ВНД · варианты ответа', messages, runs, vndStage:stage,
+      documentIds:!clean && index >= 3 ? '["vnd-corrected"]' : index >= 1 ? '["vnd-draft"]' : undefined,
+      jobState:saved ? 'saved' : undefined,
+      folder:saved ? 'Стандарты' : undefined,
       agentState:undefined, agentUnread:false,
     } : {...thread}),
   };

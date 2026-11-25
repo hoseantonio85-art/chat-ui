@@ -6,6 +6,8 @@ import {
   getScenario,
   getScenarioStep,
   getSettingsNextSteps,
+  getVndToBeNextSteps,
+  vndToBeTransitions,
   scenarios,
   settingsTransitions,
   toLivePreviewUrl,
@@ -26,7 +28,7 @@ const SCREEN_POSITIONS = [
 ];
 const SCREEN_BASE = `${import.meta.env.BASE_URL}scenario-map/`;
 const SCENARIO_LABELS: Record<ScenarioId, string> = {
-  'vnd-to-be':'ВНД · ответы кнопками',
+  'vnd-to-be':'ВНД TO-BE · все варианты',
   reasoning:'Ответ с рассуждениями',
   'chat-rename':'Переименование диалога',
   vnd:'Проверка ВНД', 'reply-ready':'Ответ готов в другом чате', settings:'Настройки', csi:'CSI после ВНД', 'csi-direct':'CSI по запросу',
@@ -124,11 +126,18 @@ export function App() {
   const isStory = location.view === 'story';
   const isSettings = scenario.id === 'settings';
   const isReplyReady = scenario.id === 'reply-ready';
-  const fitWholeFlow = isSettings || isReplyReady;
+  const isVndToBe = scenario.id === 'vnd-to-be';
+  const fitWholeFlow = isSettings || isReplyReady || isVndToBe;
   const cardSize = isStory ? { width: 330, height: 250 } : { width: 510, height: 405 };
   const column = cardSize.width + 64;
   const row = cardSize.height + 56;
-  const positions = isSettings ? [
+  const positions = isVndToBe ? [
+    {x:0,y:row*1.5},{x:column,y:row*1.5},
+    {x:column*2,y:row*.5},{x:column*3,y:row*.5},
+    {x:column*4,y:0},{x:column*4,y:row},{x:column*5,y:row*.5},
+    {x:column*2,y:row*2.5},{x:column*3,y:row*2},
+    {x:column*3,y:row*3},{x:column*4,y:row*2.5},
+  ] : isSettings ? [
     { x: 0, y: row / 2 }, { x: column, y: row / 2 },
     { x: column * 2, y: 0 }, { x: column * 3, y: 0 },
     { x: column * 2, y: row }, { x: column * 3, y: row },
@@ -136,13 +145,13 @@ export function App() {
     { x: 0, y: 0 }, { x: column, y: 0 }, { x: column * 2, y: 0 },
     { x: column * 2, y: row }, { x: column, y: row },
   ] : isStory ? STORY_POSITIONS : SCREEN_POSITIONS;
-  const boardSize = isSettings
+  const boardSize = isVndToBe ? {width:column*5+cardSize.width,height:row*3+cardSize.height} : isSettings
     ? { width: column * 3 + cardSize.width, height: row + cardSize.height }
     : isReplyReady
       ? { width: column * 2 + cardSize.width, height: row + cardSize.height }
       : isStory ? { width: 1640, height: 790 } : { width: 2160, height: 1090 };
-  const selectedBranches = isSettings ? getSettingsNextSteps(selectedStep.id) : [];
-  const liveBranches = isSettings && fullScreenStep ? getSettingsNextSteps(fullScreenStep.id) : [];
+  const selectedBranches = isSettings ? getSettingsNextSteps(selectedStep.id) : isVndToBe ? getVndToBeNextSteps(selectedStep.id) : [];
+  const liveBranches = fullScreenStep ? isSettings ? getSettingsNextSteps(fullScreenStep.id) : isVndToBe ? getVndToBeNextSteps(fullScreenStep.id) : [] : [];
 
   const updateLocation = useCallback((change: Partial<MapLocation>) => {
     setLocation(current => {
@@ -325,8 +334,8 @@ export function App() {
   const stepPoints = scenario.steps.map((_, index) => ({ ...positions[index], ...cardSize }));
   const connectorPoints = isReplyReady ? stepPoints : [rootPosition, ...stepPoints];
   const settingsPoints = new Map(scenario.steps.map((step, index) => [step.id, stepPoints[index]]));
-  const connections = isSettings
-    ? settingsTransitions.map(([from, to]) => [settingsPoints.get(from)!, settingsPoints.get(to)!])
+  const connections = isSettings || isVndToBe
+    ? (isVndToBe ? vndToBeTransitions : settingsTransitions).map(([from, to]) => [settingsPoints.get(from)!, settingsPoints.get(to)!])
     : connectorPoints.slice(0, -1).map((from, index) => [from, connectorPoints[index + 1]]);
   const isAtBoundary = (step: ScenarioStep, direction: -1 | 1) =>
     getAdjacentStep(scenario.id, step.id, direction)?.id === step.id;
@@ -449,7 +458,7 @@ export function App() {
           <Icon name={isStory ? 'screens' : 'story'} />
           {isStory ? 'Показать на карте экранов' : 'Показать в сценарии'}
         </button>
-        {selectedBranches.length > 1 && <div className="branch-choices" role="group" aria-label="Действия с памятью">
+        {selectedBranches.length > 1 && <div className="branch-choices" role="group" aria-label={isVndToBe ? "Варианты продолжения ВНД" : "Действия с памятью"}>
           {selectedBranches.map(step => <button key={step.id} onClick={() => updateLocation({ stepId: step.id })}>{step.title}</button>)}
         </div>}
         <div className="step-navigation">
@@ -473,7 +482,7 @@ export function App() {
               <button ref={modalCloseRef} onClick={closeFullScreen} aria-label="Закрыть просмотр"><Icon name="close" /></button>
             </div>
           </header>
-          {liveBranches.length > 1 && <div className="branch-choices modal-branches" role="group" aria-label="Действия с памятью">
+          {liveBranches.length > 1 && <div className="branch-choices modal-branches" role="group" aria-label={isVndToBe ? "Варианты продолжения ВНД" : "Действия с памятью"}>
             {liveBranches.map(step => <button key={step.id} onClick={() => showFullScreenStep(step)}>{step.title}</button>)}
           </div>}
           <div className="full-screen-stage">
