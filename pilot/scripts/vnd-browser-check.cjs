@@ -20,6 +20,7 @@ require('node:fs').mkdirSync(output, {recursive:true});
     await page.getByRole('textbox',{name:'Запрос помощнику'}).press('Enter');
     await page.getByText('Проверь мой регламент',{exact:true}).waitFor();
     await closeChat();
+    await page.getByRole('textbox',{name:'Запрос помощнику'}).click(); await closeChat();
     await open('Открыть чат'); await closeChat();
     await welcome('Проверить стандарты');
     await open('Новости'); await page.getByRole('dialog',{name:'Новости'}).waitFor();

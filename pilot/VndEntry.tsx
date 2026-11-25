@@ -24,7 +24,7 @@ export function VndEntry({onOpen}: {onOpen: (welcome: boolean, query?: string) =
         {hotspot('Проверить стандарты', [2450,560,806,104], () => onOpen(true))}
         {hotspot('Открыть чат', [780,376,160,144], () => onOpen(false))}
         <form className="vnd-query" onSubmit={e => {e.preventDefault(); onOpen(false,query.trim()); setQuery('');}}>
-          <input aria-label="Запрос помощнику" placeholder="Я твой ИИ помощник" value={query} onChange={e => setQuery(e.target.value)}/>
+          <input aria-label="Запрос помощнику" placeholder="Я твой ИИ помощник" onClick={() => {onOpen(false,query.trim()); setQuery('');}} value={query} onChange={e => setQuery(e.target.value)}/>
         </form>
       </> : <>
         {hotspot('Главная', [48,368,80,80], () => go('home'))}
